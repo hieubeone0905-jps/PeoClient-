@@ -153,7 +153,7 @@ public class PeoClient implements ClientModInitializer {
                 if(blacklisted(id)){drop(mc,i);return;}}
             // Keep configured hotbar categories; then remove obvious duplicates/excess.
             Map<String,Integer> counts=new HashMap<>();
-            for(int i:9;i<36;i++){ItemStack s=mc.player.getInventory().getStack(i);if(s.isEmpty())continue;
+            for(int i=9;i<36;i++){ItemStack s=mc.player.getInventory().getStack(i);if(s.isEmpty())continue;
                 String cat=category(s); counts.merge(cat,s.getCount(),Integer::sum);}
             for(int i=9;i<36;i++){ItemStack s=mc.player.getInventory().getStack(i);if(s.isEmpty())continue;
                 String cat=category(s);int max=switch(cat){case"BLOCK"->CFG.maxBlocks;case"ARROW"->CFG.maxArrows;case"THROWABLE"->CFG.maxThrowables;case"FOOD"->CFG.maxFoods;case"WATER"->CFG.maxWaterBuckets;case"LAVA"->CFG.maxLavaBuckets;case"MILK"->CFG.maxMilkBuckets;default->Integer.MAX_VALUE;};
