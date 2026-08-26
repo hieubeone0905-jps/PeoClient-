@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "peoclient",
+  "version": "${version}",
+  "name": "PeoClient",
+  "description": "PeoClient - Xray, Nuker, Fullbright and InventoryCleaner for Fabric 1.21.4.",
+  "authors": [
+    "PeoClient"
+  ],
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.peoclient.PeoClient"
+    ]
+  },
+  "mixins": [
+    "peoclient.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
