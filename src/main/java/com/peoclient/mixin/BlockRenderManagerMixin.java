@@ -8,6 +8,7 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.WorldView;
 import net.minecraft.fluid.FluidState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -25,8 +26,10 @@ public class BlockRenderManagerMixin {
         boolean ore = PeoClient.CFG.xrayBlocks.contains(net.minecraft.registry.Registries.BLOCK.getId(state.getBlock()).toString());
         if (!ore) {
             if (PeoClient.CFG.xrayHideSurface) {
-                int top = world.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ()) - 1;
-                if (pos.getY() >= top) { ci.cancel(); return; }
+                if (world instanceof WorldView worldView) {
+                    int top = worldView.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ()) - 1;
+                    if (pos.getY() >= top) { ci.cancel(); return; }
+                }
             }
             PEO_NON_XRAY.set(PeoClient.CFG.xrayOpacity);
         }

@@ -64,6 +64,6 @@ public class PoeScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal("Hotbar defaults: Weapon/Bow/Pickaxe/Axe/None/Potion/Food/Block/Block"),b->{PeoClient.CFG.slotItems=new String[]{"WEAPON","BOW","PICKAXE","AXE","NONE","POTION","FOOD","BLOCK","BLOCK"};rebuild();}).dimensions(x,y+78,300,20).build());
         addDrawableChild(ButtonWidget.builder(Text.literal("Offhand: "+PeoClient.CFG.offHandItem),b->{PeoClient.CFG.offHandItem=PeoClient.CFG.offHandItem.equals("SHIELD")?"WEAPON":"SHIELD";rebuild();}).dimensions(x,y+103,145,20).build());
     }
-    @Override public void render(DrawContext c,int mouseX,int mouseY,float delta){c.drawCenteredTextWithShadow(textRenderer,title,getWidth()/2,12,0xffffff);super.render(c,mouseX,mouseY,delta);}
+    @Override public void render(DrawContext c,int mouseX,int mouseY,float delta){c.drawCenteredTextWithShadow(textRenderer,title,width/2,12,0xffffff);super.render(c,mouseX,mouseY,delta);}
     @Override public boolean shouldPause(){return false;}
 }
