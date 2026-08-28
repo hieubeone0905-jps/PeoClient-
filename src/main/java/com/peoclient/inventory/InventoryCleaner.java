@@ -52,7 +52,7 @@ public final class InventoryCleaner {
         // 1) Explicit blacklist always wins.
         for (int slot = 0; slot < 36; slot++) {
             ItemStack stack = mc.player.getInventory().getStack(slot);
-            if (!stack.isEmpty() && PeoClient.CFG.cleanerBlacklistSet.contains(id(stack))) {
+            if (!stack.isEmpty() && (PeoClient.CFG.cleanerBlacklistSet.contains(id(stack)) || blacklistContains(id(stack)))) {
                 drop(mc, playerInventoryScreenSlot(slot));
                 cooldown = PeoClient.CFG.cleanerActionDelay;
                 return;
@@ -76,7 +76,8 @@ public final class InventoryCleaner {
         // dropping low-value leftovers.
         if (PeoClient.CFG.cleanerMergeStacks && mergeOne(mc, entries)) return;
 
-        // 5) Fill configured hotbar positions with the highest-scoring compatible item.
+        // 5) Fill the configured off-hand target first, then hotbar positions.
+        if (sortOffhand(mc, entries)) return;
         if (sortHotbar(mc, entries)) return;
     }
 
@@ -141,6 +142,24 @@ public final class InventoryCleaner {
         return false;
     }
 
+    private static boolean sortOffhand(MinecraftClient mc, List<Entry> entries) {
+        String target = PeoClient.CFG.offHandItem;
+        if (target == null || target.equalsIgnoreCase("NONE") || target.equalsIgnoreCase("IGNORE")) return false;
+        ItemStack current = mc.player.getOffHandStack();
+        if (!current.isEmpty() && matches(target, current)) return false;
+
+        Entry best = entries.stream()
+                .filter(e -> e.slot >= 9 && matches(target, e.stack))
+                .max(Comparator.comparingInt(e -> e.score))
+                .orElse(null);
+        if (best == null) return false;
+
+        mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId,
+                playerInventoryScreenSlot(best.slot), 40, SlotActionType.SWAP, mc.player);
+        cooldown = PeoClient.CFG.cleanerActionDelay + 1;
+        return true;
+    }
+
     private static boolean sortHotbar(MinecraftClient mc, List<Entry> entries) {
         String[] targets = PeoClient.CFG.slotItems;
         for (int hotbar = 0; hotbar < 9; hotbar++) {
@@ -172,8 +191,7 @@ public final class InventoryCleaner {
             case WATER -> PeoClient.CFG.maxWaterBuckets;
             case LAVA -> PeoClient.CFG.maxLavaBuckets;
             case MILK -> PeoClient.CFG.maxMilkBuckets;
-            case POTION -> PeoClient.CFG.maxPotions;
-            case PEARL -> PeoClient.CFG.maxPearls;
+            case POTION, PEARL -> 1;
             default -> Integer.MAX_VALUE;
         };
     }
@@ -224,6 +242,14 @@ public final class InventoryCleaner {
 
     private static int playerInventoryScreenSlot(int playerSlot) {
         return playerSlot < 9 ? 36 + playerSlot : playerSlot;
+    }
+
+    private static boolean blacklistContains(String itemId) {
+        String raw = PeoClient.CFG.itemsBlacklist == null ? "" : PeoClient.CFG.itemsBlacklist;
+        for (String token : raw.split("[,\\n\\s]+")) {
+            if (!token.isBlank() && token.trim().equals(itemId)) return true;
+        }
+        return false;
     }
 
     private static String id(ItemStack s) {

@@ -105,23 +105,38 @@ public final class PeoClient implements ClientModInitializer {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
 
         // Wurst/LiquidBounce-style X-Ray settings.
+        // Wurst-style X-Ray settings: block list, exposed-only and opacity.
+        // Fluids are included in the target list, matching Wurst's default X-Ray list.
         public boolean xrayFullBright = true;
         public boolean xrayExposedOnly = false;
-        public boolean xrayFluids = false;
+        public boolean xrayFluids = true;
         public int xrayBackgroundOpacity = 0;
 
         public Set<String> xrayBlocks = new LinkedHashSet<>(Arrays.asList(
-                "minecraft:coal_ore", "minecraft:copper_ore", "minecraft:iron_ore",
-                "minecraft:gold_ore", "minecraft:lapis_ore", "minecraft:redstone_ore",
-                "minecraft:diamond_ore", "minecraft:emerald_ore",
-                "minecraft:deepslate_coal_ore", "minecraft:deepslate_copper_ore",
-                "minecraft:deepslate_iron_ore", "minecraft:deepslate_gold_ore",
-                "minecraft:deepslate_lapis_ore", "minecraft:deepslate_redstone_ore",
-                "minecraft:deepslate_diamond_ore", "minecraft:deepslate_emerald_ore",
-                "minecraft:nether_gold_ore", "minecraft:nether_quartz_ore",
-                "minecraft:ancient_debris", "minecraft:spawner",
-                "minecraft:chest", "minecraft:trapped_chest", "minecraft:ender_chest",
-                "minecraft:shulker_box", "minecraft:barrel"
+                "minecraft:amethyst_cluster", "minecraft:ancient_debris", "minecraft:anvil",
+                "minecraft:beacon", "minecraft:bone_block", "minecraft:bookshelf",
+                "minecraft:brewing_stand", "minecraft:budding_amethyst", "minecraft:chain_command_block",
+                "minecraft:chest", "minecraft:coal_block", "minecraft:coal_ore", "minecraft:command_block",
+                "minecraft:copper_ore", "minecraft:crafter", "minecraft:crafting_table",
+                "minecraft:creaking_heart", "minecraft:decorated_pot", "minecraft:deepslate_coal_ore",
+                "minecraft:deepslate_copper_ore", "minecraft:deepslate_diamond_ore",
+                "minecraft:deepslate_emerald_ore", "minecraft:deepslate_gold_ore",
+                "minecraft:deepslate_iron_ore", "minecraft:deepslate_lapis_ore",
+                "minecraft:deepslate_redstone_ore", "minecraft:diamond_block", "minecraft:diamond_ore",
+                "minecraft:dispenser", "minecraft:dropper", "minecraft:emerald_block",
+                "minecraft:emerald_ore", "minecraft:enchanting_table", "minecraft:end_portal",
+                "minecraft:end_portal_frame", "minecraft:ender_chest", "minecraft:furnace",
+                "minecraft:glowstone", "minecraft:gold_block", "minecraft:gold_ore", "minecraft:hopper",
+                "minecraft:iron_block", "minecraft:iron_ore", "minecraft:ladder", "minecraft:lapis_block",
+                "minecraft:lapis_ore", "minecraft:lava", "minecraft:lodestone",
+                "minecraft:mossy_cobblestone", "minecraft:nether_gold_ore", "minecraft:nether_portal",
+                "minecraft:nether_quartz_ore", "minecraft:raw_copper_block", "minecraft:raw_gold_block",
+                "minecraft:raw_iron_block", "minecraft:redstone_block", "minecraft:redstone_ore",
+                "minecraft:repeating_command_block", "minecraft:sculk_catalyst", "minecraft:sculk_sensor",
+                "minecraft:sculk_shrieker", "minecraft:spawner", "minecraft:suspicious_gravel",
+                "minecraft:suspicious_sand", "minecraft:tnt", "minecraft:torch",
+                "minecraft:trapped_chest", "minecraft:trial_spawner", "minecraft:vault",
+                "minecraft:wall_torch", "minecraft:water"
         ));
 
         // BleachHack-inspired Nuker settings.
@@ -151,11 +166,10 @@ public final class PeoClient implements ClientModInitializer {
         public boolean cleanerGreedy = true;
         public boolean cleanerMergeStacks = true;
         public boolean cleanerTouchHotbar = false;
-        public int cleanerActionDelay = 3;
+        public int cleanerActionDelay = 0;
         public int cleanerAckTimeout = 30;
         public int maxBlocks = 512, maxArrows = 128, maxThrowables = 64, maxFoods = 200;
         public int maxWaterBuckets = 2, maxLavaBuckets = 2, maxMilkBuckets = 2;
-        public int maxPotions = 16, maxPearls = 16;
         public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
         public String itemsBlacklist = "";
         public String offHandItem = "SHIELD";
@@ -215,7 +229,7 @@ public final class PeoClient implements ClientModInitializer {
                 maxBlocks = c.maxBlocks; maxArrows = c.maxArrows;
                 maxThrowables = c.maxThrowables; maxFoods = c.maxFoods;
                 maxWaterBuckets = c.maxWaterBuckets; maxLavaBuckets = c.maxLavaBuckets;
-                maxMilkBuckets = c.maxMilkBuckets; maxPotions = c.maxPotions; maxPearls = c.maxPearls;
+                maxMilkBuckets = c.maxMilkBuckets;
                 itemsBlacklist = c.itemsBlacklist; offHandItem = c.offHandItem;
             } catch (Exception ignored) {
             }
@@ -234,7 +248,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class FullbrightLogic {
-        private static double currentGamma = 1.0;
+        private static double originalGamma = 1.0;
         private static boolean captured;
 
         private FullbrightLogic() {}
@@ -242,40 +256,46 @@ public final class PeoClient implements ClientModInitializer {
         public static void tick(MinecraftClient mc) {
             if (mc.player == null) return;
 
-            if (CFG.fullbright && !captured) {
-                currentGamma = mc.options.getGamma().getValue();
+            boolean gammaActive = CFG.fullbright && "Gamma".equalsIgnoreCase(CFG.fullbrightMethod);
+            boolean nightVisionActive = CFG.fullbright && "Night Vision".equalsIgnoreCase(CFG.fullbrightMethod);
+            boolean xrayBrightness = CFG.xray;
+            boolean brightnessActive = gammaActive || nightVisionActive || xrayBrightness;
+
+            if (brightnessActive && !captured) {
+                originalGamma = mc.options.getGamma().getValue();
                 captured = true;
             }
 
-            boolean xrayBright = CFG.xray && CFG.xrayFullBright;
-            boolean gamma = (CFG.fullbright && "Gamma".equalsIgnoreCase(CFG.fullbrightMethod)) || xrayBright;
-            boolean nv = CFG.fullbright && "Night Vision".equalsIgnoreCase(CFG.fullbrightMethod);
-
-            if (gamma) {
-                double target = MathHelper.clamp(CFG.fullbrightBrightness, 1.0, 16.0);
+            // Wurst's Gamma method forces brightness to 1600%, with optional 0.5-step fade.
+            if (gammaActive || xrayBrightness) {
                 double old = mc.options.getGamma().getValue();
-                double next = CFG.fullbrightFade
-                        ? old + MathHelper.clamp(target - old, -0.5, 0.5)
-                        : target;
+                double next = CFG.fullbrightFade && Math.abs(old - 16.0) > 0.5
+                        ? old + (old < 16.0 ? 0.5 : -0.5)
+                        : 16.0;
                 GammaUtil.forceSet(mc, next);
                 if (mc.player.hasStatusEffect(StatusEffects.NIGHT_VISION))
                     mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
-            } else if (nv) {
-                mc.player.addStatusEffect(new StatusEffectInstance(
-                        StatusEffects.NIGHT_VISION, 1337, 0, false, false, false));
-                if (captured) GammaUtil.forceSet(mc, currentGamma);
-            } else {
-                restore(mc);
+                return;
             }
+
+            // Keep the alternate method available, but do not touch inventory or server state.
+            if (nightVisionActive) {
+                mc.player.addStatusEffect(new StatusEffectInstance(
+                        StatusEffects.NIGHT_VISION, 20, 0, false, false, false));
+                if (captured) GammaUtil.forceSet(mc, originalGamma);
+                return;
+            }
+
+            restore(mc);
         }
 
         public static void restore(MinecraftClient mc) {
-            if (mc.player != null) mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
+            if (mc.player != null && mc.player.hasStatusEffect(StatusEffects.NIGHT_VISION))
+                mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
             if (captured) {
-                double target = MathHelper.clamp(CFG.fullbrightDefaultBrightness, 0.0, 1.0);
-                GammaUtil.forceSet(mc, target);
+                GammaUtil.forceSet(mc, MathHelper.clamp(originalGamma, 0.0, 16.0));
+                captured = false;
             }
-            captured = false;
         }
     }
 
@@ -455,6 +475,8 @@ public final class PeoClient implements ClientModInitializer {
             // and only currently enabled modules listed underneath it.
             int left = 8;
             String title = "PeoClient 1.21.4 V1";
+            int titleW = mc.textRenderer.getWidth(title) + 10;
+            d.fill(left - 4, 4, left + titleW, 20, 0x78070B10);
             d.drawTextWithShadow(mc.textRenderer, title, left, 8, 0xFFFFFFFF);
 
             List<String> active = new ArrayList<>();
@@ -463,18 +485,20 @@ public final class PeoClient implements ClientModInitializer {
             if (CFG.nuker) active.add("Nuker [" + CFG.nukerMode + "]");
             if (CFG.cleaner) active.add("InventoryCleaner");
 
-            // The list starts directly below the title. When a module is disabled
-            // it is removed on the next HUD render automatically.
-            int y = 22;
+            // Wurst-like readable top-left module list: strong shadow, dark backing,
+            // and enough vertical spacing that enabled modules never overlap.
+            int y = 23;
             for (String name : active) {
-                int color = switch (name.split(" ")[0]) {
-                    case "X-Ray" -> 0xFF40C8FF;
-                    case "Fullbright" -> 0xFF70FF70;
-                    case "Nuker" -> 0xFFFFB000;
-                    default -> 0xFFFF70FF;
+                int color = switch (name.startsWith("X-Ray") ? "X-Ray" : name.startsWith("Fullbright") ? "Fullbright" : name.startsWith("Nuker") ? "Nuker" : "InventoryCleaner") {
+                    case "X-Ray" -> 0xFF43D8FF;
+                    case "Fullbright" -> 0xFF71FF78;
+                    case "Nuker" -> 0xFFFFB21C;
+                    default -> 0xFFFF63E8;
                 };
+                int w = mc.textRenderer.getWidth(name) + 8;
+                d.fill(left - 4, y - 2, left + w, y + 11, 0x66070B10);
                 d.drawTextWithShadow(mc.textRenderer, name, left, y, color);
-                y += 13;
+                y += 15;
             }
         }
     }

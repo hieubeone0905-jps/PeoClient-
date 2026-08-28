@@ -1,11 +1,9 @@
-# Third-party source references
+# Third-party source / design references
 
-PeoClient 1.21.4 v1 was adapted using the source projects supplied for this task:
+PeoClient V1 was adapted using the user-supplied source archives:
 
-- BleachHack 1.20.4 — GPL-3.0
-- LiquidBounce nextgen — GPL-3.0
-- Wurst 7 — GPL-3.0 (behavior/UI reference only in this version)
+- BleachHack 1.20.4 — GPLv3. The supplied Nuker setting layout and behavior were used as the porting reference.
+- LiquidBounce nextgen — GPLv3. The supplied InventoryCleaner setting layout and cleanup workflow were used as the porting reference.
+- Wurst — GPLv3. Wurst-style Fullbright/X-Ray settings and the Hub/HUD presentation were used as behavioral/UI references. No Wurst source file is copied into this project.
 
-This version does not claim that the complete BleachHack or LiquidBounce source trees were copied verbatim. The module behavior and settings were adapted to PeoClient's Java/Fabric 1.21.4 architecture.
-
-If GPL source code is copied into the project in a later revision, retain the original copyright/license notices and comply with GPLv3 source-distribution requirements.
+PeoClient must preserve the applicable license obligations for any GPL-covered source that is directly incorporated into a distribution.

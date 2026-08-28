@@ -3,9 +3,13 @@
   "package": "com.peoclient.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "ChunkOcclusionDataBuilderMixin",
+    "ParticleManagerMixin",
     "BlockRenderManagerMixin",
     "SimpleOptionAccessor",
     "ClientPlayNetworkHandlerMixin"
   ],
-  "injectors": {"defaultRequire": 1}
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

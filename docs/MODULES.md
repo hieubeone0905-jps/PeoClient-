@@ -1,44 +1,10 @@
-# PeoClient module specification
+# PeoClient 1.21.4 V1 modules
 
-## X-Ray
-Settings currently exposed by the source:
-- Enabled
-- Target block IDs
-- Fluids
-- Opacity mode
-- Alpha (0-255)
-- Hide surface
+The V1 Hub exposes four implemented modules:
 
-The default ore list includes overworld ores, deepslate ores, ancient debris, nether gold and common ore blocks.
+- **Fullbright** — Wurst-style settings: `Method (Gamma/Night Vision)`, `Fade`, `Default brightness`. Gamma mode forces brightness to 16.0 (1600%) and restores the captured pre-enable value.
+- **X-Ray** — Wurst-style settings: `Ores`, `Only show exposed`, `Opacity`. The default target list follows Wurst's 1.21.4-era X-Ray list, including ores, chests, spawners and utility blocks.
+- **Nuker [Multi]** — settings ported from the supplied BleachHack 1.20.4 Nuker: `Mode`, `Multi`, `Cooldown`, `Shape`, `Range`, `Sort`, `Filter`, filter mode/list, `Raycast`, `Flatten`, `Rotate`, `NoParticles`, `Highlight`, highlight mode/color concept, `RangeHighlight`, width/color concept.
+- **InventoryCleaner** — settings and workflow adapted from the supplied LiquidBounce nextgen module: category quotas, blacklist, greedy mode, offhand target and nine hotbar targets, plus merge/sort/disposal ordering. Inventory disposal waits for authoritative server slot updates to reduce ghost-item corrections.
 
-## Fullbright
-- Mode: Gamma / Potion
-- Gamma: 1-12
-- Original gamma is saved before enabling gamma mode and restored after disabling.
-- Potion mode refreshes Night Vision while enabled.
-
-## Nuker
-- Mode: Normal / Survival Multi / Multi / Instant
-- Range
-- Shape: Cube / Sphere
-- Sort: Closest / Furthest / Softest / Hardest / None
-- Filter + whitelist
-- Raycast
-- Flatten
-- Multi count
-- Cooldown
-- Block filter string
-
-## InventoryCleaner
-The implementation follows the same high-level workflow as a modern inventory cleaner without copying another client's implementation:
-1. Dispose explicitly blacklisted items.
-2. Respect per-category stack limits.
-3. Preserve useful combat/tools/food categories.
-4. Fill configured hotbar targets from the main inventory.
-5. Save settings to config/peoclient.json.
-
-Hotbar target categories:
-WEAPON, BOW, PICKAXE, AXE, NONE, POTION, FOOD, BLOCK, BLOCK
-
-Offhand target:
-SHIELD or WEAPON
+The other names in the Hub are currently presentation-only placeholders and are not advertised as implemented modules.

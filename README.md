@@ -4,7 +4,7 @@ Fabric client/mod project for Minecraft 1.21.4.
 
 ## v1 changes
 
-- Wurst-style Hub layout: left hack list, searchable 3-column module grid, right-side settings panel.
+- Wurst-style Hub layout: left hack list, detailed settings panel immediately beside it on the left, searchable 3-column module grid.
 - `Right Shift` opens the Hub.
 - Each implemented module can be toggled and rebound from the settings panel.
 - HUD shows `PeoClient 1.21.4 v1` and only currently enabled modules.
@@ -14,18 +14,19 @@ Fabric client/mod project for Minecraft 1.21.4.
 ### X-Ray
 Behavior/settings are based on the X-Ray designs in BleachHack and LiquidBounce, adapted to Minecraft 1.21.4:
 - target block list
-- FullBright
-- Fluids
-- ExposedOnly
-- BackgroundOpacity
+- Ores / target block list
+- Only show exposed
+- Opacity
+- chunk occlusion disabled while active
 - automatic chunk reload
 
 ### Fullbright
 Gamma mode is implemented as a forced gamma value rather than a Night Vision effect. It also has:
 - Gamma / Night Vision method
 - Fade
-- Brightness
 - Default brightness restoration
+
+Gamma mode is fixed at 16.0 (1600%), matching Wurst's Gamma method.
 
 This follows the behavior documented in Wurst's Fullbright implementation, where Gamma mode changes the brightness option beyond vanilla's normal range. Wurst also documents Gamma and Night Vision as separate methods. 
 
