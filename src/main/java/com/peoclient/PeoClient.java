@@ -19,6 +19,7 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.*;
 import net.minecraft.util.math.random.Random;
 import net.minecraft.world.Heightmap;
+import com.peoclient.inventory.InventoryCleaner;
 import org.lwjgl.glfw.GLFW;
 import java.io.*;
 import java.nio.file.*;
@@ -57,7 +58,7 @@ public class PeoClient implements ClientModInitializer {
             mc.player.addStatusEffect(new StatusEffectInstance(StatusEffects.NIGHT_VISION, 300, 0, false, false, false));
         }
         if (CFG.nuker) NukerLogic.tick(mc);
-        if (CFG.cleaner && tick % 2 == 0) CleanerLogic.tick(mc);
+        if (CFG.cleaner && tick % 2 == 0) InventoryCleaner.tick(mc);
     }
 
     private void toggleXray(MinecraftClient mc) {
@@ -85,6 +86,11 @@ public class PeoClient implements ClientModInitializer {
         public boolean nukerNoParticles=false, nukerHighlight=false, nukerRangeHighlight=false;
         public int maxBlocks=512,maxArrows=128,maxThrowables=64,maxFoods=200,maxWaterBuckets=2,maxLavaBuckets=2,maxMilkBuckets=2;
         public boolean cleanerGreedy=true;
+        public boolean cleanerMergeStacks=true;
+        public boolean cleanerTouchHotbar=false;
+        public int cleanerActionDelay=1;
+        public int maxPotions=16,maxPearls=16;
+        public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
         public String offHandItem="SHIELD";
         public String[] slotItems={"WEAPON","BOW","PICKAXE","AXE","NONE","POTION","FOOD","BLOCK","BLOCK"};
         public String itemsBlacklist="";
@@ -108,7 +114,7 @@ public class PeoClient implements ClientModInitializer {
           this.nukerCooldown=c.nukerCooldown;this.nukerShape=c.nukerShape;this.nukerSort=c.nukerSort;this.nukerRange=c.nukerRange;
           this.nukerFilter=c.nukerFilter;this.nukerWhitelist=c.nukerWhitelist;this.nukerRaycast=c.nukerRaycast;this.nukerFlatten=c.nukerFlatten;
           this.nukerRotate=c.nukerRotate;this.nukerNoParticles=c.nukerNoParticles;this.nukerHighlight=c.nukerHighlight;this.nukerRangeHighlight=c.nukerRangeHighlight;
-          this.maxBlocks=c.maxBlocks;this.maxArrows=c.maxArrows;this.maxThrowables=c.maxThrowables;this.maxFoods=c.maxFoods;this.maxWaterBuckets=c.maxWaterBuckets;
+          this.maxBlocks=c.maxBlocks;this.maxArrows=c.maxArrows;this.maxThrowables=c.maxThrowables;this.maxFoods=c.maxFoods;this.maxWaterBuckets=c.maxWaterBuckets;this.maxPotions=c.maxPotions;this.maxPearls=c.maxPearls;this.cleanerMergeStacks=c.cleanerMergeStacks;this.cleanerTouchHotbar=c.cleanerTouchHotbar;this.cleanerActionDelay=c.cleanerActionDelay;this.cleanerBlacklistSet=c.cleanerBlacklistSet==null?new LinkedHashSet<>():c.cleanerBlacklistSet;
           this.maxLavaBuckets=c.maxLavaBuckets;this.maxMilkBuckets=c.maxMilkBuckets;this.cleanerGreedy=c.cleanerGreedy;this.offHandItem=c.offHandItem;
           this.slotItems=c.slotItems==null?slotItems:c.slotItems;this.itemsBlacklist=c.itemsBlacklist;this.savedGamma=c.savedGamma;
           if(c.xrayBlocks!=null)this.xrayBlocks=c.xrayBlocks; }
@@ -144,30 +150,6 @@ public class PeoClient implements ClientModInitializer {
         static boolean filterContains(Block b){String id=Registries.BLOCK.getId(b).toString(); return CFG.itemsBlacklist.contains(id);}
     }
 
-    static class CleanerLogic {
-        static void tick(MinecraftClient mc) {
-            if(mc.player==null||mc.interactionManager==null)return;
-            List<Integer> inv=new ArrayList<>(); for(int i=0;i<36;i++) if(!mc.player.getInventory().getStack(i).isEmpty())inv.add(i);
-            // Drop explicit blacklist first.
-            for(int i:inv){ItemStack s=mc.player.getInventory().getStack(i);String id=Registries.ITEM.getId(s.getItem()).toString();
-                if(blacklisted(id)){drop(mc,i);return;}}
-            // Keep configured hotbar categories; then remove obvious duplicates/excess.
-            Map<String,Integer> counts=new HashMap<>();
-            for(int i=9;i<36;i++){ItemStack s=mc.player.getInventory().getStack(i);if(s.isEmpty())continue;
-                String cat=category(s); counts.merge(cat,s.getCount(),Integer::sum);}
-            for(int i=9;i<36;i++){ItemStack s=mc.player.getInventory().getStack(i);if(s.isEmpty())continue;
-                String cat=category(s);int max=switch(cat){case"BLOCK"->CFG.maxBlocks;case"ARROW"->CFG.maxArrows;case"THROWABLE"->CFG.maxThrowables;case"FOOD"->CFG.maxFoods;case"WATER"->CFG.maxWaterBuckets;case"LAVA"->CFG.maxLavaBuckets;case"MILK"->CFG.maxMilkBuckets;default->Integer.MAX_VALUE;};
-                if(counts.getOrDefault(cat,0)>max && !"WEAPON".equals(cat)){drop(mc,i);return;}}
-            // Hotbar sorting (matches LiquidBounce defaults).
-            String[] targets=CFG.slotItems; for(int slot=0;slot<9;slot++){String wanted=targets[slot]; if("NONE".equals(wanted)||"IGNORE".equals(wanted))continue;
-                int current=mc.player.getInventory().getStack(slot).isEmpty()? -1:slot;
-                if(current>=0&&category(mc.player.getInventory().getStack(current)).equals(wanted))continue;
-                for(int i=9;i<36;i++){ItemStack s=mc.player.getInventory().getStack(i);if(!s.isEmpty()&&category(s).equals(wanted)){swap(mc,i,slot);return;}}
-            }
-        }
-        static boolean blacklisted(String id){for(String s:CFG.itemsBlacklist.split(","))if(!s.trim().isEmpty()&&s.trim().equals(id))return true;return false;}
-        static void drop(MinecraftClient mc,int invSlot){int screenSlot=invSlot<9?36+invSlot:invSlot;mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId,screenSlot,1,SlotActionType.THROW,mc.player);}
-        static void swap(MinecraftClient mc,int fromInv,int hotbar){int from=fromInv<9?36+fromInv:fromInv;int to=36+hotbar;mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId,from,hotbar,SlotActionType.SWAP,mc.player);}
-        static String category(ItemStack s){Item i=s.getItem();if(i instanceof SwordItem||i instanceof TridentItem)return"WEAPON";if(i instanceof PickaxeItem)return"PICKAXE";if(i instanceof AxeItem)return"AXE";if(i instanceof BowItem||i instanceof CrossbowItem)return"BOW";if(i instanceof PotionItem)return"POTION";if(s.contains(net.minecraft.component.DataComponentTypes.FOOD))return"FOOD";if(i instanceof BlockItem)return"BLOCK";if(i instanceof ArrowItem)return"ARROW";if(i instanceof ShieldItem)return"SHIELD";if(i==Items.WATER_BUCKET)return"WATER";if(i==Items.LAVA_BUCKET)return"LAVA";if(i==Items.MILK_BUCKET)return"MILK";return"THROWABLE";}
-    }
+    /** @deprecated Use InventoryCleaner. */
+    @Deprecated static class CleanerLogic { static void tick(MinecraftClient mc) { InventoryCleaner.tick(mc); } }
 }
