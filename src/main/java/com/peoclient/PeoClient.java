@@ -246,7 +246,7 @@ public class PeoClient implements ClientModInitializer {
             if(CFG.fullbright)active.add("Fullbright");
             if(CFG.cleaner)active.add("Inventory Cleaner");
             int right=mc.getWindow().getScaledWidth()-8;
-            d.drawTextWithShadow(mc.textRenderer,"PeoClient",right-mc.textRenderer.getWidth("PeoClient"),8,0xFFFFFF);
+            String title="PeoClient 1.21.4 v1"; d.drawTextWithShadow(mc.textRenderer,title,right-mc.textRenderer.getWidth(title),8,0xFFFFFF);
             int y=22;
             for(String s:active){
                 int w=mc.textRenderer.getWidth(s);

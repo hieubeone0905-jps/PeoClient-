@@ -1,6 +1,9 @@
-# PeoClient 1.21.4
+# PeoClient 1.21.4 v1
 
 Fabric client-side utility/mod project for Minecraft 1.21.4.
+
+## Modules / UI v1
+- Wurst-inspired searchable hub with left hack list, 3-column module grid, expandable settings panel and per-module keybind capture.
 
 ## Modules
 - X-Ray: configurable target block registry IDs, fluids, surface hiding, opacity/alpha and reload-on-change.
