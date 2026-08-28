@@ -1,5 +1,5 @@
-
 package com.peoclient.mixin;
+
 import com.peoclient.PeoClient;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.render.VertexConsumer;
@@ -17,35 +17,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(BlockRenderManager.class)
 public class BlockRenderManagerMixin {
-    
-
     @Inject(method="renderBlock", at=@At("HEAD"), cancellable=true)
-    private void peo$renderBlock(BlockState state, BlockPos pos, BlockRenderView world, MatrixStack matrices,
-                                 VertexConsumer consumer, boolean cull, Random random, CallbackInfo ci) {
-        PeoClient.setNonXrayActive(false);
-        if (!PeoClient.CFG.xray) return;
-        boolean ore = PeoClient.CFG.xrayBlocks.contains(net.minecraft.registry.Registries.BLOCK.getId(state.getBlock()).toString());
-        if (!ore) {
-            if (PeoClient.CFG.xrayHideSurface) {
-                if (world instanceof WorldView worldView) {
-                    int top = worldView.getTopY(net.minecraft.world.Heightmap.Type.MOTION_BLOCKING_NO_LEAVES, pos.getX(), pos.getZ()) - 1;
-                    if (pos.getY() >= top) { ci.cancel(); return; }
-                }
-            }
-            PeoClient.setNonXrayActive(PeoClient.CFG.xrayOpacity);
+    private void peo$xray(BlockState state, BlockPos pos, BlockRenderView world, MatrixStack matrices,
+                          VertexConsumer consumer, boolean cull, Random random, CallbackInfo ci) {
+        if(!PeoClient.CFG.xray) return;
+        String id=net.minecraft.registry.Registries.BLOCK.getId(state.getBlock()).toString();
+        if(!PeoClient.CFG.xrayBlocks.contains(id)) {
+            ci.cancel();
         }
     }
 
-    @Inject(method="renderBlock", at=@At("RETURN"))
-    private void peo$renderBlockEnd(BlockState state, BlockPos pos, BlockRenderView world, MatrixStack matrices,
-                                    VertexConsumer consumer, boolean cull, Random random, CallbackInfo ci) {
-        PeoClient.setNonXrayActive(false);
-    }
-
     @Inject(method="renderFluid", at=@At("HEAD"), cancellable=true)
-    private void peo$renderFluid(BlockPos pos, BlockRenderView world, VertexConsumer consumer,
-                                 BlockState blockState, FluidState fluidState, CallbackInfo ci) {
-        if (PeoClient.CFG.xray && !PeoClient.CFG.xrayFluids) ci.cancel();
+    private void peo$xrayFluid(BlockPos pos, BlockRenderView world, VertexConsumer consumer,
+                               BlockState blockState, FluidState fluidState, CallbackInfo ci) {
+        if(PeoClient.CFG.xray && !PeoClient.CFG.xrayFluids) ci.cancel();
     }
-
 }

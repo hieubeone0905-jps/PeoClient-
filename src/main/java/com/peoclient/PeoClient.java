@@ -1,12 +1,16 @@
-
 package com.peoclient;
 
 import com.google.gson.*;
+import com.peoclient.inventory.InventoryCleaner;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.block.*;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.FluidBlock;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.entity.effect.StatusEffectInstance;
@@ -17,143 +21,236 @@ import net.minecraft.screen.slot.SlotActionType;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.*;
-import net.minecraft.util.math.random.Random;
-import net.minecraft.world.Heightmap;
-import com.peoclient.inventory.InventoryCleaner;
 import org.lwjgl.glfw.GLFW;
+
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
 public class PeoClient implements ClientModInitializer {
     public static final Config CFG = new Config();
-    private static final ThreadLocal<Boolean> NON_XRAY_ACTIVE = ThreadLocal.withInitial(() -> false);
-
-    public static void setNonXrayActive(boolean active) { NON_XRAY_ACTIVE.set(active); }
-    public static boolean isNonXrayActive() { return NON_XRAY_ACTIVE.get(); }
-    public static KeyBinding menuKey;
-    public static KeyBinding xrayKey, nukerKey, fullbrightKey, cleanerKey;
+    public static KeyBinding menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey;
     private int tick;
 
     @Override public void onInitializeClient() {
         CFG.load();
-        menuKey = key("PeoClient menu", GLFW.GLFW_KEY_RIGHT_SHIFT);
+        menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
         xrayKey = key("Xray", GLFW.GLFW_KEY_X);
         nukerKey = key("Nuker", GLFW.GLFW_KEY_N);
         fullbrightKey = key("Fullbright", GLFW.GLFW_KEY_F);
-        cleanerKey = key("InventoryCleaner", GLFW.GLFW_KEY_I);
+        cleanerKey = key("Inventory Cleaner", GLFW.GLFW_KEY_I);
+
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
+        HudRenderCallback.EVENT.register((draw, delta) -> Hud.render(draw));
     }
 
     private KeyBinding key(String name, int code) {
-        return KeyBindingHelper.registerKeyBinding(new KeyBinding(name, InputUtil.Type.KEYSYM, code, "PeoClient"));
+        return KeyBindingHelper.registerKeyBinding(
+                new KeyBinding(name, InputUtil.Type.KEYSYM, code, "PeoClient"));
     }
 
     private void tick(MinecraftClient mc) {
         while (menuKey.wasPressed()) mc.setScreen(new PoeScreen());
-        while (xrayKey.wasPressed()) toggleXray(mc);
+        while (xrayKey.wasPressed()) { CFG.xray = !CFG.xray; reload(mc); }
         while (nukerKey.wasPressed()) CFG.nuker = !CFG.nuker;
         while (fullbrightKey.wasPressed()) toggleFullbright(mc);
         while (cleanerKey.wasPressed()) CFG.cleaner = !CFG.cleaner;
-        if (++tick % 10 == 0) CFG.save();
 
         if (mc.player == null || mc.world == null) return;
-        if (CFG.fullbright && CFG.fullbrightMode == 2) {
-            mc.player.addStatusEffect(new StatusEffectInstance(StatusEffects.NIGHT_VISION, 300, 0, false, false, false));
+
+        if (CFG.fullbright) {
+            // Night vision is a reliable client-side fallback on modern versions.
+            mc.player.addStatusEffect(new StatusEffectInstance(
+                    StatusEffects.NIGHT_VISION, 260, 0, false, false, false));
         }
+
         if (CFG.nuker) NukerLogic.tick(mc);
-        if (CFG.cleaner && tick % 2 == 0) InventoryCleaner.tick(mc);
+        if (CFG.cleaner) InventoryCleaner.tick(mc);
+
+        if (++tick % 40 == 0) CFG.save();
     }
 
-    private void toggleXray(MinecraftClient mc) {
-        CFG.xray = !CFG.xray;
-        if (mc.worldRenderer != null) mc.worldRenderer.reload();
-    }
     private void toggleFullbright(MinecraftClient mc) {
         CFG.fullbright = !CFG.fullbright;
-        if (!CFG.fullbright && mc.player != null) mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
-        if (CFG.fullbright && CFG.fullbrightMode == 1) CFG.savedGamma = mc.options.getGamma().getValue();
+        if (!CFG.fullbright && mc.player != null)
+            mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
+        reload(mc);
+    }
+
+    public static void reload(MinecraftClient mc) {
         if (mc.worldRenderer != null) mc.worldRenderer.reload();
     }
 
-    public static void reload(MinecraftClient mc) { if (mc.worldRenderer != null) mc.worldRenderer.reload(); }
-
-    public static class Config {
+    public static final class Config {
         public boolean xray=false, nuker=false, fullbright=false, cleaner=false;
-        public boolean xrayFluids=false, xrayOpacity=true, xrayHideSurface=false;
-        public int xrayAlpha=64;
-        public double fullbrightGamma=9;
-        public int fullbrightMode=0; // 0 table, 1 gamma, 2 potion
-        public int nukerMode=0, nukerMulti=2, nukerCooldown=0, nukerShape=0, nukerSort=0;
-        public double nukerRange=4.2;
-        public boolean nukerFilter=false, nukerWhitelist=false, nukerRaycast=true, nukerFlatten=false, nukerRotate=false;
-        public boolean nukerNoParticles=false, nukerHighlight=false, nukerRangeHighlight=false;
-        public int maxBlocks=512,maxArrows=128,maxThrowables=64,maxFoods=200,maxWaterBuckets=2,maxLavaBuckets=2,maxMilkBuckets=2;
-        public boolean cleanerGreedy=true;
-        public boolean cleanerMergeStacks=true;
-        public boolean cleanerTouchHotbar=false;
-        public int cleanerActionDelay=1;
-        public int maxPotions=16,maxPearls=16;
-        public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
+
+        // Wurst-style Xray: only these blocks are rendered while Xray is on.
+        public boolean xrayFluids=false, xrayHideSurface=true;
+        public int xrayRange=0; // 0 = normal loaded render distance
+        public Set<String> xrayBlocks = new LinkedHashSet<>(Arrays.asList(
+                "minecraft:coal_ore","minecraft:copper_ore","minecraft:iron_ore",
+                "minecraft:gold_ore","minecraft:lapis_ore","minecraft:redstone_ore",
+                "minecraft:diamond_ore","minecraft:emerald_ore",
+                "minecraft:deepslate_coal_ore","minecraft:deepslate_copper_ore",
+                "minecraft:deepslate_iron_ore","minecraft:deepslate_gold_ore",
+                "minecraft:deepslate_lapis_ore","minecraft:deepslate_redstone_ore",
+                "minecraft:deepslate_diamond_ore","minecraft:deepslate_emerald_ore",
+                "minecraft:ancient_debris","minecraft:nether_gold_ore",
+                "minecraft:spawner","minecraft:chest","minecraft:trapped_chest",
+                "minecraft:ender_chest","minecraft:shulker_box"));
+
+        // Survival-safe nuker: uses normal server-validated block breaking.
+        public boolean nukerFilter=false, nukerWhitelist=false, nukerRaycast=true;
+        public boolean nukerFlatten=false, nukerRotate=true;
+        public int nukerRange=4, nukerBlocksPerTick=2, nukerDelay=0;
+        public String nukerFilterIds="";
+        public boolean nukerOnlyWhenHoldingTool=false;
+
+        // Fullbright.
+        public boolean fullbrightNightVision=true;
+
+        // Cleaner: conservative acknowledgement-friendly settings.
+        public boolean cleanerGreedy=true, cleanerMergeStacks=true, cleanerTouchHotbar=false;
+        public int cleanerActionDelay=4, cleanerAckTimeout=12;
+        public int maxBlocks=512,maxArrows=128,maxThrowables=64,maxFoods=200;
+        public int maxWaterBuckets=2,maxLavaBuckets=2,maxMilkBuckets=2,maxPotions=16,maxPearls=16;
+        public Set<String> cleanerBlacklistSet=new LinkedHashSet<>();
+        public String itemsBlacklist="";
         public String offHandItem="SHIELD";
         public String[] slotItems={"WEAPON","BOW","PICKAXE","AXE","NONE","POTION","FOOD","BLOCK","BLOCK"};
-        public String itemsBlacklist="";
-        public double savedGamma=1.0;
-        public Set<String> xrayBlocks = new LinkedHashSet<>(Arrays.asList(
-          "minecraft:coal_ore","minecraft:copper_ore","minecraft:iron_ore","minecraft:gold_ore","minecraft:lapis_ore",
-          "minecraft:redstone_ore","minecraft:diamond_ore","minecraft:emerald_ore","minecraft:deepslate_coal_ore",
-          "minecraft:deepslate_copper_ore","minecraft:deepslate_iron_ore","minecraft:deepslate_gold_ore",
-          "minecraft:deepslate_lapis_ore","minecraft:deepslate_redstone_ore","minecraft:deepslate_diamond_ore",
-          "minecraft:deepslate_emerald_ore","minecraft:ancient_debris","minecraft:nether_gold_ore",
-          "minecraft:coal_block","minecraft:iron_block","minecraft:gold_block","minecraft:diamond_block","minecraft:emerald_block"));
 
-        private Path path() { return MinecraftClient.getInstance().runDirectory.toPath().resolve("config/peoclient.json"); }
+        private Path path() {
+            return MinecraftClient.getInstance().runDirectory.toPath().resolve("config/peoclient.json");
+        }
         public void load() {
-            try { Path p=path(); if(!Files.exists(p)) {save();return;} Gson g=new Gson(); Config c=g.fromJson(Files.readString(p),Config.class);
-                if(c!=null){ copyFrom(c); } } catch(Exception ignored){}
+            try {
+                Path p=path();
+                if (!Files.exists(p)) { save(); return; }
+                Config c=new Gson().fromJson(Files.readString(p), Config.class);
+                if(c==null) return;
+                if(c.xrayBlocks!=null)xrayBlocks=c.xrayBlocks;
+                if(c.cleanerBlacklistSet!=null)cleanerBlacklistSet=c.cleanerBlacklistSet;
+                // Gson leaves fields absent in older configs at their Java defaults.
+                xray=c.xray;nuker=c.nuker;fullbright=c.fullbright;cleaner=c.cleaner;
+                xrayFluids=c.xrayFluids;xrayHideSurface=c.xrayHideSurface;
+                nukerFilter=c.nukerFilter;nukerWhitelist=c.nukerWhitelist;nukerRaycast=c.nukerRaycast;
+                nukerFlatten=c.nukerFlatten;nukerRotate=c.nukerRotate;
+                nukerRange=c.nukerRange;nukerBlocksPerTick=c.nukerBlocksPerTick;nukerDelay=c.nukerDelay;
+                nukerFilterIds=c.nukerFilterIds;nukerOnlyWhenHoldingTool=c.nukerOnlyWhenHoldingTool;
+                fullbrightNightVision=c.fullbrightNightVision;
+                cleanerGreedy=c.cleanerGreedy;cleanerMergeStacks=c.cleanerMergeStacks;
+                cleanerTouchHotbar=c.cleanerTouchHotbar;cleanerActionDelay=c.cleanerActionDelay;
+                cleanerAckTimeout=c.cleanerAckTimeout;maxBlocks=c.maxBlocks;maxArrows=c.maxArrows;
+                maxThrowables=c.maxThrowables;maxFoods=c.maxFoods;maxWaterBuckets=c.maxWaterBuckets;
+                maxLavaBuckets=c.maxLavaBuckets;maxMilkBuckets=c.maxMilkBuckets;maxPotions=c.maxPotions;
+                maxPearls=c.maxPearls;itemsBlacklist=c.itemsBlacklist;offHandItem=c.offHandItem;
+                if(c.slotItems!=null)slotItems=c.slotItems;
+            } catch(Exception ignored) {}
         }
-        private void copyFrom(Config c){ this.xray=c.xray;this.nuker=c.nuker;this.fullbright=c.fullbright;this.cleaner=c.cleaner;
-          this.xrayFluids=c.xrayFluids;this.xrayOpacity=c.xrayOpacity;this.xrayHideSurface=c.xrayHideSurface;this.xrayAlpha=c.xrayAlpha;
-          this.fullbrightGamma=c.fullbrightGamma;this.fullbrightMode=c.fullbrightMode;this.nukerMode=c.nukerMode;this.nukerMulti=c.nukerMulti;
-          this.nukerCooldown=c.nukerCooldown;this.nukerShape=c.nukerShape;this.nukerSort=c.nukerSort;this.nukerRange=c.nukerRange;
-          this.nukerFilter=c.nukerFilter;this.nukerWhitelist=c.nukerWhitelist;this.nukerRaycast=c.nukerRaycast;this.nukerFlatten=c.nukerFlatten;
-          this.nukerRotate=c.nukerRotate;this.nukerNoParticles=c.nukerNoParticles;this.nukerHighlight=c.nukerHighlight;this.nukerRangeHighlight=c.nukerRangeHighlight;
-          this.maxBlocks=c.maxBlocks;this.maxArrows=c.maxArrows;this.maxThrowables=c.maxThrowables;this.maxFoods=c.maxFoods;this.maxWaterBuckets=c.maxWaterBuckets;this.maxPotions=c.maxPotions;this.maxPearls=c.maxPearls;this.cleanerMergeStacks=c.cleanerMergeStacks;this.cleanerTouchHotbar=c.cleanerTouchHotbar;this.cleanerActionDelay=c.cleanerActionDelay;this.cleanerBlacklistSet=c.cleanerBlacklistSet==null?new LinkedHashSet<>():c.cleanerBlacklistSet;
-          this.maxLavaBuckets=c.maxLavaBuckets;this.maxMilkBuckets=c.maxMilkBuckets;this.cleanerGreedy=c.cleanerGreedy;this.offHandItem=c.offHandItem;
-          this.slotItems=c.slotItems==null?slotItems:c.slotItems;this.itemsBlacklist=c.itemsBlacklist;this.savedGamma=c.savedGamma;
-          if(c.xrayBlocks!=null)this.xrayBlocks=c.xrayBlocks; }
-        public void save(){try{Path p=path();Files.createDirectories(p.getParent());Files.writeString(p,new GsonBuilder().setPrettyPrinting().create().toJson(this));}catch(Exception ignored){}}
+        public void save() {
+            try {
+                Path p=path(); Files.createDirectories(p.getParent());
+                Files.writeString(p,new GsonBuilder().setPrettyPrinting().create().toJson(this));
+            } catch(Exception ignored) {}
+        }
     }
 
-    static class NukerLogic {
+    static final class NukerLogic {
+        private static int cooldown;
+        private static BlockPos breaking;
+
         static void tick(MinecraftClient mc) {
-            if(mc.interactionManager==null||mc.player==null||mc.world==null)return;
-            double r=CFG.nukerRange; List<BlockPos> list=new ArrayList<>();
-            int minY=CFG.nukerFlatten?(int)Math.floor(mc.player.getY()-mc.player.getEyeHeight(mc.player.getPose())+0.2):(int)Math.floor(mc.player.getEyeY()-r);
-            for(int x=(int)Math.ceil(-r);x<=Math.ceil(r);x++) for(int y=minY-(int)Math.floor(mc.player.getEyeY());y<=Math.ceil(r);y++) for(int z=(int)Math.ceil(-r);z<=Math.ceil(r);z++){
-                BlockPos p=BlockPos.ofFloored(mc.player.getEyePos().add(x,y,z)); double d=CFG.nukerShape==0?
-                    Math.max(Math.max(Math.abs(mc.player.getX()-(p.getX()+.5)),Math.abs(mc.player.getEyeY()-(p.getY()+.5))),Math.abs(mc.player.getZ()-(p.getZ()+.5))):
-                    mc.player.getEyePos().distanceTo(Vec3d.ofCenter(p));
-                if(d-.5>r)continue; BlockState s=mc.world.getBlockState(p); if(s.isAir()||s.getBlock() instanceof FluidBlock)continue;
-                if(CFG.nukerFilter){boolean c=filterContains(s.getBlock()); if((!CFG.nukerWhitelist&&c)||(CFG.nukerWhitelist&&!c))continue;}
-                if(CFG.nukerRaycast && !mc.world.raycast(new net.minecraft.world.RaycastContext(mc.player.getEyePos(),Vec3d.ofCenter(p),net.minecraft.world.RaycastContext.ShapeType.OUTLINE,net.minecraft.world.RaycastContext.FluidHandling.NONE,mc.player)).getBlockPos().equals(p))continue;
-                list.add(p);
+            if(mc.interactionManager==null||mc.player==null||mc.world==null||mc.currentScreen!=null)return;
+            if(cooldown>0){cooldown--;return;}
+
+            // Survival breaking is intentionally serialized: Minecraft's server only
+            // accepts a legitimate break-progress stream for one block at a time.
+            if(breaking!=null) {
+                if(mc.world.getBlockState(breaking).isAir()) {
+                    breaking=null;
+                } else {
+                    Direction side=sideFor(breaking,mc.player.getEyePos());
+                    mc.interactionManager.updateBlockBreakingProgress(breaking,side);
+                    mc.player.swingHand(Hand.MAIN_HAND);
+                    cooldown=Math.max(0,CFG.nukerDelay);
+                    return;
+                }
             }
-            Comparator<BlockPos> cmp=Comparator.comparingDouble(p->mc.player.getEyePos().distanceTo(Vec3d.ofCenter(p)));
-            if(CFG.nukerSort==1)cmp=cmp.reversed();
-            if(CFG.nukerSort==2)cmp=Comparator.comparingDouble(p->mc.world.getBlockState(p).getHardness(mc.world,p));
-            if(CFG.nukerSort==3)cmp=cmp.reversed();
-            list.sort(cmp);
-            int done=0, limit=CFG.nukerMode==2||CFG.nukerMode==1?CFG.nukerMulti:1;
-            for(BlockPos p:list){ if(CFG.nukerCooldown>0 && tickMod(CFG.nukerCooldown))return;
-                Direction dir=Direction.UP; if(!mc.interactionManager.updateBlockBreakingProgress(p,dir))continue;
-                mc.player.swingHand(Hand.MAIN_HAND); if(++done>=limit)return; if(CFG.nukerMode==3)mc.interactionManager.breakBlock(p);
-            }
+
+            BlockPos target=findTarget(mc);
+            if(target==null)return;
+            breaking=target;
+            Direction side=sideFor(target,mc.player.getEyePos());
+            if(CFG.nukerRotate) rotateTo(mc,target);
+            mc.interactionManager.attackBlock(target,side);
+            mc.interactionManager.updateBlockBreakingProgress(target,side);
+            mc.player.swingHand(Hand.MAIN_HAND);
+            cooldown=Math.max(0,CFG.nukerDelay);
         }
-        static boolean tickMod(int c){return System.nanoTime()%((c+1)*50_000_000L)>40_000_000L;}
-        static boolean filterContains(Block b){String id=Registries.BLOCK.getId(b).toString(); return CFG.itemsBlacklist.contains(id);}
+
+        private static BlockPos findTarget(MinecraftClient mc) {
+            double r=Math.max(1,Math.min(6,CFG.nukerRange));
+            BlockPos origin=mc.player.getBlockPos();
+            int rr=(int)Math.ceil(r);
+            BlockPos best=null; double bestD=Double.MAX_VALUE;
+            for(int dx=-rr;dx<=rr;dx++) for(int dy=-rr;dy<=rr;dy++) for(int dz=-rr;dz<=rr;dz++){
+                BlockPos p=origin.add(dx,dy,dz);
+                double d=mc.player.getEyePos().distanceTo(Vec3d.ofCenter(p));
+                if(d>r+0.75)continue;
+                BlockState st=mc.world.getBlockState(p);
+                if(st.isAir()||st.getBlock() instanceof FluidBlock)continue;
+                if(CFG.nukerFlatten && p.getY()!=origin.getY()-1)continue;
+                if(CFG.nukerFilter) {
+                    boolean listed=CFG.nukerFilterIds.contains(Registries.BLOCK.getId(st.getBlock()).toString());
+                    if(CFG.nukerWhitelist ? !listed : listed)continue;
+                }
+                if(CFG.nukerOnlyWhenHoldingTool &&
+                        !(mc.player.getMainHandStack().getItem() instanceof MiningToolItem))continue;
+                if(CFG.nukerRaycast) {
+                    BlockHitResult hit=mc.world.raycast(new net.minecraft.world.RaycastContext(
+                            mc.player.getEyePos(),Vec3d.ofCenter(p),
+                            net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
+                            net.minecraft.world.RaycastContext.FluidHandling.NONE,mc.player));
+                    if(hit.getType()!=HitResult.Type.BLOCK||!hit.getBlockPos().equals(p))continue;
+                }
+                if(d<bestD){bestD=d;best=p;}
+            }
+            return best;
+        }
+
+        private static void rotateTo(MinecraftClient mc,BlockPos p) {
+            Vec3d c=Vec3d.ofCenter(p);
+            double dx=c.x-mc.player.getX(), dy=c.y-mc.player.getEyeY(), dz=c.z-mc.player.getZ();
+            mc.player.setYaw((float)Math.toDegrees(Math.atan2(dz,dx))-90f);
+            mc.player.setPitch((float)-Math.toDegrees(Math.atan2(dy,Math.sqrt(dx*dx+dz*dz))));
+        }
+
+        private static Direction sideFor(BlockPos p,Vec3d eye) {
+            Vec3d c=Vec3d.ofCenter(p);
+            double ax=Math.abs(eye.x-c.x),ay=Math.abs(eye.y-c.y),az=Math.abs(eye.z-c.z);
+            if(ax>=ay&&ax>=az)return eye.x<c.x?Direction.WEST:Direction.EAST;
+            if(ay>=ax&&ay>=az)return eye.y<c.y?Direction.DOWN:Direction.UP;
+            return eye.z<c.z?Direction.NORTH:Direction.SOUTH;
+        }
     }
 
-    /** @deprecated Use InventoryCleaner. */
-    @Deprecated static class CleanerLogic { static void tick(MinecraftClient mc) { InventoryCleaner.tick(mc); } }
+    public static final class Hud {
+        static void render(DrawContext d) {
+            MinecraftClient mc=MinecraftClient.getInstance();
+            if(mc.player==null)return;
+            List<String> active=new ArrayList<>();
+            if(CFG.xray)active.add("Xray");
+            if(CFG.nuker)active.add("Nuker");
+            if(CFG.fullbright)active.add("Fullbright");
+            if(CFG.cleaner)active.add("Inventory Cleaner");
+            int right=mc.getWindow().getScaledWidth()-8;
+            d.drawTextWithShadow(mc.textRenderer,"PeoClient",right-mc.textRenderer.getWidth("PeoClient"),8,0xFFFFFF);
+            int y=22;
+            for(String s:active){
+                int w=mc.textRenderer.getWidth(s);
+                d.drawTextWithShadow(mc.textRenderer,s,right-w,y,0xE8E8E8);
+                y+=12;
+            }
+        }
+    }
 }

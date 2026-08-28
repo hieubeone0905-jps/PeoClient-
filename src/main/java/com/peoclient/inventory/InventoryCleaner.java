@@ -22,9 +22,27 @@ public final class InventoryCleaner {
     private InventoryCleaner() {}
 
     private static int cooldown;
+    private static int pendingSlot = -1;
+    private static ItemStack pendingBefore = ItemStack.EMPTY;
+    private static int pendingWait;
 
     public static void tick(MinecraftClient mc) {
         if (mc.player == null || mc.interactionManager == null || mc.currentScreen != null) return;
+
+        // Never pipeline inventory clicks. The server must acknowledge the previous
+        // mutation before we send another one; this prevents ghost items on laggy servers.
+        if (pendingSlot >= 0) {
+            ItemStack now = mc.player.getInventory().getStack(pendingSlot);
+            boolean changed = !ItemStack.areItemsAndComponentsEqual(now, pendingBefore)
+                    || now.getCount() != pendingBefore.getCount();
+            if (changed || pendingWait-- <= 0) {
+                pendingSlot = -1;
+                pendingBefore = ItemStack.EMPTY;
+                pendingWait = 0;
+            } else {
+                return;
+            }
+        }
         if (cooldown > 0) { cooldown--; return; }
 
         // 1) Explicit blacklist always wins.
@@ -161,6 +179,10 @@ public final class InventoryCleaner {
     }
 
     private static void drop(MinecraftClient mc, int screenSlot) {
+        int playerSlot = screenSlot >= 36 ? screenSlot - 36 : screenSlot;
+        pendingSlot = playerSlot;
+        pendingBefore = mc.player.getInventory().getStack(playerSlot).copy();
+        pendingWait = Math.max(2, PeoClient.CFG.cleanerAckTimeout);
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 1,
                 SlotActionType.THROW, mc.player);
     }
