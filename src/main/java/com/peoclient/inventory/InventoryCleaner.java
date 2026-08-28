@@ -213,7 +213,7 @@ public final class InventoryCleaner {
 
     private static boolean isThrowable(ItemStack s) {
         Item i = s.getItem();
-        return i instanceof SnowballItem || i instanceof EggItem || i instanceof EnderpearlItem
+        return i instanceof SnowballItem || i instanceof EggItem || i instanceof EnderPearlItem
                 || i instanceof WindChargeItem || i instanceof ExperienceBottleItem;
     }
 

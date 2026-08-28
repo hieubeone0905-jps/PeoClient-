@@ -19,3 +19,8 @@ Windows:
 ```text
 gradlew.bat build
 ```
+
+
+## Latest CI fix
+- Corrected the Yarn 1.21.4 class name `EnderpearlItem` to `EnderPearlItem` in InventoryCleaner.
+- This fixes the compile error reported by GitHub Actions at InventoryCleaner.java:216.
