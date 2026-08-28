@@ -1,31 +1,73 @@
 # PeoClient 1.21.4 v1
 
-Fabric client-side utility/mod project for Minecraft 1.21.4.
+Fabric client/mod project for Minecraft 1.21.4.
 
-## Modules / UI v1
-- Wurst-inspired searchable hub with left hack list, 3-column module grid, expandable settings panel and per-module keybind capture.
+## v1 changes
 
-## Modules
-- X-Ray: configurable target block registry IDs, fluids, surface hiding, opacity/alpha and reload-on-change.
-- Fullbright: Gamma and Night Vision modes with restoration of the user's original gamma.
-- Nuker: range, shape, sorting, filtering/whitelist, raycast, flattening, multi-break, instant mode and optional visual/rotation settings reserved for renderer integration.
-- InventoryCleaner: blacklist, greedy cleanup, stack limits, hotbar category targets and offhand target.
+- Wurst-style Hub layout: left hack list, searchable 3-column module grid, right-side settings panel.
+- `Right Shift` opens the Hub.
+- Each implemented module can be toggled and rebound from the settings panel.
+- HUD shows `PeoClient 1.21.4 v1` and only currently enabled modules.
 
-## Important
-This project is an independent implementation. It does not include copied source from BleachHack or LiquidBounce. Their projects can be used as behavioral references subject to their respective licenses.
+## Implemented modules
+
+### X-Ray
+Behavior/settings are based on the X-Ray designs in BleachHack and LiquidBounce, adapted to Minecraft 1.21.4:
+- target block list
+- FullBright
+- Fluids
+- ExposedOnly
+- BackgroundOpacity
+- automatic chunk reload
+
+### Fullbright
+Gamma mode is implemented as a forced gamma value rather than a Night Vision effect. It also has:
+- Gamma / Night Vision method
+- Fade
+- Brightness
+- Default brightness restoration
+
+This follows the behavior documented in Wurst's Fullbright implementation, where Gamma mode changes the brightness option beyond vanilla's normal range. Wurst also documents Gamma and Night Vision as separate methods. 
+
+### Nuker
+The Nuker settings are ported/adapted from the setting model and block-selection behavior of the supplied BleachHack 1.20.4 Nuker source:
+- Normal / SurvMulti / Multi / Instant modes
+- Multi count
+- Cooldown
+- Cube / Sphere
+- Range
+- Closest / Furthest / Softest / Hardest / None sorting
+- Filter / Whitelist
+- Raycast
+- Flatten
+- Rotate
+
+The Minecraft 1.21.4 implementation uses the normal block-breaking API. It does not claim to bypass server-side validation or anti-cheat.
+
+### InventoryCleaner
+The implementation follows the supplied LiquidBounce InventoryCleaner design:
+- blacklist
+- category quotas
+- greedy cleanup
+- stack merging
+- hotbar targets
+- per-category limits
+- server slot-update acknowledgement before another disposal action
+
+The acknowledgement gate is specifically intended to reduce ghost-item desynchronization when the server is lagging.
+
+## Source/license note
+
+The supplied BleachHack and LiquidBounce projects are GPLv3 projects. This PeoClient version is an adaptation rather than a literal copy of their complete module source, because their module/event/settings architectures and mappings are different from this small Fabric 1.21.4 project.
+
+If code from those GPL projects is copied into PeoClient later, PeoClient must remain compatible with the applicable GPLv3 source-distribution requirements.
 
 ## Build
-Requires Java 21 and a network-capable Gradle environment. Run:
+
+Requires Java 21 and a network-capable Gradle environment:
 
     ./gradlew build
 
-The built mod will be under `build/libs/`.
+The generated jar is under `build/libs/`.
 
-## Current verification
-The source has been statically reviewed and packaged. A full Gradle build could not be performed in this environment because Gradle 8.12.1 is not cached and `services.gradle.org` is unreachable from the build environment.
-
-## Detailed modules
-
-- `docs/NUKER_BLEACHHACK_PARITY.md` — Nuker parity settings and 1.21.4 adaptation.
-- `docs/INVENTORY_CLEANER.md` — InventoryCleaner behaviour and configuration.
-- `src/main/java/com/peoclient/inventory/InventoryCleaner.java` — independent detailed cleaner implementation.
+A full build was attempted in the current environment, but Gradle 8.12.1 could not be downloaded because `services.gradle.org` is unreachable from this environment.

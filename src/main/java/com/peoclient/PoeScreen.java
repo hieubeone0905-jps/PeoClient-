@@ -5,47 +5,35 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.client.util.InputUtil;
-import net.minecraft.client.option.KeyBinding;
 import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
-/**
- * PeoClient 1.21.4 v1 - Wurst-inspired hub layout.
- *
- * This is an independent UI implementation: searchable left module list,
- * three-column module grid, expandable settings panel and per-module keybind capture.
- */
 public final class PoeScreen extends Screen {
     private TextFieldWidget search;
-    private String expanded = "";
-    private String listening = "";
-    private int scroll;
+    private String selected = "Nuker [Multi]";
+    private boolean listening;
+    private String bindTarget;
+    private double scroll;
 
-    private static final String[] ALL_MODULES = {
+    private static final List<String> MODULES = Arrays.asList(
             "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray",
-            "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind",
-            "AntiCactus", "AntiEntityPush", "AntiHunger", "AntiKnockback",
-            "AntiSpam", "AntiWaterPush", "AntiWobble", "ArrowDMG",
-            "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
-            "AutoDrop", "AutoEat", "AutoFish", "AutoLoot", "AutoMine",
-            "AutoReconnect", "AutoSprint", "AutoSwim", "BetterChat",
-            "BetterTab", "BlockESP", "ChestESP", "CPS", "Criticals [Packet]",
-            "ElytraHelper", "EntityControl", "EntityESP", "FastBreak",
-            "FastUse", "Freecam", "Fullbright+", "GuiMove", "HitBox",
-            "HoleESP", "ItemSaver", "Jesus", "KillAura", "LiquidVision",
-            "MobESP", "NameTags", "NoFall", "NoRotate", "NoSlowDown",
-            "NoVoid", "PacketLogger", "PearlPredict", "ProjectileESP",
-            "Reach", "Scaffold", "Speed", "Step", "Timer", "Trajectories",
-            "Truesight", "Velocity", "WindowWalk", "WorldTime"
-    };
-
-    private static final String[] FUNCTIONAL = {
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray"
-    };
+            "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
+            "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
+            "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
+            "AutoDrop", "AutoEat", "AutoFish", "AutoLoot", "AutoMine", "AutoReconnect",
+            "AutoSprint", "AutoSwim", "BetterChat", "BetterTab", "BlockESP", "BoneESP",
+            "CameraNoClip", "ChestESP", "CPS", "Criticals [Packet]", "ElytraHelper",
+            "EntityControl", "EntityESP", "FastBreak", "FastUse", "Flight", "Freecam",
+            "GuiMove", "HitBox", "HoleESP", "KillAura", "MobESP", "NameTags", "NoFall",
+            "NoRotate", "NoSlowDown", "NoVoid", "PacketLogger", "PearlPredict", "ProjectileESP",
+            "Reach", "Scaffold", "Speed", "Step", "Timer", "Trajectories", "Truesight",
+            "Velocity", "WindowWalk", "WorldTime"
+    );
 
     public PoeScreen() {
         super(Text.literal("PeoClient 1.21.4 v1"));
@@ -53,378 +41,409 @@ public final class PoeScreen extends Screen {
 
     @Override
     protected void init() {
-        search = new TextFieldWidget(textRenderer, 254, 24, Math.max(220, width - 560), 22,
+        search = new TextFieldWidget(textRenderer, width / 2 - 220, 18, 440, 28,
                 Text.literal("Search"));
-        search.setMaxLength(40);
+        search.setMaxLength(64);
         search.setPlaceholder(Text.literal("Search hacks..."));
         addDrawableChild(search);
-        search.setFocused(true);
     }
 
-    private boolean matches(String name) {
-        String q = search == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
-        return q.isEmpty() || name.toLowerCase(Locale.ROOT).contains(q);
-    }
-
-    private boolean isFunctional(String name) {
-        for (String s : FUNCTIONAL) if (s.equals(name)) return true;
-        return false;
+    private boolean implemented(String name) {
+        return name.equals("Fullbright") || name.equals("InventoryCleaner")
+                || name.equals("Nuker [Multi]") || name.equals("X-Ray");
     }
 
     private boolean enabled(String name) {
         return switch (name) {
-            case "X-Ray" -> PeoClient.CFG.xray;
-            case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "Fullbright" -> PeoClient.CFG.fullbright;
             case "InventoryCleaner" -> PeoClient.CFG.cleaner;
+            case "Nuker [Multi]" -> PeoClient.CFG.nuker;
+            case "X-Ray" -> PeoClient.CFG.xray;
             default -> false;
         };
     }
 
     private void toggle(String name) {
-        MinecraftClient mc = client;
-        if (mc == null) return;
         switch (name) {
-            case "X-Ray" -> {
-                PeoClient.CFG.xray = !PeoClient.CFG.xray;
-                PeoClient.reload(mc);
-            }
-            case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
-            case "Fullbright" -> {
-                PeoClient.CFG.fullbright = !PeoClient.CFG.fullbright;
-                if (!PeoClient.CFG.fullbright && mc.player != null)
-                    mc.player.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.NIGHT_VISION);
-            }
+            case "Fullbright" -> PeoClient.toggleFullbright(client);
             case "InventoryCleaner" -> PeoClient.CFG.cleaner = !PeoClient.CFG.cleaner;
+            case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
+            case "X-Ray" -> PeoClient.toggleXray(client);
         }
         PeoClient.CFG.save();
     }
 
-    private void cycleSetting(String module, int row) {
-        var c = PeoClient.CFG;
-        switch (module) {
-            case "Nuker [Multi]" -> {
-                if (row == 0) c.nukerRange = c.nukerRange >= 6 ? 1 : c.nukerRange + 1;
-                if (row == 1) c.nukerBlocksPerTick = c.nukerBlocksPerTick >= 4 ? 1 : c.nukerBlocksPerTick + 1;
-                if (row == 2) c.nukerRaycast = !c.nukerRaycast;
-                if (row == 3) c.nukerRotate = !c.nukerRotate;
-                if (row == 4) c.nukerFlatten = !c.nukerFlatten;
-                if (row == 5) c.nukerOnlyWhenHoldingTool = !c.nukerOnlyWhenHoldingTool;
-                if (row == 6) c.nukerFilter = !c.nukerFilter;
-            }
-            case "X-Ray" -> {
-                if (row == 0) c.xrayFluids = !c.xrayFluids;
-                if (row == 1) c.xrayHideSurface = !c.xrayHideSurface;
-            }
-            case "Fullbright" -> {
-                if (row == 0) c.fullbrightNightVision = !c.fullbrightNightVision;
-            }
-            case "InventoryCleaner" -> {
-                if (row == 0) c.cleanerGreedy = !c.cleanerGreedy;
-                if (row == 1) c.cleanerMergeStacks = !c.cleanerMergeStacks;
-                if (row == 2) c.cleanerTouchHotbar = !c.cleanerTouchHotbar;
-                if (row == 3) c.cleanerActionDelay = c.cleanerActionDelay >= 10 ? 1 : c.cleanerActionDelay + 1;
-                if (row == 4) c.cleanerAckTimeout = c.cleanerAckTimeout >= 20 ? 4 : c.cleanerAckTimeout + 2;
-            }
-        }
-        c.save();
+    private void openBind(String module) {
+        listening = true;
+        bindTarget = module;
     }
 
-    private String keyFor(String module) {
-        return switch (module) {
-            case "X-Ray" -> PeoClient.xrayKey.getBoundKeyLocalizedText().getString();
-            case "Nuker [Multi]" -> PeoClient.nukerKey.getBoundKeyLocalizedText().getString();
-            case "Fullbright" -> PeoClient.fullbrightKey.getBoundKeyLocalizedText().getString();
-            case "InventoryCleaner" -> PeoClient.cleanerKey.getBoundKeyLocalizedText().getString();
-            default -> "NONE";
-        };
-    }
-
-    private void beginKeybind(String module) {
-        if (isFunctional(module)) {
-            listening = module;
-        }
-    }
-
-    private void setKey(String module, int keyCode) {
-        if (!isFunctional(module) || client == null) return;
+    private void setBind(String module, int keyCode) {
         var key = switch (module) {
-            case "X-Ray" -> PeoClient.xrayKey;
-            case "Nuker [Multi]" -> PeoClient.nukerKey;
             case "Fullbright" -> PeoClient.fullbrightKey;
             case "InventoryCleaner" -> PeoClient.cleanerKey;
+            case "Nuker [Multi]" -> PeoClient.nukerKey;
+            case "X-Ray" -> PeoClient.xrayKey;
             default -> null;
         };
         if (key != null) {
             key.setBoundKey(InputUtil.Type.KEYSYM.createFromCode(keyCode));
-            KeyBinding.updateKeysByCode();
-            PeoClient.CFG.save();
+            MinecraftClient.getInstance().options.write();
         }
-        listening = "";
+        listening = false;
+        bindTarget = null;
     }
 
-    private void drawPanel(DrawContext d, int x, int y, int w, int h, int color) {
-        d.fill(x, y, x + w, y + h, color);
-        d.drawBorder(x, y, w, h, 0x704E79A8);
-    }
-
-    private void drawModule(DrawContext d, String name, int x, int y, int w, int h) {
-        boolean active = enabled(name);
-        boolean real = isFunctional(name);
-        int bg = active ? 0xB02D5F89 : 0xB01D2938;
-        drawPanel(d, x, y, w, h, bg);
-        d.drawTextWithShadow(textRenderer, name, x + 9, y + 7, active ? 0xFFFFFF55 : 0xFFE8EEF5);
-        d.drawTextWithShadow(textRenderer, real ? "▼" : "·", x + w - 18, y + 7, real ? 0xFFFFFFFF : 0xFF66717F);
-        if (active) d.drawTextWithShadow(textRenderer, "ON", x + w - 42, y + 7, 0xFF66FF55);
-    }
-
-    private List<String> filteredModules() {
-        List<String> out = new ArrayList<>();
-        for (String s : ALL_MODULES) if (matches(s)) out.add(s);
-        return out;
-    }
-
-    private void drawSettings(DrawContext d, int x, int y, int w) {
-        if (expanded.isEmpty()) {
-            drawPanel(d, x, y, w, 110, 0xB018222F);
-            d.drawTextWithShadow(textRenderer, "Module Settings", x + 12, y + 12, 0xFFB7C8D9);
-            d.drawTextWithShadow(textRenderer, "Click a ▼ module to edit it.", x + 12, y + 34, 0xFF8D9AAA);
-            d.drawTextWithShadow(textRenderer, "Click the module name to toggle.", x + 12, y + 52, 0xFF8D9AAA);
-            return;
-        }
-
-        int h = expanded.equals("Nuker [Multi]") ? 292 : expanded.equals("InventoryCleaner") ? 248 : 190;
-        drawPanel(d, x, y, w, h, 0xE0192533);
-        int title = enabled(expanded) ? 0xFFFFD83D : 0xFF67D7FF;
-        d.drawTextWithShadow(textRenderer, expanded, x + 12, y + 12, title);
-
-        d.drawTextWithShadow(textRenderer, "Enable", x + 12, y + 35, 0xFFE7EDF5);
-        drawToggle(d, x + w - 52, y + 31, enabled(expanded));
-
-        String[] rows;
-        if (expanded.equals("Nuker [Multi]")) {
-            rows = new String[]{
-                    "Range: " + PeoClient.CFG.nukerRange,
-                    "Blocks/tick: " + PeoClient.CFG.nukerBlocksPerTick,
-                    "Raycast: " + on(PeoClient.CFG.nukerRaycast),
-                    "Auto Rotate: " + on(PeoClient.CFG.nukerRotate),
-                    "Flatten: " + on(PeoClient.CFG.nukerFlatten),
-                    "Tool Required: " + on(PeoClient.CFG.nukerOnlyWhenHoldingTool),
-                    "Filter: " + on(PeoClient.CFG.nukerFilter)
-            };
-        } else if (expanded.equals("X-Ray")) {
-            rows = new String[]{
-                    "Fluids: " + on(PeoClient.CFG.xrayFluids),
-                    "Hide Surface: " + on(PeoClient.CFG.xrayHideSurface),
-                    "Targets: " + PeoClient.CFG.xrayBlocks.size() + " blocks",
-                    "Mode: Ore / Chest / Spawner"
-            };
-        } else if (expanded.equals("Fullbright")) {
-            rows = new String[]{
-                    "Night Vision fallback: " + on(PeoClient.CFG.fullbrightNightVision),
-                    "Mode: Client brightness",
-                    "Keybind: " + keyFor(expanded)
-            };
-        } else {
-            rows = new String[]{
-                    "Greedy: " + on(PeoClient.CFG.cleanerGreedy),
-                    "Merge Stacks: " + on(PeoClient.CFG.cleanerMergeStacks),
-                    "Touch Hotbar: " + on(PeoClient.CFG.cleanerTouchHotbar),
-                    "Action Delay: " + PeoClient.CFG.cleanerActionDelay + " ticks",
-                    "Ack Timeout: " + PeoClient.CFG.cleanerAckTimeout + " ticks"
-            };
-        }
-
-        int ry = y + 61;
-        for (int i = 0; i < rows.length; i++) {
-            d.fill(x + 9, ry - 3, x + w - 9, ry + 20, 0x601E2A38);
-            d.drawTextWithShadow(textRenderer, rows[i], x + 15, ry + 3, 0xFFD9E2EA);
-            if (i < rows.length - 1 && !rows[i].startsWith("Mode:") && !rows[i].startsWith("Targets:"))
-                d.drawTextWithShadow(textRenderer, "›", x + w - 20, ry + 3, 0xFF7EA9CC);
-            ry += 28;
-        }
-
-        int by = y + h - 32;
-        d.fill(x + 10, by, x + w - 10, by + 22, 0x702C4053);
-        d.drawTextWithShadow(textRenderer,
-                listening.equals(expanded) ? "Press a key..." : "Keybind: " + keyFor(expanded),
-                x + 17, by + 7, listening.equals(expanded) ? 0xFFFFFF55 : 0xFFB9C8D7);
-    }
-
-    private String on(boolean v) { return v ? "ON" : "OFF"; }
-
-    private void drawToggle(DrawContext d, int x, int y, boolean v) {
-        d.fill(x, y, x + 34, y + 16, v ? 0xFF42A65A : 0xFF4B5662);
-        d.fill(v ? x + 20 : x + 2, y + 2, v ? x + 32 : x + 14, y + 14, 0xFFFFFFFF);
+    private String keyName(String module) {
+        var key = switch (module) {
+            case "Fullbright" -> PeoClient.fullbrightKey;
+            case "InventoryCleaner" -> PeoClient.cleanerKey;
+            case "Nuker [Multi]" -> PeoClient.nukerKey;
+            case "X-Ray" -> PeoClient.xrayKey;
+            default -> null;
+        };
+        return key == null ? "NONE" : key.getBoundKeyLocalizedText().getString();
     }
 
     @Override
     public void render(DrawContext d, int mouseX, int mouseY, float delta) {
-        d.fill(0, 0, width, height, 0xB00A111A);
+        d.fill(0, 0, width, height, 0xD90A0F16);
 
-        // Header.
-        d.fill(0, 0, width, 52, 0xE0131D29);
-        d.fill(0, 51, width, 53, 0xFF315A78);
-        d.drawTextWithShadow(textRenderer, "P", 14, 9, 0xFF6B8CFF);
-        d.drawTextWithShadow(textRenderer, "PeoClient", 36, 7, 0xFFFFFFFF);
-        d.drawTextWithShadow(textRenderer, "1.21.4", 140, 10, 0xFF9EADBC);
-        d.drawTextWithShadow(textRenderer, "v1", 188, 10, 0xFF9EADBC);
-        d.drawTextWithShadow(textRenderer, "Right Shift • Hub", width - 125, 11, 0xFF8FA5B9);
-
-        // Left module list.
-        int leftW = 228;
-        drawPanel(d, 8, 62, leftW, height - 76, 0xC5141D28);
-        d.drawTextWithShadow(textRenderer, "HACK LIST", 18, 73, 0xFF7FC8FF);
-
-        int ly = 94;
-        int visible = Math.max(1, (height - 112) / 15);
-        List<String> mods = filteredModules();
-        int start = Math.max(0, Math.min(scroll, Math.max(0, mods.size() - visible)));
-        for (int i = start; i < Math.min(mods.size(), start + visible); i++) {
-            String name = mods.get(i);
-            boolean real = isFunctional(name);
-            boolean active = enabled(name);
-            if (name.equals(expanded)) d.fill(12, ly - 2, leftW + 4, ly + 13, 0xA02B5371);
-            d.drawTextWithShadow(textRenderer, name, 18, ly, active ? 0xFFFFFF55 : (real ? 0xFFE5EDF5 : 0xFF93A1AE));
-            if (active) d.drawTextWithShadow(textRenderer, "●", leftW - 10, ly, 0xFF57E65C);
-            ly += 15;
-        }
-        d.drawTextWithShadow(textRenderer, "↑↓ Scroll  •  Click module", 18, height - 27, 0xFF6F8193);
-
-        // Main grid.
-        int rightW = 245;
-        int gridX = 246;
-        int gridW = Math.max(300, width - gridX - rightW - 18);
-        int settingsX = width - rightW - 9;
-        int cols = 3;
-        int gap = 6;
-        int cellW = (gridW - gap * (cols - 1)) / cols;
-        int gy = 62;
-
-        d.drawTextWithShadow(textRenderer, "MODULES", gridX, 72, 0xFF7FC8FF);
-
-        List<String> grid = filteredModules();
-        int idx = 0;
-        for (int row = 0; row < 100 && idx < grid.size(); row++) {
-            for (int col = 0; col < cols && idx < grid.size(); col++) {
-                String name = grid.get(idx++);
-                int x = gridX + col * (cellW + gap);
-                int y = gy + 18 + row * 29;
-                drawModule(d, name, x, y, cellW, 24);
-                if (y > height - 45) break;
-            }
-            if (gy + 18 + row * 29 > height - 45) break;
-        }
-
-        // Settings.
-        drawSettings(d, settingsX, 62, rightW);
-
-        if (listening.equals(expanded)) {
-            d.drawTextWithShadow(textRenderer, "Press a key (ESC cancels)", settingsX + 12,
-                    Math.min(height - 15, 62 + (expanded.equals("Nuker [Multi]") ? 292 : 190) - 7),
-                    0xFFFFFF55);
-        }
+        // Header
+        d.fill(0, 0, width, 74, 0xF20B1119);
+        d.fill(0, 72, width, 75, 0xFF1D466A);
+        d.drawTextWithShadow(textRenderer, "P", 18, 26, 0xFF5E8DFF);
+        d.drawTextWithShadow(textRenderer, "PeoClient", 48, 18, 0xFFF5F7FF);
+        d.drawTextWithShadow(textRenderer, "1.21.4", 276, 22, 0xFF9CA7B7);
+        d.drawTextWithShadow(textRenderer, "v1", 365, 22, 0xFF9CA7B7);
+        d.drawTextWithShadow(textRenderer, "Right Shift • Hub", width - 154, 22, 0xFFB5C0CF);
+        d.drawTextWithShadow(textRenderer, listening
+                ? "Press a key (ESC cancels)" : "Click module to toggle • ▼ settings",
+                width - 270, 51, listening ? 0xFFFFD429 : 0xFF8E9AA8);
 
         super.render(d, mouseX, mouseY, delta);
-        // redraw header title after widgets so it stays crisp
-        d.drawTextWithShadow(textRenderer, "PeoClient 1.21.4 v1", 36, 31, 0xFF8FA5B9);
+
+        // Panels
+        int top = 88;
+        int bottom = height - 22;
+        int leftW = 250;
+        int settingsW = Math.min(360, Math.max(300, width / 4));
+        int mainX = leftW + 16;
+        int settingsX = width - settingsW - 16;
+        int mainW = settingsX - mainX - 12;
+
+        panel(d, 16, top, leftW, bottom - top, 0xC90C131C);
+        panel(d, mainX, top, mainW, bottom - top, 0xB50B1118);
+        panel(d, settingsX, top, settingsW, bottom - top, 0xC90C131C);
+
+        d.drawTextWithShadow(textRenderer, "HACK LIST", 34, top + 24, 0xFF72CFFF);
+        d.drawTextWithShadow(textRenderer, "MODULES", mainX + 14, top + 24, 0xFF72CFFF);
+        d.drawTextWithShadow(textRenderer, "Module Settings", settingsX + 18, top + 24, 0xFFD6DCE6);
+
+        drawHackList(d, 34, top + 48, leftW - 20, bottom - top - 66);
+        drawModules(d, mainX + 12, top + 48, mainW - 24, bottom - top - 66);
+        drawSettings(d, settingsX + 14, top + 48, settingsW - 28, bottom - top - 66);
+
+        d.drawTextWithShadow(textRenderer, "↑↓ Scroll • Click module", 22, height - 16, 0xFF7D8794);
+    }
+
+    private void panel(DrawContext d, int x, int y, int w, int h, int color) {
+        d.fill(x, y, x + w, y + h, color);
+        d.drawBorder(x, y, w, h, 0xFF203B55);
+    }
+
+    private void drawHackList(DrawContext d, int x, int y, int w, int h) {
+        String q = query();
+        int row = 15;
+        int yy = y - (int) scroll;
+        for (String name : MODULES) {
+            if (!q.isBlank() && !name.toLowerCase(Locale.ROOT).contains(q)) continue;
+            if (yy > y - row && yy < y + h) {
+                int color = implemented(name) ? 0xFFE2E7EE : 0xFF87919D;
+                if (enabled(name)) color = 0xFFFFE84D;
+                d.drawTextWithShadow(textRenderer, name, x, yy, color);
+                if (enabled(name)) d.fill(x + w - 7, yy + 4, x + w - 2, yy + 9, 0xFF4DFF5D);
+            }
+            yy += row;
+        }
+    }
+
+    private void drawModules(DrawContext d, int x, int y, int w, int h) {
+        String q = query();
+        List<String> filtered = new ArrayList<>();
+        for (String n : MODULES)
+            if (q.isBlank() || n.toLowerCase(Locale.ROOT).contains(q)) filtered.add(n);
+
+        int cols = 3;
+        int gap = 10;
+        int cardW = (w - gap * (cols - 1)) / cols;
+        int rowH = 35;
+        int yy = y - (int) scroll;
+        for (int i = 0; i < filtered.size(); i++) {
+            int col = i % cols;
+            int row = i / cols;
+            int cx = x + col * (cardW + gap);
+            int cy = yy + row * rowH;
+            if (cy < y - rowH || cy > y + h) continue;
+
+            boolean real = implemented(filtered.get(i));
+            boolean on = enabled(filtered.get(i));
+            int bg = on ? 0xC92A435A : 0xA6121B25;
+            if (filtered.get(i).equals(selected)) bg = on ? 0xD53A5874 : 0xB31B2A3A;
+
+            d.fill(cx, cy, cx + cardW, cy + 30, bg);
+            d.drawBorder(cx, cy, cardW, 30, real ? 0xFF2B5578 : 0xFF243340);
+            d.drawTextWithShadow(textRenderer, filtered.get(i), cx + 12, cy + 10,
+                    real ? (on ? 0xFFFFEA42 : 0xFFE7ECF2) : 0xFF9AA4AF);
+            d.drawTextWithShadow(textRenderer, "▼", cx + cardW - 20, cy + 10,
+                    real ? 0xFFDDE6EF : 0xFF5F6974);
+            if (on) d.fill(cx + cardW - 42, cy + 25, cx + cardW - 34, cy + 27, 0xFF4DFF5D);
+        }
+    }
+
+    private void drawSettings(DrawContext d, int x, int y, int w, int h) {
+        if (!implemented(selected)) {
+            d.drawTextWithShadow(textRenderer, "Select a supported module.", x, y + 18, 0xFF8F9AA7);
+            d.drawTextWithShadow(textRenderer, "Only modules with real logic can be toggled.",
+                    x, y + 36, 0xFF687481);
+            return;
+        }
+
+        int yy = y + 6;
+        d.drawTextWithShadow(textRenderer, selected, x, yy, colorFor(selected));
+        yy += 24;
+        row(d, x, yy, w, "Enable", enabled(selected), true); yy += 28;
+        row(d, x, yy, w, "Keybind", keyName(selected), false); yy += 28;
+
+        switch (selected) {
+            case "Nuker [Multi]" -> yy = nukerSettings(d, x, yy, w);
+            case "X-Ray" -> yy = xraySettings(d, x, yy, w);
+            case "Fullbright" -> yy = fullbrightSettings(d, x, yy, w);
+            case "InventoryCleaner" -> cleanerSettings(d, x, yy, w);
+        }
+    }
+
+    private int nukerSettings(DrawContext d, int x, int y, int w) {
+        row(d, x, y, w, "Mode", PeoClient.CFG.nukerMode, false); y += 28;
+        row(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, false); y += 28;
+        row(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown + " ticks", false); y += 28;
+        row(d, x, y, w, "Shape", PeoClient.CFG.nukerShape, false); y += 28;
+        row(d, x, y, w, "Range", String.format(Locale.ROOT, "%.1f", PeoClient.CFG.nukerRange), false); y += 28;
+        row(d, x, y, w, "Sort", PeoClient.CFG.nukerSort, false); y += 28;
+        row(d, x, y, w, "Filter", PeoClient.CFG.nukerFilter, true); y += 28;
+        row(d, x, y, w, "Whitelist", PeoClient.CFG.nukerWhitelist, true); y += 28;
+        row(d, x, y, w, "Raycast", PeoClient.CFG.nukerRaycast, true); y += 28;
+        row(d, x, y, w, "Flatten", PeoClient.CFG.nukerFlatten, true); y += 28;
+        row(d, x, y, w, "Rotate", PeoClient.CFG.nukerRotate, true); y += 28;
+        row(d, x, y, w, "Highlight", PeoClient.CFG.nukerHighlight, true); y += 28;
+        return y;
+    }
+
+    private int xraySettings(DrawContext d, int x, int y, int w) {
+        row(d, x, y, w, "FullBright", PeoClient.CFG.xrayFullBright, true); y += 28;
+        row(d, x, y, w, "Fluids", PeoClient.CFG.xrayFluids, true); y += 28;
+        row(d, x, y, w, "ExposedOnly", PeoClient.CFG.xrayExposedOnly, true); y += 28;
+        row(d, x, y, w, "BackgroundOpacity", PeoClient.CFG.xrayBackgroundOpacity, false); y += 28;
+        row(d, x, y, w, "Blocks", PeoClient.CFG.xrayBlocks.size() + " selected", false); y += 28;
+        d.drawTextWithShadow(textRenderer, "Ore set: coal • copper • iron • gold", x, y, 0xFF9AA5B2); y += 17;
+        d.drawTextWithShadow(textRenderer, "diamond • emerald • redstone • lapis", x, y, 0xFF9AA5B2);
+        return y + 24;
+    }
+
+    private int fullbrightSettings(DrawContext d, int x, int y, int w) {
+        row(d, x, y, w, "Method", PeoClient.CFG.fullbrightMethod, false); y += 28;
+        row(d, x, y, w, "Fade", PeoClient.CFG.fullbrightFade, true); y += 28;
+        row(d, x, y, w, "Brightness", String.format(Locale.ROOT, "%.1f", PeoClient.CFG.fullbrightBrightness), false); y += 28;
+        row(d, x, y, w, "Default brightness", String.format(Locale.ROOT, "%.2f", PeoClient.CFG.fullbrightDefaultBrightness), false); y += 28;
+        d.drawTextWithShadow(textRenderer,
+                "Gamma mode uses a forced gamma value, not a", x, y, 0xFF9AA5B2);
+        d.drawTextWithShadow(textRenderer,
+                "Night Vision status effect.", x, y + 17, 0xFF9AA5B2);
+        return y + 40;
+    }
+
+    private int cleanerSettings(DrawContext d, int x, int y, int w) {
+        row(d, x, y, w, "Greedy", PeoClient.CFG.cleanerGreedy, true); y += 28;
+        row(d, x, y, w, "Merge stacks", PeoClient.CFG.cleanerMergeStacks, true); y += 28;
+        row(d, x, y, w, "Touch hotbar", PeoClient.CFG.cleanerTouchHotbar, true); y += 28;
+        row(d, x, y, w, "Action delay", PeoClient.CFG.cleanerActionDelay + " ticks", false); y += 28;
+        row(d, x, y, w, "Ack timeout", PeoClient.CFG.cleanerAckTimeout + " ticks", false); y += 28;
+        row(d, x, y, w, "Max blocks", PeoClient.CFG.maxBlocks, false); y += 28;
+        row(d, x, y, w, "Max arrows", PeoClient.CFG.maxArrows, false); y += 28;
+        row(d, x, y, w, "Max throwables", PeoClient.CFG.maxThrowables, false); y += 28;
+        row(d, x, y, w, "Max food points", PeoClient.CFG.maxFoods, false);
+        return y + 28;
+    }
+
+    private void row(DrawContext d, int x, int y, int w, String label, Object value, boolean toggle) {
+        d.drawTextWithShadow(textRenderer, label, x, y + 8, 0xFFE0E6ED);
+        String text = String.valueOf(value);
+        int tw = textRenderer.getWidth(text);
+        d.fill(x + w - tw - 10, y + 3, x + w, y + 24, 0xA51B2733);
+        d.drawTextWithShadow(textRenderer, text, x + w - tw - 5, y + 8,
+                toggle ? (Boolean.TRUE.equals(value) ? 0xFF55FF66 : 0xFF8E99A6) : 0xFFB9C7D5);
+    }
+
+    private int colorFor(String s) {
+        return switch (s) {
+            case "Fullbright" -> 0xFF70FF70;
+            case "X-Ray" -> 0xFF40C8FF;
+            case "Nuker [Multi]" -> 0xFFFFB000;
+            default -> 0xFFFF70FF;
+        };
+    }
+
+    private String query() {
+        return search == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0) return super.mouseClicked(mouseX, mouseY, button);
+        int top = 88, bottom = height - 22;
+        int leftW = 250;
+        int mainX = leftW + 16;
+        int settingsW = Math.min(360, Math.max(300, width / 4));
+        int settingsX = width - settingsW - 16;
+        int mainW = settingsX - mainX - 12;
 
-        // Don't steal clicks from the search field.
-        if (mouseX >= 254 && mouseX <= 254 + Math.max(220, width - 560) &&
-                mouseY >= 24 && mouseY <= 46) return super.mouseClicked(mouseX, mouseY, button);
+        if (mouseY >= top + 48 && mouseY < bottom) {
+            // Module grid
+            String q = query();
+            List<String> filtered = new ArrayList<>();
+            for (String n : MODULES)
+                if (q.isBlank() || n.toLowerCase(Locale.ROOT).contains(q)) filtered.add(n);
 
-        int leftW = 228;
-        if (mouseX >= 8 && mouseX <= leftW + 8 && mouseY >= 92 && mouseY < height - 34) {
-            List<String> mods = filteredModules();
-            int visible = Math.max(1, (height - 112) / 15);
-            int start = Math.max(0, Math.min(scroll, Math.max(0, mods.size() - visible)));
-            int i = start + (int)((mouseY - 92) / 15);
-            if (i >= 0 && i < mods.size()) {
-                String name = mods.get(i);
-                if (isFunctional(name)) {
-                    toggle(name);
-                    expanded = name;
-                }
-                return true;
-            }
-        }
-
-        int rightW = 245;
-        int gridX = 246;
-        int gridW = Math.max(300, width - gridX - rightW - 18);
-        int cols = 3, gap = 6;
-        int cellW = (gridW - gap * (cols - 1)) / cols;
-        List<String> grid = filteredModules();
-        int idx = 0;
-        for (int row = 0; row < 100 && idx < grid.size(); row++) {
-            for (int col = 0; col < cols && idx < grid.size(); col++) {
-                String name = grid.get(idx++);
-                int x = gridX + col * (cellW + gap);
-                int y = 80 + row * 29;
-                if (mouseX >= x && mouseX <= x + cellW && mouseY >= y && mouseY <= y + 24) {
-                    if (isFunctional(name)) {
-                        if (mouseX >= x + cellW - 25) {
-                            expanded = expanded.equals(name) ? "" : name;
+            int cols = 3, gap = 10, cardW = (mainW - gap * 2) / 3, rowH = 35;
+            int yy = top + 48 - (int) scroll;
+            for (int i = 0; i < filtered.size(); i++) {
+                int col = i % cols, row = i / cols;
+                int cx = mainX + 12 + col * (cardW + gap);
+                int cy = yy + row * rowH;
+                if (mouseX >= cx && mouseX <= cx + cardW && mouseY >= cy && mouseY <= cy + 30) {
+                    String name = filtered.get(i);
+                    if (implemented(name)) {
+                        selected = name;
+                        if (mouseX > cx + cardW - 32) {
+                            // Arrow = select settings without toggling.
                         } else {
                             toggle(name);
-                            expanded = name;
                         }
                     }
                     return true;
                 }
             }
-            if (80 + row * 29 > height - 45) break;
         }
 
-        int settingsX = width - rightW - 9;
-        int settingsY = 62;
-        if (!expanded.isEmpty() && mouseX >= settingsX && mouseX <= settingsX + rightW) {
-            int h = expanded.equals("Nuker [Multi]") ? 292 : expanded.equals("InventoryCleaner") ? 248 : 190;
-            if (mouseY >= settingsY + 28 && mouseY <= settingsY + 54) {
-                toggle(expanded);
+        if (mouseX >= settingsX && mouseY >= top + 48 && mouseY < bottom && implemented(selected)) {
+            int y = top + 54;
+            if (mouseY >= y && mouseY <= y + 24) {
+                toggle(selected);
                 return true;
             }
-            int rows = expanded.equals("Nuker [Multi]") ? 7 : expanded.equals("InventoryCleaner") ? 5 : expanded.equals("X-Ray") ? 2 : 1;
-            int ry = settingsY + 58;
-            for (int i = 0; i < rows; i++) {
-                if (mouseY >= ry && mouseY <= ry + 23) {
-                    cycleSetting(expanded, i);
-                    return true;
+            y += 28;
+            if (mouseY >= y && mouseY <= y + 24) {
+                openBind(selected);
+                return true;
+            }
+            y += 28;
+
+            switch (selected) {
+                case "Nuker [Multi]" -> {
+                    if (clickNuker(mouseY, y)) return true;
                 }
-                ry += 28;
-            }
-            if (mouseY >= settingsY + h - 34 && mouseY <= settingsY + h) {
-                beginKeybind(expanded);
-                return true;
+                case "X-Ray" -> {
+                    if (clickXray(mouseY, y)) return true;
+                }
+                case "Fullbright" -> {
+                    if (clickFullbright(mouseY, y)) return true;
+                }
+                case "InventoryCleaner" -> {
+                    if (clickCleaner(mouseY, y)) return true;
+                }
             }
         }
 
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        if (mouseX < 240) scroll -= (int)Math.signum(verticalAmount) * 3;
-        scroll = Math.max(0, scroll);
+    private boolean clickNuker(double my, int y) {
+        if (hit(my, y)) { PeoClient.CFG.nukerMode = switch (PeoClient.CFG.nukerMode) {
+            case "Normal" -> "SurvMulti"; case "SurvMulti" -> "Multi"; case "Multi" -> "Instant"; default -> "Normal";
+        }; return save();
+        }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerMulti = PeoClient.CFG.nukerMulti >= 10 ? 1 : PeoClient.CFG.nukerMulti + 1; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerCooldown = PeoClient.CFG.nukerCooldown >= 4 ? 0 : PeoClient.CFG.nukerCooldown + 1; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerShape = PeoClient.CFG.nukerShape.equals("Cube") ? "Sphere" : "Cube"; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerRange = PeoClient.CFG.nukerRange >= 6 ? 1 : PeoClient.CFG.nukerRange + 0.5; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerSort = switch (PeoClient.CFG.nukerSort) {
+            case "Closest" -> "Furthest"; case "Furthest" -> "Softest"; case "Softest" -> "Hardest"; case "Hardest" -> "None"; default -> "Closest";
+        }; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerFilter = !PeoClient.CFG.nukerFilter; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerWhitelist = !PeoClient.CFG.nukerWhitelist; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerRaycast = !PeoClient.CFG.nukerRaycast; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerFlatten = !PeoClient.CFG.nukerFlatten; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerRotate = !PeoClient.CFG.nukerRotate; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.nukerHighlight = !PeoClient.CFG.nukerHighlight; return save(); }
+        return false;
+    }
+
+    private boolean clickXray(double my, int y) {
+        if (hit(my, y)) { PeoClient.CFG.xrayFullBright = !PeoClient.CFG.xrayFullBright; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.xrayFluids = !PeoClient.CFG.xrayFluids; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.xrayExposedOnly = !PeoClient.CFG.xrayExposedOnly; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.xrayBackgroundOpacity = PeoClient.CFG.xrayBackgroundOpacity >= 240 ? 0 : PeoClient.CFG.xrayBackgroundOpacity + 40; return save(); }
+        return false;
+    }
+
+    private boolean clickFullbright(double my, int y) {
+        if (hit(my, y)) { PeoClient.CFG.fullbrightMethod = PeoClient.CFG.fullbrightMethod.equals("Gamma") ? "Night Vision" : "Gamma"; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.fullbrightFade = !PeoClient.CFG.fullbrightFade; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.fullbrightBrightness = PeoClient.CFG.fullbrightBrightness >= 16 ? 1 : PeoClient.CFG.fullbrightBrightness + 1; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.fullbrightDefaultBrightness = PeoClient.CFG.fullbrightDefaultBrightness >= 1 ? 0 : PeoClient.CFG.fullbrightDefaultBrightness + 0.1; return save(); }
+        return false;
+    }
+
+    private boolean clickCleaner(double my, int y) {
+        if (hit(my, y)) { PeoClient.CFG.cleanerGreedy = !PeoClient.CFG.cleanerGreedy; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.cleanerMergeStacks = !PeoClient.CFG.cleanerMergeStacks; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.cleanerTouchHotbar = !PeoClient.CFG.cleanerTouchHotbar; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.cleanerActionDelay = PeoClient.CFG.cleanerActionDelay >= 10 ? 1 : PeoClient.CFG.cleanerActionDelay + 1; return save(); }
+        if (hit(my, y += 28)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 60 ? 10 : PeoClient.CFG.cleanerAckTimeout + 5; return save(); }
+        return false;
+    }
+
+    private boolean hit(double mouseY, int y) {
+        return mouseY >= y && mouseY <= y + 24;
+    }
+
+    private boolean save() {
+        PeoClient.CFG.save();
+        if (client != null) PeoClient.reload(client);
         return true;
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (!listening.isEmpty()) {
+        if (listening) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                listening = "";
+                listening = false;
+                bindTarget = null;
                 return true;
             }
-            setKey(listening, keyCode);
+            setBind(bindTarget, keyCode);
+            return true;
+        }
+        if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+            close();
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        scroll = Math.max(0, scroll - verticalAmount * 28);
+        return true;
     }
 
     @Override

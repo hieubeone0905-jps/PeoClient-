@@ -25,6 +25,8 @@ public final class InventoryCleaner {
     private static int pendingSlot = -1;
     private static ItemStack pendingBefore = ItemStack.EMPTY;
     private static int pendingWait;
+    private static int pendingScreenSlot = -1;
+    private static boolean pendingServerAck;
 
     public static void tick(MinecraftClient mc) {
         if (mc.player == null || mc.interactionManager == null || mc.currentScreen != null) return;
@@ -32,13 +34,15 @@ public final class InventoryCleaner {
         // Never pipeline inventory clicks. The server must acknowledge the previous
         // mutation before we send another one; this prevents ghost items on laggy servers.
         if (pendingSlot >= 0) {
-            ItemStack now = mc.player.getInventory().getStack(pendingSlot);
-            boolean changed = !ItemStack.areItemsAndComponentsEqual(now, pendingBefore)
-                    || now.getCount() != pendingBefore.getCount();
-            if (changed || pendingWait-- <= 0) {
+            // The local client updates immediately after clickSlot(). Do not treat
+            // that local prediction as an acknowledgement. We wait for the server's
+            // ScreenHandlerSlotUpdate packet (see ClientPlayNetworkHandlerMixin).
+            if (pendingServerAck || pendingWait-- <= 0) {
                 pendingSlot = -1;
+                pendingScreenSlot = -1;
                 pendingBefore = ItemStack.EMPTY;
                 pendingWait = 0;
+                pendingServerAck = false;
             } else {
                 return;
             }
@@ -181,10 +185,28 @@ public final class InventoryCleaner {
     private static void drop(MinecraftClient mc, int screenSlot) {
         int playerSlot = screenSlot >= 36 ? screenSlot - 36 : screenSlot;
         pendingSlot = playerSlot;
+        pendingScreenSlot = screenSlot;
         pendingBefore = mc.player.getInventory().getStack(playerSlot).copy();
-        pendingWait = Math.max(2, PeoClient.CFG.cleanerAckTimeout);
+        pendingWait = Math.max(4, PeoClient.CFG.cleanerAckTimeout);
+        pendingServerAck = false;
+        // Button 1 = throw the whole stack. One action is sent, then we wait for
+        // the server correction/update before scheduling another disposal.
         mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, screenSlot, 1,
                 SlotActionType.THROW, mc.player);
+    }
+
+    public static void onServerSlotUpdate(int syncId, int screenSlot, ItemStack serverStack, int revision) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.player == null || mc.player.currentScreenHandler == null) return;
+        if (pendingSlot < 0) return;
+        if (syncId != mc.player.currentScreenHandler.syncId) return;
+        if (screenSlot != pendingScreenSlot) return;
+
+        // For a whole-stack throw, the authoritative result is an empty slot.
+        // If the server sends that state, the action is acknowledged.
+        if (serverStack.isEmpty()) {
+            pendingServerAck = true;
+        }
     }
 
     private static void swapWithHotbar(MinecraftClient mc, int playerSlot, int hotbarSlot) {
