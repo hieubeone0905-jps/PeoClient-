@@ -44,7 +44,9 @@ public final class BlockRenderManagerMixin {
                 ci.cancel();
                 return;
             }
-            consumer.fixedColor(255, 255, 255, alpha);
+            // VertexConsumer in Minecraft 1.21.4 does not expose fixedColor().
+            // Keep X-Ray stable by cancelling non-target blocks when the configured
+            // background opacity is zero; otherwise let vanilla render them.
         }
     }
 
