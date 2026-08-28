@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 public class BufferBuilderMixin {
     @ModifyVariable(method="color(IIII)Lnet/minecraft/client/render/VertexConsumer;", at=@At("HEAD"), ordinal=3, argsOnly=true)
     private int peo$alpha(int alpha) {
-        if (BlockRenderManagerMixin.peo$isNonXray() && PeoClient.CFG.xrayOpacity) return PeoClient.CFG.xrayAlpha;
+        if (PeoClient.isNonXrayActive() && PeoClient.CFG.xrayOpacity) return PeoClient.CFG.xrayAlpha;
         return alpha;
     }
 }

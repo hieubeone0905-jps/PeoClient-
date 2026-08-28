@@ -17,11 +17,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(BlockRenderManager.class)
 public class BlockRenderManagerMixin {
-    private static final ThreadLocal<Boolean> PEO_NON_XRAY = ThreadLocal.withInitial(() -> false);
+    
 
     @Inject(method="renderBlock", at=@At("HEAD"), cancellable=true)
     private void peo$renderBlock(BlockState state, BlockPos pos, BlockRenderView world, MatrixStack matrices,
                                  VertexConsumer consumer, boolean cull, Random random, CallbackInfo ci) {
+        PeoClient.setNonXrayActive(false);
         if (!PeoClient.CFG.xray) return;
         boolean ore = PeoClient.CFG.xrayBlocks.contains(net.minecraft.registry.Registries.BLOCK.getId(state.getBlock()).toString());
         if (!ore) {
@@ -31,14 +32,14 @@ public class BlockRenderManagerMixin {
                     if (pos.getY() >= top) { ci.cancel(); return; }
                 }
             }
-            PEO_NON_XRAY.set(PeoClient.CFG.xrayOpacity);
+            PeoClient.setNonXrayActive(PeoClient.CFG.xrayOpacity);
         }
     }
 
     @Inject(method="renderBlock", at=@At("RETURN"))
     private void peo$renderBlockEnd(BlockState state, BlockPos pos, BlockRenderView world, MatrixStack matrices,
                                     VertexConsumer consumer, boolean cull, Random random, CallbackInfo ci) {
-        PEO_NON_XRAY.set(false);
+        PeoClient.setNonXrayActive(false);
     }
 
     @Inject(method="renderFluid", at=@At("HEAD"), cancellable=true)
@@ -47,5 +48,4 @@ public class BlockRenderManagerMixin {
         if (PeoClient.CFG.xray && !PeoClient.CFG.xrayFluids) ci.cancel();
     }
 
-    private static boolean peo$isNonXray() { return PEO_NON_XRAY.get(); }
 }

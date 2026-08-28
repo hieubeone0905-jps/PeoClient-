@@ -27,6 +27,10 @@ import java.util.*;
 
 public class PeoClient implements ClientModInitializer {
     public static final Config CFG = new Config();
+    private static final ThreadLocal<Boolean> NON_XRAY_ACTIVE = ThreadLocal.withInitial(() -> false);
+
+    public static void setNonXrayActive(boolean active) { NON_XRAY_ACTIVE.set(active); }
+    public static boolean isNonXrayActive() { return NON_XRAY_ACTIVE.get(); }
     public static KeyBinding menuKey;
     public static KeyBinding xrayKey, nukerKey, fullbrightKey, cleanerKey;
     private int tick;
