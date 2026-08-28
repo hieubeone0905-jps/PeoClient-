@@ -47,5 +47,5 @@ public class BlockRenderManagerMixin {
         if (PeoClient.CFG.xray && !PeoClient.CFG.xrayFluids) ci.cancel();
     }
 
-    public static boolean peo$isNonXray() { return PEO_NON_XRAY.get(); }
+    private static boolean peo$isNonXray() { return PEO_NON_XRAY.get(); }
 }
