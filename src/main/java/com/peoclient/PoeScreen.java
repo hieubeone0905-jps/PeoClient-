@@ -30,7 +30,7 @@ public class PoeScreen extends Screen {
         else modules();
     }
 
-    private void clearAndInit(){if(client!=null)client.setScreen(new PoeScreen());}
+    protected void clearAndInit(){if(client!=null)client.setScreen(new PoeScreen());}
 
     private boolean match(String name){
         return search==null || search.getText().isBlank() ||
