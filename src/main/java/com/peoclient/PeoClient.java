@@ -113,6 +113,12 @@ public final class PeoClient implements ClientModInitializer {
     public static final class Config {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
 
+        // Account/network settings.  A username override only changes the client-side
+        // display/session value; it does not authenticate a different online account.
+        public String usernameOverride = "";
+        public boolean randomProxy = false;
+        public List<String> proxyList = new ArrayList<>();
+
         // Wurst/LiquidBounce-style X-Ray settings.
         // Wurst-style X-Ray settings: block list, exposed-only and opacity.
         // Fluids are included in the target list, matching Wurst's default X-Ray list.
@@ -163,7 +169,11 @@ public final class PeoClient implements ClientModInitializer {
         public boolean nukerRotate = true;
         public boolean nukerNoParticles = false;
         public boolean nukerHighlight = false;
+        public String nukerHighlightMode = "Opacity";
+        public String nukerHighlightColor = "255,128,128";
         public boolean nukerRangeHighlight = false;
+        public double nukerRangeWidth = 3.0;
+        public String nukerRangeColor = "255,0,0";
 
         // Wurst Fullbright settings.
         public String fullbrightMethod = "Gamma";
@@ -226,7 +236,11 @@ public final class PeoClient implements ClientModInitializer {
                 nukerFlatten = c.nukerFlatten; nukerRotate = c.nukerRotate;
                 nukerNoParticles = c.nukerNoParticles;
                 nukerHighlight = c.nukerHighlight;
+                nukerHighlightMode = c.nukerHighlightMode;
+                nukerHighlightColor = c.nukerHighlightColor;
                 nukerRangeHighlight = c.nukerRangeHighlight;
+                nukerRangeWidth = c.nukerRangeWidth;
+                nukerRangeColor = c.nukerRangeColor;
 
                 fullbrightMethod = c.fullbrightMethod;
                 fullbrightFade = c.fullbrightFade;
@@ -243,6 +257,21 @@ public final class PeoClient implements ClientModInitializer {
                 maxWaterBuckets = c.maxWaterBuckets; maxLavaBuckets = c.maxLavaBuckets;
                 maxMilkBuckets = c.maxMilkBuckets;
                 itemsBlacklist = c.itemsBlacklist; offHandItem = c.offHandItem;
+
+                // Normalize missing values from older PeoClient config files so the
+                // settings screen and module logic never dereference nulls.
+                if (nukerMode == null) nukerMode = "Normal";
+                if (nukerShape == null) nukerShape = "Cube";
+                if (nukerSort == null) nukerSort = "Closest";
+                if (nukerFilterIds == null) nukerFilterIds = "";
+                if (nukerHighlightMode == null) nukerHighlightMode = "Opacity";
+                if (nukerHighlightColor == null) nukerHighlightColor = "255,128,128";
+                if (nukerRangeColor == null) nukerRangeColor = "255,0,0";
+                if (fullbrightMethod == null) fullbrightMethod = "Gamma";
+                if (itemsBlacklist == null) itemsBlacklist = "";
+                if (offHandItem == null) offHandItem = "SHIELD";
+                if (usernameOverride == null) usernameOverride = "";
+                if (proxyList == null) proxyList = new ArrayList<>();
             } catch (Exception ignored) {
             }
         }
