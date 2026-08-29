@@ -33,6 +33,7 @@ public final class PoeScreen extends Screen {
     private boolean draggingSettingsScrollbar;
     private boolean draggingHackScrollbar;
     private double dragScrollbarOffset;
+    private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
             "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray",
@@ -499,7 +500,26 @@ public final class PoeScreen extends Screen {
             }
             int contentY = firstRowsTop + (implemented(selected) ? 68 : 34);
             switch (selected) {
-                case "Nuker [Multi]" -> clickNuker(mouseY, contentY);
+                case "Nuker [Multi]" -> {
+                    int np = contentY + 26;
+                    if (hit(mouseY, np + 34)) draggingSlider = "NukerMulti";
+                    else if (hit(mouseY, np + 68)) draggingSlider = "NukerCooldown";
+                    else if (hit(mouseY, np + 136)) draggingSlider = "NukerRange";
+                    else {
+                        int wp = np + 26;
+                        wp += 34 * 5; // Mode, Multi, Cooldown, Shape, Range, Sort
+                        wp += 60;     // Filter section header gap
+                        wp += 34 * 2; // Filter + Filter mode
+                        wp += 60;     // Edit blocks + selected-list area header
+                        wp += Math.min(nukerFilterIds().size(), 5) * 36;
+                        if (nukerFilterIds().size() > 5) wp += 20;
+                        wp += 34 * 4; // Raycast, Flatten, Rotate, NoParticles
+                        wp += 60;     // Highlight section
+                        wp += 34 * 4; // Highlight, Mode, Color, RangeHighlight
+                        if (hit(mouseY, wp)) draggingSlider = "NukerWidth";
+                    }
+                    clickNuker(mouseX, mouseY, settingsX, settingsW, contentY);
+                }
                 case "InventoryCleaner" -> clickCleaner(mouseY, contentY);
                 case "X-Ray" -> clickXray(mouseY, contentY);
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
@@ -509,19 +529,47 @@ public final class PoeScreen extends Screen {
         return true;
     }
 
-    private void clickNuker(double my, int y) {
+    private double sliderValue(double mouseX, int x, int w, double min, double max, String label) {
+        int sliderX = x + Math.max(130, Math.min(175, textRenderer.getWidth(label) + 28));
+        int sliderW = Math.max(90, w - (sliderX - x) - 72);
+        double t = MathHelper.clamp((mouseX - sliderX) / (double) sliderW, 0.0, 1.0);
+        return min + t * (max - min);
+    }
+
+    private double roundSlider(double value, double min, double max, double step) {
+        double v = MathHelper.clamp(value, min, max);
+        return Math.round(v / step) * step;
+    }
+
+    private void clickNuker(double mx, double my, int x, int w, int y) {
         int p = y + 26;
         if (hit(my, p)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi", "Instant"); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerMulti = step(PeoClient.CFG.nukerMulti, 0, 10); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerCooldown = step(PeoClient.CFG.nukerCooldown, 0, 20); save(); return; } p += 34;
+
+        if (hit(my, p)) {
+            double v = sliderValue(mx, x, w, 0, 10, "Multi");
+            PeoClient.CFG.nukerMulti = (int) Math.round(v);
+            save(); return;
+        } p += 34;
+
+        if (hit(my, p)) {
+            double v = sliderValue(mx, x, w, 0, 20, "Cooldown");
+            PeoClient.CFG.nukerCooldown = (int) Math.round(v);
+            save(); return;
+        } p += 34;
+
         if (hit(my, p)) { PeoClient.CFG.nukerShape = cycle(PeoClient.CFG.nukerShape, "Cube", "Sphere"); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerRange = PeoClient.CFG.nukerRange >= 6.0 ? 0.1 : Math.round((PeoClient.CFG.nukerRange + 0.1) * 10.0) / 10.0; save(); return; } p += 34;
+
+        if (hit(my, p)) {
+            PeoClient.CFG.nukerRange = roundSlider(sliderValue(mx, x, w, 0.1, 6.0, "Range"), 0.1, 6.0, 0.1);
+            save(); return;
+        } p += 34;
+
         if (hit(my, p)) { PeoClient.CFG.nukerSort = cycle(PeoClient.CFG.nukerSort, "Closest", "Furthest", "Softest", "Hardest", "None"); save(); return; } p += 60;
 
         if (hit(my, p)) { PeoClient.CFG.nukerFilter = !PeoClient.CFG.nukerFilter; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerWhitelist = !PeoClient.CFG.nukerWhitelist; save(); return; } p += 34;
         if (hit(my, p)) { client.setScreen(new BlockPickerScreen(this, true)); return; } p += 60;
-        // Clicking a visible selected row removes that block.
+
         List<String> ids = nukerFilterIds();
         int visible = Math.min(ids.size(), 5);
         for (int i = 0; i < visible; i++) {
@@ -539,7 +587,10 @@ public final class PoeScreen extends Screen {
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightMode = cycle(PeoClient.CFG.nukerHighlightMode, "Opacity", "Expand"); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightColor = cycleList(PeoClient.CFG.nukerHighlightColor, "255,128,128", "255,255,255", "255,200,80"); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerRangeHighlight = !PeoClient.CFG.nukerRangeHighlight; save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerRangeWidth = PeoClient.CFG.nukerRangeWidth >= 10 ? 0.1 : Math.round((PeoClient.CFG.nukerRangeWidth + 0.1) * 10.0) / 10.0; save(); return; } p += 34;
+        if (hit(my, p)) {
+            PeoClient.CFG.nukerRangeWidth = roundSlider(sliderValue(mx, x, w, 0.1, 10.0, "Width"), 0.1, 10.0, 0.1);
+            save(); return;
+        } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerRangeColor = cycleList(PeoClient.CFG.nukerRangeColor, "255,0,0", "255,255,255", "0,200,255"); save(); }
     }
 
@@ -643,6 +694,27 @@ public final class PoeScreen extends Screen {
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        if (button == 0 && draggingSlider != null) {
+            int[] l = layout();
+            int sx = l[2], sw = l[3], top = l[4], bottom = l[5];
+            int listTop = top + 40;
+            int viewport = bottom - listTop;
+            int y = listTop - (int) settingsScroll;
+            int firstRowsTop = y + 46;
+            int contentY = firstRowsTop + (implemented(selected) ? 68 : 34);
+            int p = contentY + 26;
+            if ("NukerMulti".equals(draggingSlider)) {
+                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 10, "Multi"));
+            } else if ("NukerCooldown".equals(draggingSlider)) {
+                PeoClient.CFG.nukerCooldown = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 20, "Cooldown"));
+            } else if ("NukerRange".equals(draggingSlider)) {
+                PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 6.0, "Range"), 0.1, 6.0, 0.1);
+            } else if ("NukerWidth".equals(draggingSlider)) {
+                PeoClient.CFG.nukerRangeWidth = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 10.0, "Width"), 0.1, 10.0, 0.1);
+            }
+            PeoClient.CFG.save();
+            return true;
+        }
         int[] l = layout();
         int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], top = l[4], bottom = l[5];
         int listTop = top + 40;
@@ -676,6 +748,7 @@ public final class PoeScreen extends Screen {
         if (button == 0) {
             draggingSettingsScrollbar = false;
             draggingHackScrollbar = false;
+            draggingSlider = null;
         }
         return super.mouseReleased(mouseX, mouseY, button);
     }
@@ -731,6 +804,8 @@ public final class PoeScreen extends Screen {
         private final PoeScreen parent;
         private TextFieldWidget search;
         private double scroll;
+        private boolean draggingPickerScrollbar;
+        private double pickerDragOffset;
 
         private final boolean nukerMode;
 
@@ -824,6 +899,19 @@ public final class PoeScreen extends Screen {
                 }
                 y += rowH;
             }
+            int viewportH = bottom - top;
+            int contentH = Math.max(viewportH, entries.size() * rowH + 18);
+            if (contentH > viewportH) {
+                int trackX = right - 6;
+                int trackTop = top;
+                int trackBottom = bottom;
+                int thumbH = Math.max(24, (int)((viewportH / (double)contentH) * viewportH));
+                int travel = Math.max(1, viewportH - thumbH);
+                int maxScroll = Math.max(0, contentH - viewportH);
+                int thumbY = trackTop + (maxScroll == 0 ? 0 : (int)((scroll / maxScroll) * travel));
+                d.fill(trackX, trackTop, trackX + 4, trackBottom, 0xFF243641);
+                d.fill(trackX, thumbY, trackX + 4, thumbY + thumbH, 0xFFE1E6EA);
+            }
             if (entries.isEmpty()) {
                 d.drawText(textRenderer, Text.literal("No matching blocks."), left + 10, top + 35, 0xFFFFFFFF, false);
             }
@@ -840,7 +928,21 @@ public final class PoeScreen extends Screen {
             int top = 72;
             int bottom = height - 34;
             if (mouseX < left || mouseX > right || mouseY < top || mouseY > bottom) return false;
+            List<Entry> entries = matches();
             int rowH = 34;
+            int viewportH = bottom - top;
+            int contentH = Math.max(viewportH, entries.size() * rowH + 18);
+            if (button == 0 && contentH > viewportH && mouseX >= right - 12) {
+                int thumbH = Math.max(24, (int)((viewportH / (double)contentH) * viewportH));
+                int travel = Math.max(1, viewportH - thumbH);
+                int maxScroll = Math.max(0, contentH - viewportH);
+                int thumbY = top + (maxScroll == 0 ? 0 : (int)((scroll / maxScroll) * travel));
+                if (mouseY >= thumbY && mouseY <= thumbY + thumbH) {
+                    draggingPickerScrollbar = true;
+                    pickerDragOffset = mouseY - thumbY;
+                    return true;
+                }
+            }
             int y = top + 18 - (int) scroll;
             for (Entry e : matches()) {
                 if (mouseY >= y && mouseY < y + rowH - 4) {
@@ -863,6 +965,30 @@ public final class PoeScreen extends Screen {
             int max = Math.max(0, matches().size() - visible);
             scroll = MathHelper.clamp(scroll - verticalAmount * rowH, 0, max * rowH);
             return true;
+        }
+
+        @Override
+        public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+            if (button == 0 && draggingPickerScrollbar) {
+                int top = 72;
+                int bottom = height - 34;
+                int viewportH = bottom - top;
+                int contentH = Math.max(viewportH, matches().size() * 34 + 18);
+                int thumbH = Math.max(24, (int)((viewportH / (double)contentH) * viewportH));
+                int travel = Math.max(1, viewportH - thumbH);
+                int maxScroll = Math.max(0, contentH - viewportH);
+                int desired = (int)(mouseY - pickerDragOffset - top);
+                int rel = MathHelper.clamp(desired, 0, travel);
+                scroll = maxScroll == 0 ? 0 : (rel / (double)travel) * maxScroll;
+                return true;
+            }
+            return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        }
+
+        @Override
+        public boolean mouseReleased(double mouseX, double mouseY, int button) {
+            if (button == 0) draggingPickerScrollbar = false;
+            return super.mouseReleased(mouseX, mouseY, button);
         }
 
         @Override
