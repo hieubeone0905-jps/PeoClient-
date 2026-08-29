@@ -462,6 +462,7 @@ public final class PeoClient implements ClientModInitializer {
 
     public static final class NukerLogic {
         private static final List<BlockPos> renderBlocks = new ArrayList<>();
+        private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
         private static BlockPos breakingPos;
         private static Direction breakingSide;
@@ -472,78 +473,101 @@ public final class PeoClient implements ClientModInitializer {
             if (mc.interactionManager == null || mc.player == null || mc.world == null
                     || mc.currentScreen != null) return;
 
-            if (cooldown > 0) {
-                cooldown--;
-                return;
-            }
-
-            List<Target> targets = collect(mc);
-            if (targets.isEmpty()) return;
-
-            targets.sort(comparator(mc));
             renderBlocks.clear();
 
-            int mode = mode();
-            // Keep server-facing block breaking conservative. SurvMulti is intentionally
-            // rate-limited to avoid flooding a server with block-break requests.
-            int limit = switch (mode) {
-                case 2 -> Math.min(2, Math.max(1, CFG.nukerMulti)); // Multi
-                case 1 -> 1; // SurvMulti: one legitimate break progression at a time
-                default -> 1;
-            };
-
-            // Survival/server-safe progression: keep one legitimate break state alive
-            // across ticks. Calling updateBlockBreakingProgress() without first starting
-            // the break is rejected by stricter servers and can leave the client
-            // swinging at a block that never actually disappears.
-            Target target = targets.get(0);
-            if (breakingPos != null && CFG.nukerFilter && !passesFilter(mc.world.getBlockState(breakingPos).getBlock())) {
-                mc.interactionManager.cancelBlockBreaking();
-                breakingPos = null;
-                breakingSide = null;
-            }
-            BlockState state = mc.world.getBlockState(target.pos);
-            float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
-            if (delta <= 0) return;
-
-            // Rotate first and let the next tick send the updated player rotation before
-            // starting the server-facing block-break action. This keeps the interaction
-            // closer to vanilla click/rotation ordering instead of changing view and
-            // immediately sending an action in the same tick.
-            if (CFG.nukerRotate && rotateTo(mc, target.pos)) {
-                cooldown = Math.max(1, CFG.nukerCooldown);
+            if (cooldown > 0) {
+                cooldown--;
+                if (breakingPos != null) renderBlocks.add(breakingPos);
                 return;
             }
 
-            boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
-                    || breakingSide != target.side;
-            if (newTarget) {
+            // Build a fresh queue when the old one is exhausted or its active target became invalid.
+            if (queue.isEmpty() || !activeTargetStillValid(mc)) {
                 if (breakingPos != null) {
                     mc.interactionManager.cancelBlockBreaking();
-                }
-                boolean started = mc.interactionManager.attackBlock(target.pos, target.side);
-                if (!started) {
                     breakingPos = null;
                     breakingSide = null;
+                }
+                queue.clear();
+                queue.addAll(collect(mc));
+                queue.sort(comparator(mc));
+            }
+
+            int batch = MathHelper.clamp(CFG.nukerMulti, 1, 10);
+            if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
+                // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
+                if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
+            } else if (!queue.isEmpty()) {
+                queue.subList(1, queue.size()).clear();
+            }
+
+            while (!queue.isEmpty()) {
+                Target target = queue.get(0);
+                if (!isValidTarget(mc, target)) {
+                    queue.remove(0);
+                    continue;
+                }
+
+                BlockState state = mc.world.getBlockState(target.pos);
+                float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
+                if (delta <= 0) {
+                    queue.remove(0);
+                    continue;
+                }
+
+                if (CFG.nukerRotate && rotateTo(mc, target.pos)) {
+                    cooldown = 1;
+                    renderBlocks.add(target.pos);
                     return;
                 }
-                breakingPos = target.pos.toImmutable();
-                breakingSide = target.side;
-            } else {
-                mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
+
+                boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
+                        || breakingSide != target.side;
+                if (newTarget) {
+                    if (breakingPos != null) mc.interactionManager.cancelBlockBreaking();
+                    if (!mc.interactionManager.attackBlock(target.pos, target.side)) {
+                        queue.remove(0);
+                        breakingPos = null;
+                        breakingSide = null;
+                        continue;
+                    }
+                    breakingPos = target.pos.toImmutable();
+                    breakingSide = target.side;
+                } else {
+                    mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
+                }
+
+                mc.player.swingHand(Hand.MAIN_HAND);
+                renderBlocks.add(target.pos);
+
+                if (mc.world.getBlockState(target.pos).isAir()) {
+                    queue.remove(0);
+                    breakingPos = null;
+                    breakingSide = null;
+                    // Advance immediately only after the world confirms the previous block is gone.
+                    cooldown = Math.max(0, CFG.nukerCooldown);
+                } else {
+                    cooldown = Math.max(0, CFG.nukerCooldown);
+                }
+                return;
             }
+        }
 
-            mc.player.swingHand(Hand.MAIN_HAND);
-            renderBlocks.add(target.pos);
+        private static boolean activeTargetStillValid(MinecraftClient mc) {
+            if (breakingPos == null) return false;
+            BlockState state = mc.world.getBlockState(breakingPos);
+            return !state.isAir() && !(state.getBlock() instanceof FluidBlock)
+                    && (!CFG.nukerFilter || passesFilter(state.getBlock()));
+        }
 
-            // If the block was actually broken by the server/world update, forget the
-            // active target so the next tick can start a fresh legitimate break.
-            if (mc.world.getBlockState(target.pos).isAir()) {
-                breakingPos = null;
-                breakingSide = null;
-            }
-
-            cooldown = Math.max(0, CFG.nukerCooldown);
+        private static boolean isValidTarget(MinecraftClient mc, Target target) {
+            BlockState state = mc.world.getBlockState(target.pos);
+            if (state.isAir() || state.getBlock() instanceof FluidBlock) return false;
+            if (CFG.nukerFlatten && target.pos.getY() < mc.player.getBlockY() - 1) return false;
+            if (CFG.nukerFilter && !passesFilter(state.getBlock())) return false;
+            if (CFG.nukerRaycast && target.side == null) return false;
+            return mc.player.getEyePos().distanceTo(Vec3d.ofCenter(target.pos))
+                    <= MathHelper.clamp(CFG.nukerRange, 1.0, 6.0) + 0.25;
         }
 
         private static List<Target> collect(MinecraftClient mc) {
@@ -561,18 +585,15 @@ public final class PeoClient implements ClientModInitializer {
                         double distance = "Cube".equalsIgnoreCase(CFG.nukerShape)
                                 ? Math.max(Math.max(Math.abs(x), Math.abs(y)), Math.abs(z))
                                 : mc.player.getEyePos().distanceTo(Vec3d.ofCenter(pos));
-
                         if (distance > range + 0.25) continue;
 
                         BlockState state = mc.world.getBlockState(pos);
                         if (state.isAir() || state.getBlock() instanceof FluidBlock) continue;
-
                         if (CFG.nukerFilter && !passesFilter(state.getBlock())) continue;
 
                         Direction side = bestSide(mc, pos);
                         if (CFG.nukerRaycast && side == null) continue;
                         if (side == null) side = Direction.UP;
-
                         out.add(new Target(pos, side));
                     }
                 }
@@ -600,31 +621,22 @@ public final class PeoClient implements ClientModInitializer {
         private static Comparator<Target> comparator(MinecraftClient mc) {
             Comparator<Target> keepUnder = Comparator.comparing(
                     t -> t.pos.equals(BlockPos.ofFloored(mc.player.getPos()).down()));
-
             Comparator<Target> distance = Comparator.comparingDouble(
                     t -> mc.player.getEyePos().distanceTo(Vec3d.ofCenter(t.pos)));
-
             Comparator<Target> hardness = Comparator.comparingDouble(
                     t -> mc.world.getBlockState(t.pos).getHardness(mc.world, t.pos));
-
             Comparator<Target> result = switch (CFG.nukerSort) {
                 case "Furthest" -> distance.reversed();
                 case "Softest" -> hardness;
                 case "Hardest" -> hardness.reversed();
                 default -> distance;
             };
-
             return keepUnder.thenComparing(result);
         }
 
         private static Direction bestSide(MinecraftClient mc, BlockPos pos) {
             Vec3d eye = mc.player.getEyePos();
             Vec3d center = Vec3d.ofCenter(pos);
-
-            // Prefer the exact face that a vanilla-style ray from the player's eye
-            // actually hits. The old implementation picked the first adjacent air
-            // face, which could be a different face from the one visible to the player,
-            // especially when mining from above/below.
             try {
                 BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
                         eye, center,
@@ -636,22 +648,9 @@ public final class PeoClient implements ClientModInitializer {
                 }
             } catch (Throwable ignored) {
             }
-
-            // Raycast mode should never guess a face that cannot be verified.
             if (CFG.nukerRaycast) return null;
-
             Vec3d toPlayer = eye.subtract(center);
-            Direction facing = Direction.getFacing(toPlayer.x, toPlayer.y, toPlayer.z);
-            return facing;
-        }
-
-        private static int mode() {
-            return switch (CFG.nukerMode) {
-                case "SurvMulti" -> 1;
-                case "Multi" -> 2;
-                case "Instant" -> 3;
-                default -> 0;
-            };
+            return Direction.getFacing(toPlayer.x, toPlayer.y, toPlayer.z);
         }
 
         private static boolean rotateTo(MinecraftClient mc, BlockPos pos) {
@@ -659,7 +658,6 @@ public final class PeoClient implements ClientModInitializer {
             double horizontal = Math.sqrt(v.x * v.x + v.z * v.z);
             float yaw = (float) (Math.toDegrees(Math.atan2(v.z, v.x)) - 90.0);
             float pitch = (float) -Math.toDegrees(Math.atan2(v.y, horizontal));
-
             float yawDelta = MathHelper.wrapDegrees(yaw - mc.player.getYaw());
             float pitchDelta = pitch - mc.player.getPitch();
             boolean changed = Math.abs(yawDelta) > 2.0f || Math.abs(pitchDelta) > 2.0f;
