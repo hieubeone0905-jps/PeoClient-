@@ -567,7 +567,7 @@ public final class PeoClient implements ClientModInitializer {
             // Wurst-style compact HUD: logo at top-left, active modules directly underneath.
             var title = Text.literal("PeoClient 1.21.4 V1")
                     .styled(style -> style.withBold(true));
-            d.drawText(mc.textRenderer, title, 10, 8, 0xFFFFFFFF);
+            d.drawText(mc.textRenderer, title, 10, 8, 0xFFFFFFFF, false);
 
             int y = 24;
             if (CFG.xray) y = active(d, mc, "X-Ray", y);
@@ -579,7 +579,7 @@ public final class PeoClient implements ClientModInitializer {
         private static int active(net.minecraft.client.gui.DrawContext d, MinecraftClient mc, String name, int y) {
             d.drawText(mc.textRenderer,
                     Text.literal(name).styled(style -> style.withBold(true)),
-                    10, y, 0xFFFFFFFF);
+                    10, y, 0xFFFFFFFF, false);
             return y + 14;
         }
     }}
