@@ -89,8 +89,8 @@ public final class InventoryCleaner {
     private static boolean sortHotbar(MinecraftClient mc, List<Entry> entries) {
         String[] targets = PeoClient.CFG.slotItems == null ? new String[0] : PeoClient.CFG.slotItems;
         for (int hotbar = 0; hotbar < 9; hotbar++) {
-            String target = hotbar < targets.length ? targets[hotbar] : "NONE";
-            target = safe(target, "NONE");
+            String configuredTarget = hotbar < targets.length ? targets[hotbar] : "NONE";
+            final String target = safe(configuredTarget, "NONE");
             if (target.equalsIgnoreCase("NONE") || target.equalsIgnoreCase("IGNORE")) continue;
 
             ItemStack current = mc.player.getInventory().getStack(hotbar);

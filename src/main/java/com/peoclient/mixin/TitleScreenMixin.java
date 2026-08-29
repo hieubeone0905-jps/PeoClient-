@@ -19,7 +19,7 @@ public final class TitleScreenMixin {
         int height = mc.getWindow().getScaledHeight();
         int x = width / 2 - 100;
         int y = Math.min(height - 62, height / 4 + 108);
-        screen.addDrawableChild(ButtonWidget.builder(
+        ((ScreenAccessor) screen).peo$addDrawableChild(ButtonWidget.builder(
                 net.minecraft.text.Text.literal("Peo Account: " + PeoClient.getDisplayUsername()),
                 b -> net.minecraft.client.MinecraftClient.getInstance().setScreen(new AccountScreen(screen)))
                 .dimensions(x, y, 200, 20).build());

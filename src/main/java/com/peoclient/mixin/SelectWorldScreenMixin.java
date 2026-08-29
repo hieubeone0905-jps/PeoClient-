@@ -15,7 +15,7 @@ public final class SelectWorldScreenMixin {
     private void peo$addAccountButton(CallbackInfo ci) {
         SelectWorldScreen screen = (SelectWorldScreen) (Object) this;
         var mc = net.minecraft.client.MinecraftClient.getInstance();
-        screen.addDrawableChild(ButtonWidget.builder(
+        ((ScreenAccessor) screen).peo$addDrawableChild(ButtonWidget.builder(
                 net.minecraft.text.Text.literal("Peo Account: " + PeoClient.getDisplayUsername()),
                 b -> mc.setScreen(new AccountScreen(screen)))
                 .dimensions(10, 10, 190, 20).build());
