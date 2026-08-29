@@ -495,6 +495,11 @@ public final class PeoClient implements ClientModInitializer {
             // the break is rejected by stricter servers and can leave the client
             // swinging at a block that never actually disappears.
             Target target = targets.get(0);
+            if (breakingPos != null && CFG.nukerFilter && !passesFilter(mc.world.getBlockState(breakingPos).getBlock())) {
+                mc.interactionManager.cancelBlockBreaking();
+                breakingPos = null;
+                breakingSide = null;
+            }
             BlockState state = mc.world.getBlockState(target.pos);
             float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
             if (delta <= 0) return;
@@ -553,7 +558,7 @@ public final class PeoClient implements ClientModInitializer {
                         BlockState state = mc.world.getBlockState(pos);
                         if (state.isAir() || state.getBlock() instanceof FluidBlock) continue;
 
-                        if (CFG.nukerFilter && filtered(state.getBlock())) continue;
+                        if (CFG.nukerFilter && !passesFilter(state.getBlock())) continue;
 
                         Direction side = bestSide(mc, pos);
                         if (CFG.nukerRaycast && side == null) continue;
@@ -566,14 +571,21 @@ public final class PeoClient implements ClientModInitializer {
             return out;
         }
 
-        private static boolean filtered(Block block) {
-            String id = Registries.BLOCK.getId(block).toString();
+        private static boolean passesFilter(Block block) {
             Set<String> filter = new LinkedHashSet<>();
-            for (String s : CFG.nukerFilterIds.split("[,\\n\\s]+")) {
-                if (!s.isBlank()) filter.add(s.trim());
+            String raw = CFG.nukerFilterIds == null ? "" : CFG.nukerFilterIds;
+            for (String s : raw.split("[,\\n\\s]+")) {
+                if (!s.isBlank()) {
+                    String normalized = s.trim().toLowerCase(Locale.ROOT);
+                    if (!normalized.contains(":")) normalized = "minecraft:" + normalized;
+                    filter.add(normalized);
+                }
             }
-            boolean contains = filter.contains(id);
-            return CFG.nukerWhitelist ? !contains : contains;
+
+            String blockId = Registries.BLOCK.getId(block).toString().toLowerCase(Locale.ROOT);
+            if (filter.isEmpty()) return !CFG.nukerWhitelist;
+            boolean contains = filter.contains(blockId);
+            return CFG.nukerWhitelist ? contains : !contains;
         }
 
         private static Comparator<Target> comparator(MinecraftClient mc) {

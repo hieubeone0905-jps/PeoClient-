@@ -1,7 +1,11 @@
-# Build Status
+# BUILD STATUS
 
-Patch: Nuker survival block-breaking synchronization.
+This revision updates the Nuker settings UI and filter list.
 
-Changed `NukerLogic` to use a real `attackBlock()` start followed by `updateBlockBreakingProgress()` on subsequent ticks, with a tracked breaking position/face and cancellation when switching targets. This avoids sending progress updates for a break that was never started.
+- Numeric Nuker controls are displayed as slider-style controls with explicit 0/min to maximum ranges.
+- The Nuker settings panel remains scrollable.
+- The main Nuker settings panel shows up to five selected blacklist/whitelist blocks with icon, translated name, and registry ID.
+- Clicking a selected row removes it.
+- The existing Block Picker remains available for adding/removing blocks.
 
-This is intended to improve vanilla/server-compatible block breaking. It does not attempt to bypass anti-cheat or server protections.
+Build verification in this environment was attempted, but the Gradle wrapper could not download Gradle 8.12.1 because `services.gradle.org` was not reachable. The ZIP itself was validated after packaging.

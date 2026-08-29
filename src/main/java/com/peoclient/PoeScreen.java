@@ -5,6 +5,7 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.item.BlockItem;
+import net.minecraft.block.Block;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
@@ -202,16 +203,17 @@ public final class PoeScreen extends Screen {
     private int drawNuker(DrawContext d, int x, int y, int w) {
         y = section(d, x, y, "Mining");
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerMode);
-        y = rowValue(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti + " blocks");
-        y = rowValue(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown + " ticks");
+        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 0, 10, "%.0f blocks");
+        y = sliderRow(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown, 0, 20, "%.0f ticks");
         y = rowValue(d, x, y, w, "Shape", PeoClient.CFG.nukerShape);
-        y = rowValue(d, x, y, w, "Range", String.format(Locale.ROOT, "%.1f", PeoClient.CFG.nukerRange));
+        y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 0.1, 6.0, "%.1f");
         y = rowValue(d, x, y, w, "Sort", PeoClient.CFG.nukerSort);
 
         y = section(d, x, y, "Filter");
         y = rowToggle(d, x, y, w, "Filter", PeoClient.CFG.nukerFilter);
         y = rowValue(d, x, y, w, "Filter mode", PeoClient.CFG.nukerWhitelist ? "Whitelist" : "Blacklist");
-        y = rowValue(d, x, y, w, "Edit blocks", shortList(PeoClient.CFG.nukerFilterIds));
+        y = rowValue(d, x, y, w, "Edit blocks", selectedNukerCount() + " selected");
+        y = drawSelectedNukerBlocks(d, x, y, w);
 
         y = section(d, x, y, "Mining behaviour");
         y = rowToggle(d, x, y, w, "Raycast", PeoClient.CFG.nukerRaycast);
@@ -224,9 +226,52 @@ public final class PoeScreen extends Screen {
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerHighlightMode);
         y = rowValue(d, x, y, w, "Color", PeoClient.CFG.nukerHighlightColor);
         y = rowToggle(d, x, y, w, "RangeHighlight", PeoClient.CFG.nukerRangeHighlight);
-        y = rowValue(d, x, y, w, "Width", String.format(Locale.ROOT, "%.1f", PeoClient.CFG.nukerRangeWidth));
+        y = sliderRow(d, x, y, w, "Width", PeoClient.CFG.nukerRangeWidth, 0.1, 10.0, "%.1f");
         y = rowValue(d, x, y, w, "Range color", PeoClient.CFG.nukerRangeColor);
         return y;
+    }
+
+    private int drawSelectedNukerBlocks(DrawContext d, int x, int y, int w) {
+        List<String> ids = nukerFilterIds();
+        if (ids.isEmpty()) return y + 6;
+        int visible = Math.min(ids.size(), 5);
+        for (int i = 0; i < visible; i++) {
+            String raw = ids.get(i);
+            Identifier id = Identifier.tryParse(raw);
+            String name = raw;
+            ItemStack stack = ItemStack.EMPTY;
+            if (id != null && Registries.BLOCK.containsId(id)) {
+                Block block = Registries.BLOCK.get(id);
+                name = block.asItem().getDefaultStack().getName().getString();
+                stack = block.asItem().getDefaultStack();
+            }
+            d.fill(x, y, x + w, y + 32, 0x9A121C24);
+            d.drawBorder(x, y, w, 32, 0xFF294354);
+            if (!stack.isEmpty()) d.drawItem(stack, x + 6, y + 7);
+            drawText(d, fitText(name, Math.max(80, w - 120)), x + 34, y + 6, 0xFFFFFFFF, false);
+            drawText(d, fitText(raw, Math.max(80, w - 120)), x + 34, y + 18, 0xFF8E9AA3, false);
+            drawText(d, "X", x + w - 18, y + 10, 0xFFFFFFFF, true);
+            y += 36;
+        }
+        if (ids.size() > visible) {
+            drawText(d, "+" + (ids.size() - visible) + " more...", x + 8, y + 2, 0xFF98A5AE, false);
+            y += 20;
+        }
+        return y + 4;
+    }
+
+    private List<String> nukerFilterIds() {
+        List<String> out = new ArrayList<>();
+        String raw = PeoClient.CFG.nukerFilterIds == null ? "" : PeoClient.CFG.nukerFilterIds;
+        for (String s : raw.split("[,\\n\\s]+")) {
+            String t = s.trim();
+            if (!t.isBlank() && !out.contains(t)) out.add(t);
+        }
+        return out;
+    }
+
+    private int selectedNukerCount() {
+        return nukerFilterIds().size();
     }
 
     private int drawCleaner(DrawContext d, int x, int y, int w) {
@@ -312,6 +357,24 @@ public final class PoeScreen extends Screen {
             out.append(value.charAt(i));
         }
         return out + suffix;
+    }
+
+    private int sliderRow(DrawContext d, int x, int y, int w, String label, double value, double min, double max, String format) {
+        d.fill(x, y, x + w, y + 28, 0xB7152029);
+        d.drawBorder(x, y, w, 28, 0xFF294354);
+        drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
+        int sliderX = x + Math.max(130, Math.min(175, textRenderer.getWidth(label) + 28));
+        int sliderW = Math.max(90, w - (sliderX - x) - 72);
+        int trackY = y + 14;
+        d.fill(sliderX, trackY - 2, sliderX + sliderW, trackY + 2, 0xFF304B5C);
+        double norm = (value - min) / (max - min);
+        norm = Math.max(0.0, Math.min(1.0, norm));
+        int knobX = sliderX + (int)Math.round(norm * sliderW);
+        d.fill(sliderX, trackY - 2, knobX, trackY + 2, 0xFF8EA6B5);
+        d.fill(knobX - 3, trackY - 5, knobX + 3, trackY + 5, 0xFFFFFFFF);
+        String shown = String.format(Locale.ROOT, format, value);
+        drawText(d, shown, x + w - textRenderer.getWidth(shown) - 10, y + 9, 0xFFE1E6EA, false);
+        return y + 34;
     }
 
     private int rowToggle(DrawContext d, int x, int y, int w, String label, boolean value) {
@@ -447,17 +510,25 @@ public final class PoeScreen extends Screen {
     }
 
     private void clickNuker(double my, int y) {
-        int p = y + 26; // Mining heading
+        int p = y + 26;
         if (hit(my, p)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi", "Instant"); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerMulti = step(PeoClient.CFG.nukerMulti, 1, 10); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerCooldown = step(PeoClient.CFG.nukerCooldown, 0, 4); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerMulti = step(PeoClient.CFG.nukerMulti, 0, 10); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerCooldown = step(PeoClient.CFG.nukerCooldown, 0, 20); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerShape = cycle(PeoClient.CFG.nukerShape, "Cube", "Sphere"); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerRange = PeoClient.CFG.nukerRange >= 6.0 ? 1.0 : PeoClient.CFG.nukerRange + 0.5; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerRange = PeoClient.CFG.nukerRange >= 6.0 ? 0.1 : Math.round((PeoClient.CFG.nukerRange + 0.1) * 10.0) / 10.0; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerSort = cycle(PeoClient.CFG.nukerSort, "Closest", "Furthest", "Softest", "Hardest", "None"); save(); return; } p += 60;
 
         if (hit(my, p)) { PeoClient.CFG.nukerFilter = !PeoClient.CFG.nukerFilter; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerWhitelist = !PeoClient.CFG.nukerWhitelist; save(); return; } p += 34;
         if (hit(my, p)) { client.setScreen(new BlockPickerScreen(this, true)); return; } p += 60;
+        // Clicking a visible selected row removes that block.
+        List<String> ids = nukerFilterIds();
+        int visible = Math.min(ids.size(), 5);
+        for (int i = 0; i < visible; i++) {
+            if (hit(my, p)) { ids.remove(i); PeoClient.CFG.nukerFilterIds = String.join(",", ids); save(); return; }
+            p += 36;
+        }
+        if (ids.size() > visible) p += 20;
 
         if (hit(my, p)) { PeoClient.CFG.nukerRaycast = !PeoClient.CFG.nukerRaycast; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerFlatten = !PeoClient.CFG.nukerFlatten; save(); return; } p += 34;
@@ -468,7 +539,7 @@ public final class PoeScreen extends Screen {
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightMode = cycle(PeoClient.CFG.nukerHighlightMode, "Opacity", "Expand"); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightColor = cycleList(PeoClient.CFG.nukerHighlightColor, "255,128,128", "255,255,255", "255,200,80"); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerRangeHighlight = !PeoClient.CFG.nukerRangeHighlight; save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.nukerRangeWidth = PeoClient.CFG.nukerRangeWidth >= 10 ? .1 : PeoClient.CFG.nukerRangeWidth + .5; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerRangeWidth = PeoClient.CFG.nukerRangeWidth >= 10 ? 0.1 : Math.round((PeoClient.CFG.nukerRangeWidth + 0.1) * 10.0) / 10.0; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerRangeColor = cycleList(PeoClient.CFG.nukerRangeColor, "255,0,0", "255,255,255", "0,200,255"); save(); }
     }
 
@@ -627,7 +698,7 @@ public final class PoeScreen extends Screen {
 
     private int settingsContentHeight() {
         return switch (selected) {
-            case "Nuker [Multi]" -> 790;
+            case "Nuker [Multi]" -> 980;
             case "InventoryCleaner" -> 900;
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;
@@ -688,7 +759,9 @@ public final class PoeScreen extends Screen {
                 String name = stack.getName().getString();
                 String key = id.toString();
                 if (q.isBlank() || name.toLowerCase(Locale.ROOT).contains(q) || key.contains(q)) {
-                    out.add(new Entry(id, name, stack));
+                    Block block = ((BlockItem) item).getBlock();
+                    Identifier blockId = Registries.BLOCK.getId(block);
+                    out.add(new Entry(blockId, name, stack));
                 }
             }
             out.sort((a, b) -> {
