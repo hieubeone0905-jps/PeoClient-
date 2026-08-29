@@ -86,8 +86,15 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static int getModuleKeyCode(String module) {
-        KeyBinding key = MODULE_KEYS.get(module);
-        return key == null ? GLFW.GLFW_KEY_UNKNOWN : key.getBoundKey().getCode();
+        Integer stored = CFG.keybinds.get(module);
+        if (stored != null) return stored;
+        return switch (module) {
+            case "Fullbright" -> GLFW.GLFW_KEY_F;
+            case "InventoryCleaner" -> GLFW.GLFW_KEY_I;
+            case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
+            case "X-Ray" -> GLFW.GLFW_KEY_X;
+            default -> GLFW.GLFW_KEY_UNKNOWN;
+        };
     }
 
     private void tick(MinecraftClient mc) {
