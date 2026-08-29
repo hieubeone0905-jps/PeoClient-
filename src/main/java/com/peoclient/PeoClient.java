@@ -480,9 +480,11 @@ public final class PeoClient implements ClientModInitializer {
             renderBlocks.clear();
 
             int mode = mode();
+            // Keep server-facing block breaking conservative. SurvMulti is intentionally
+            // rate-limited to avoid flooding a server with block-break requests.
             int limit = switch (mode) {
-                case 2 -> Math.max(1, CFG.nukerMulti); // Multi
-                case 1 -> Math.max(1, CFG.nukerMulti); // SurvMulti
+                case 2 -> Math.min(2, Math.max(1, CFG.nukerMulti)); // Multi
+                case 1 -> 1; // SurvMulti: one legitimate break progression at a time
                 default -> 1;
             };
 
@@ -495,7 +497,7 @@ public final class PeoClient implements ClientModInitializer {
 
                 // Survival-safe serial progress: never pretend a server accepted an
                 // impossible instant break.
-                if (mode == 1 && delta < 1.0f && broken > 0) break;
+                if (mode == 1 && broken > 0) break;
 
                 if (CFG.nukerRotate) rotateTo(mc, target.pos);
 

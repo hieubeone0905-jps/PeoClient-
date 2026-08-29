@@ -29,6 +29,9 @@ public final class PoeScreen extends Screen {
     private String bindTarget;
     private double hackScroll;
     private double settingsScroll;
+    private boolean draggingSettingsScrollbar;
+    private boolean draggingHackScrollbar;
+    private double dragScrollbarOffset;
 
     static final List<String> MODULES = Arrays.asList(
             "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray",
@@ -142,6 +145,8 @@ public final class PoeScreen extends Screen {
         d.enableScissor(settingsX + 1, listTop, settingsX + settingsW - 1, listBottom);
         drawSettings(d, settingsX + 14, listTop, settingsW - 28);
         d.disableScissor();
+        drawScrollbar(d, leftX + leftW - 7, listTop, 6, listBottom - listTop, filtered().size() * 20, listBottom - listTop, hackScroll);
+        drawScrollbar(d, settingsX + settingsW - 7, listTop, 6, listBottom - listTop, settingsContentHeight(), listBottom - listTop, settingsScroll);
 
         drawText(d, "Wheel: scroll hovered panel", 14, height - 16, 0xFF73808B, false);
         drawText(d, "ESC: close", Math.max(18, width - textRenderer.getWidth("ESC: close") - 14), height - 16, 0xFF73808B, false);
@@ -387,7 +392,26 @@ public final class PoeScreen extends Screen {
         int listTop = top + 40;
         if (mouseY < listTop || mouseY >= bottom) return super.mouseClicked(mouseX, mouseY, button);
 
-        if (mouseX >= leftX && mouseX <= leftX + leftW) {
+        int viewport = bottom - listTop;
+        if (button == 0 && mouseX >= leftX + leftW - 10 && mouseX < leftX + leftW && canScroll(filtered().size() * 20, viewport)) {
+            double max = Math.max(0, filtered().size() * 20 - viewport);
+            int[] thumb = scrollbarThumb(listTop, viewport, filtered().size() * 20, viewport, hackScroll);
+            if (mouseY >= thumb[0] && mouseY <= thumb[1]) {
+                draggingHackScrollbar = true;
+                dragScrollbarOffset = mouseY - thumb[0];
+                return true;
+            }
+        }
+        if (button == 0 && mouseX >= settingsX + settingsW - 10 && mouseX < settingsX + settingsW && canScroll(settingsContentHeight(), viewport)) {
+            int[] thumb = scrollbarThumb(listTop, viewport, settingsContentHeight(), viewport, settingsScroll);
+            if (mouseY >= thumb[0] && mouseY <= thumb[1]) {
+                draggingSettingsScrollbar = true;
+                dragScrollbarOffset = mouseY - thumb[0];
+                return true;
+            }
+        }
+
+        if (mouseX >= leftX && mouseX <= leftX + leftW - 10) {
             int rowH = 20;
             int yy = listTop - (int) hackScroll;
             for (String name : filtered()) {
@@ -522,6 +546,67 @@ public final class PoeScreen extends Screen {
 
     private String cycleList(String value, String... values) {
         return cycle(value, values);
+    }
+
+    private boolean canScroll(int contentHeight, int viewport) {
+        return contentHeight > viewport;
+    }
+
+    private int[] scrollbarThumb(int top, int viewport, int contentHeight, int viewHeight, double scroll) {
+        int trackH = Math.max(1, viewport);
+        int thumbH = Math.max(24, (int) ((double) trackH * trackH / Math.max(trackH, contentHeight)));
+        thumbH = Math.min(trackH, thumbH);
+        int maxScroll = Math.max(1, contentHeight - viewHeight);
+        int travel = Math.max(0, trackH - thumbH);
+        int thumbTop = top + (int) Math.round(travel * (scroll / maxScroll));
+        return new int[]{thumbTop, thumbTop + thumbH};
+    }
+
+    private void drawScrollbar(DrawContext d, int x, int y, int w, int h, int contentHeight, int viewHeight, double scroll) {
+        if (!canScroll(contentHeight, viewHeight)) return;
+        d.fill(x, y, x + w, y + h, 0x401A252E);
+        int[] thumb = scrollbarThumb(y, h, contentHeight, viewHeight, scroll);
+        d.fill(x, thumb[0], x + w, thumb[1], 0xFF6C7D89);
+        d.drawBorder(x, thumb[0], w, Math.max(1, thumb[1] - thumb[0]), 0xFF9AA7B0);
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        int[] l = layout();
+        int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], top = l[4], bottom = l[5];
+        int listTop = top + 40;
+        int viewport = bottom - listTop;
+        if (button == 0 && draggingSettingsScrollbar) {
+            int[] thumb = scrollbarThumb(listTop, viewport, settingsContentHeight(), viewport, settingsScroll);
+            int thumbH = thumb[1] - thumb[0];
+            int travel = Math.max(1, viewport - thumbH);
+            int desiredTop = (int) mouseY - (int) dragScrollbarOffset;
+            int relative = MathHelper.clamp(desiredTop - listTop, 0, travel);
+            double max = Math.max(0, settingsContentHeight() - viewport);
+            settingsScroll = max == 0 ? 0 : (double) relative / travel * max;
+            return true;
+        }
+        if (button == 0 && draggingHackScrollbar) {
+            int content = filtered().size() * 20;
+            int[] thumb = scrollbarThumb(listTop, viewport, content, viewport, hackScroll);
+            int thumbH = thumb[1] - thumb[0];
+            int travel = Math.max(1, viewport - thumbH);
+            int desiredTop = (int) mouseY - (int) dragScrollbarOffset;
+            int relative = MathHelper.clamp(desiredTop - listTop, 0, travel);
+            double max = Math.max(0, content - viewport);
+            hackScroll = max == 0 ? 0 : (double) relative / travel * max;
+            return true;
+        }
+        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            draggingSettingsScrollbar = false;
+            draggingHackScrollbar = false;
+        }
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
