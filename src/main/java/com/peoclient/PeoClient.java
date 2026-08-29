@@ -34,6 +34,7 @@ public final class PeoClient implements ClientModInitializer {
     public static final Config CFG = new Config();
 
     public static KeyBinding menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey;
+    public static final Map<String, KeyBinding> MODULE_KEYS = new LinkedHashMap<>();
     private static String originalUsername = "Player";
     private int saveTick;
     private boolean networkConfigured;
@@ -44,10 +45,11 @@ public final class PeoClient implements ClientModInitializer {
         CFG.load();
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
-        xrayKey = key("X-Ray", GLFW.GLFW_KEY_X);
-        nukerKey = key("Nuker", GLFW.GLFW_KEY_N);
-        fullbrightKey = key("Fullbright", GLFW.GLFW_KEY_F);
-        cleanerKey = key("InventoryCleaner", GLFW.GLFW_KEY_I);
+        registerModuleKeys();
+        xrayKey = MODULE_KEYS.get("X-Ray");
+        nukerKey = MODULE_KEYS.get("Nuker [Multi]");
+        fullbrightKey = MODULE_KEYS.get("Fullbright");
+        cleanerKey = MODULE_KEYS.get("InventoryCleaner");
 
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         HudRenderCallback.EVENT.register((draw, delta) -> Hud.render(draw));
@@ -56,6 +58,36 @@ public final class PeoClient implements ClientModInitializer {
     private KeyBinding key(String name, int code) {
         return KeyBindingHelper.registerKeyBinding(
                 new KeyBinding(name, InputUtil.Type.KEYSYM, code, "PeoClient"));
+    }
+
+    private void registerModuleKeys() {
+        for (String module : PoeScreen.MODULES) {
+            int defaultCode = switch (module) {
+                case "Fullbright" -> GLFW.GLFW_KEY_F;
+                case "InventoryCleaner" -> GLFW.GLFW_KEY_I;
+                case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
+                case "X-Ray" -> GLFW.GLFW_KEY_X;
+                default -> GLFW.GLFW_KEY_UNKNOWN;
+            };
+            Integer stored = CFG.keybinds.get(module);
+            int code = stored != null ? stored : defaultCode;
+            MODULE_KEYS.put(module, key("PeoClient " + module, code));
+        }
+    }
+
+    public static boolean setModuleKey(String module, int keyCode) {
+        KeyBinding key = MODULE_KEYS.get(module);
+        if (key == null) return false;
+        key.setBoundKey(InputUtil.Type.KEYSYM.createFromCode(keyCode));
+        CFG.keybinds.put(module, keyCode);
+        MinecraftClient.getInstance().options.write();
+        CFG.save();
+        return true;
+    }
+
+    public static int getModuleKeyCode(String module) {
+        KeyBinding key = MODULE_KEYS.get(module);
+        return key == null ? GLFW.GLFW_KEY_UNKNOWN : key.getBoundKey().getCode();
     }
 
     private void tick(MinecraftClient mc) {
@@ -67,10 +99,9 @@ public final class PeoClient implements ClientModInitializer {
 
         while (menuKey.wasPressed()) mc.setScreen(new PoeScreen());
 
-        while (xrayKey.wasPressed()) toggleXray(mc);
-        while (nukerKey.wasPressed()) CFG.nuker = !CFG.nuker;
-        while (fullbrightKey.wasPressed()) toggleFullbright(mc);
-        while (cleanerKey.wasPressed()) CFG.cleaner = !CFG.cleaner;
+        for (Map.Entry<String, KeyBinding> entry : MODULE_KEYS.entrySet()) {
+            while (entry.getValue().wasPressed()) toggleModuleByName(entry.getKey(), mc);
+        }
 
         if (mc.player == null || mc.world == null) {
             if (++saveTick >= 100) {
@@ -89,6 +120,17 @@ public final class PeoClient implements ClientModInitializer {
             saveTick = 0;
             CFG.save();
         }
+    }
+
+    public static void toggleModuleByName(String module, MinecraftClient mc) {
+        switch (module) {
+            case "X-Ray" -> toggleXray(mc);
+            case "Nuker [Multi]" -> CFG.nuker = !CFG.nuker;
+            case "Fullbright" -> toggleFullbright(mc);
+            case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
+            default -> { /* reserved for modules that are not implemented yet */ }
+        }
+        CFG.save();
     }
 
     public static void toggleXray(MinecraftClient mc) {
@@ -112,6 +154,7 @@ public final class PeoClient implements ClientModInitializer {
 
     public static final class Config {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
+        public Map<String, Integer> keybinds = new LinkedHashMap<>();
 
         // Account/network settings.  A username override only changes the client-side
         // display/session value; it does not authenticate a different online account.
@@ -221,6 +264,7 @@ public final class PeoClient implements ClientModInitializer {
                 slotItems = c.slotItems != null ? c.slotItems : slotItems;
 
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
+                keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
                 proxyList = c.proxyList != null ? c.proxyList : proxyList;
@@ -262,6 +306,7 @@ public final class PeoClient implements ClientModInitializer {
 
                 // Normalize missing values from older PeoClient config files so the
                 // settings screen and module logic never dereference nulls.
+                if (keybinds == null) keybinds = new LinkedHashMap<>();
                 if (nukerMode == null) nukerMode = "Normal";
                 if (nukerShape == null) nukerShape = "Cube";
                 if (nukerSort == null) nukerSort = "Closest";
