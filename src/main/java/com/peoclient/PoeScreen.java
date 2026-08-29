@@ -14,12 +14,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * PeoClient V1 Hub.
+ * PeoClient Hub.
  *
- * Layout is intentionally close to the Wurst-style Hub shown by the user:
- * compact hack list on the far left, detailed settings immediately to its right,
- * and a three-column module grid occupying the rest of the screen.  No settings
- * panel is placed on the far right, and every panel has its own scroll position.
+ * The layout is intentionally simple: Hack List on the left, module settings in
+ * the center-left, and the module list on the right. Every scrolling surface is
+ * clipped to its own panel so settings can never draw over the header or another
+ * panel.
  */
 public final class PoeScreen extends Screen {
     private TextFieldWidget search;
@@ -51,10 +51,11 @@ public final class PoeScreen extends Screen {
 
     @Override
     protected void init() {
-        search = new TextFieldWidget(textRenderer, Math.max(430, width / 2 - 230), 18, 460, 30,
+        int searchW = Math.min(420, Math.max(260, width - 520));
+        search = new TextFieldWidget(textRenderer, width / 2 - searchW / 2, 18, searchW, 22,
                 Text.literal("Search"));
         search.setMaxLength(64);
-        search.setPlaceholder(Text.literal("Search hacks..."));
+        search.setPlaceholder(Text.literal("Search modules..."));
         addDrawableChild(search);
     }
 
@@ -81,6 +82,13 @@ public final class PoeScreen extends Screen {
             case "X-Ray" -> PeoClient.toggleXray(client);
         }
         PeoClient.CFG.save();
+    }
+
+    private void select(String name) {
+        if (!name.equals(selected)) {
+            selected = name;
+            settingsScroll = 0;
+        }
     }
 
     private void openBind(String module) {
@@ -117,43 +125,52 @@ public final class PoeScreen extends Screen {
 
     @Override
     public void render(DrawContext d, int mouseX, int mouseY, float delta) {
-        // Wurst-like dark translucent Hub background.
-        d.fill(0, 0, width, height, 0xD9080D14);
-        d.fill(0, 0, width, 72, 0xF20A1119);
-        d.fill(0, 70, width, 74, 0xFF1D5278);
+        d.fill(0, 0, width, height, 0xD90A0F14);
+        d.fill(0, 0, width, 74, 0xF20B1118);
+        d.fill(0, 72, width, 75, 0xFF315873);
 
-        // Header.
-        text(d, "P", 18, 22, 0xFF5AA8FF, true);
-        text(d, "PeoClient", 46, 16, 0xFFFFFFFF, true);
-        text(d, "1.21.4", 278, 20, 0xFFB8C7D9, false);
-        text(d, "V1", 374, 20, 0xFFB8C7D9, false);
-        text(d, "Right Shift • Hub", width - 158, 20, 0xFFB8C7D9, false);
-        text(d, listening ? "Press a key • ESC cancels" : "Left click = toggle • Right click = select settings",
-                width - 360, 48, listening ? 0xFFFFD54A : 0xFF8090A0, false);
+        drawText(d, "P", 18, 20, 0xFFFFFFFF, true);
+        drawText(d, "PeoClient", 42, 16, 0xFFFFFFFF, true);
+        drawText(d, "1.21.4", 42, 34, 0xFFB7C1CA, false);
+        drawText(d, "Right Shift", width - 120, 18, 0xFFB7C1CA, false);
+        drawText(d, listening ? "Press a key (ESC cancels)" : "Left = toggle   •   Right = settings",
+                width - 320, 42, listening ? 0xFFFFFFFF : 0xFF9CA8B2, false);
 
         super.render(d, mouseX, mouseY, delta);
 
-        int top = 88;
+        int top = 90;
         int bottom = height - 24;
-        int hackX = 14, hackW = 208;
-        int settingsX = hackX + hackW + 10, settingsW = 330;
-        int mainX = settingsX + settingsW + 12;
-        int mainW = width - mainX - 14;
+        int gap = 12;
+        int leftW = Math.min(310, Math.max(260, width / 4));
+        int rightW = Math.min(230, Math.max(210, width / 6));
+        int settingsX = 14 + leftW + gap;
+        int rightX = width - rightW - 14;
+        int settingsW = Math.max(360, rightX - settingsX - gap);
 
-        panel(d, hackX, top, hackW, bottom - top, 0xDD0C141E, 0xFF29445E);
-        panel(d, settingsX, top, settingsW, bottom - top, 0xDD0C141E, 0xFF29445E);
-        panel(d, mainX, top, mainW, bottom - top, 0xB80A1118, 0xFF29445E);
+        panel(d, 14, top, leftW, bottom - top, 0xD20D151D, 0xFF2A4154);
+        panel(d, settingsX, top, settingsW, bottom - top, 0xD20D151D, 0xFF2A4154);
+        panel(d, rightX, top, rightW, bottom - top, 0xD20D151D, 0xFF2A4154);
 
-        text(d, "HACK LIST", hackX + 18, top + 18, 0xFF69CFFF, true);
-        text(d, "SETTINGS", settingsX + 18, top + 18, colorFor(selected), true);
-        text(d, "MODULES", mainX + 14, top + 18, 0xFF69CFFF, true);
+        drawText(d, "HACK LIST", 14 + 16, top + 18, 0xFFFFFFFF, true);
+        drawText(d, "SETTINGS", settingsX + 16, top + 18, 0xFFFFFFFF, true);
+        drawText(d, "MODULES", rightX + 14, top + 18, 0xFFFFFFFF, true);
 
-        drawHackList(d, hackX + 18, top + 42, hackW - 28, bottom - top - 60);
-        drawSettings(d, settingsX + 14, top + 42, settingsW - 28, bottom - top - 60);
-        drawModules(d, mainX + 12, top + 42, mainW - 24, bottom - top - 60);
+        int listTop = top + 40;
+        int listBottom = bottom - 8;
+        d.enableScissor(14 + 1, listTop, 14 + leftW - 1, listBottom);
+        drawHackList(d, 14 + 14, listTop, leftW - 28, listBottom - listTop);
+        d.disableScissor();
 
-        text(d, "↑↓ Scroll", hackX + 18, height - 16, 0xFF758595, false);
-        text(d, "ESC • Close", width - 92, height - 16, 0xFF758595, false);
+        d.enableScissor(settingsX + 1, listTop, settingsX + settingsW - 1, listBottom);
+        drawSettings(d, settingsX + 14, listTop, settingsW - 28, listBottom - listTop);
+        d.disableScissor();
+
+        d.enableScissor(rightX + 1, listTop, rightX + rightW - 1, listBottom);
+        drawModules(d, rightX + 12, listTop, rightW - 24, listBottom - listTop);
+        d.disableScissor();
+
+        drawText(d, "Wheel: scroll panel", 14, height - 16, 0xFF73808B, false);
+        drawText(d, "ESC: close", width - 80, height - 16, 0xFF73808B, false);
     }
 
     private void panel(DrawContext d, int x, int y, int w, int h, int fill, int border) {
@@ -161,24 +178,22 @@ public final class PoeScreen extends Screen {
         d.drawBorder(x, y, w, h, border);
     }
 
-    private void text(DrawContext d, String s, int x, int y, int color, boolean bold) {
+    private void drawText(DrawContext d, String s, int x, int y, int color, boolean bold) {
         d.drawTextWithShadow(textRenderer, s, x, y, color);
         if (bold) d.drawTextWithShadow(textRenderer, s, x + 1, y, color);
     }
 
     private void drawHackList(DrawContext d, int x, int y, int w, int h) {
         List<String> filtered = filtered();
-        int rowH = 16;
+        int rowH = 20;
         int yy = y - (int) hackScroll;
         for (String name : filtered) {
             if (yy + rowH >= y && yy <= y + h) {
                 boolean real = implemented(name);
                 boolean on = enabled(name);
-                if (name.equals(selected)) d.fill(x - 8, yy - 2, x + w, yy + 14, 0xFF19344A);
-                text(d, name, x, yy, on ? colorFor(name) : (real ? 0xFFE5ECF3 : 0xFF8997A5), false);
-                if (on) {
-                    d.fill(x + w - 9, yy + 4, x + w - 3, yy + 10, 0xFF55E66A);
-                }
+                if (name.equals(selected)) d.fill(x - 8, yy - 2, x + w, yy + 17, 0xFF1C3547);
+                drawText(d, name, x, yy + 2, on || real ? 0xFFFFFFFF : 0xFF7E8A94, on || name.equals(selected));
+                if (on) d.fill(x + w - 8, yy + 6, x + w - 2, yy + 12, 0xFFFFFFFF);
             }
             yy += rowH;
         }
@@ -186,105 +201,90 @@ public final class PoeScreen extends Screen {
 
     private void drawModules(DrawContext d, int x, int y, int w, int h) {
         List<String> filtered = filtered();
-        int cols = w >= 720 ? 3 : 2;
-        int gap = 8;
-        int cardW = Math.max(150, (w - gap * (cols - 1)) / cols);
         int rowH = 34;
-        int cardH = 29;
+        int cardH = 30;
         int yy = y - (int) moduleScroll;
-
-        for (int i = 0; i < filtered.size(); i++) {
-            int col = i % cols;
-            int row = i / cols;
-            int cx = x + col * (cardW + gap);
-            int cy = yy + row * rowH;
-            if (cy + cardH < y || cy > y + h) continue;
-
-            String name = filtered.get(i);
-            boolean real = implemented(name);
-            boolean on = enabled(name);
-            boolean sel = name.equals(selected);
-            int bg = sel ? 0xD52A4860 : (on ? 0xD01F3E55 : 0xB5131C26);
-            int border = sel ? 0xFF5B9FD1 : (real ? 0xFF2B5578 : 0xFF263542);
-
-            d.fill(cx, cy, cx + cardW, cy + cardH, bg);
-            d.drawBorder(cx, cy, cardW, cardH, border);
-            text(d, name, cx + 10, cy + 9, real ? (on ? colorFor(name) : 0xFFE4EAF1) : 0xFF8B98A5, false);
-
-            // Wurst-style arrow area on the right side of each module card.
-            d.fill(cx + cardW - 34, cy + 1, cx + cardW - 33, cy + cardH - 1, 0xFF34516A);
-            text(d, "▼", cx + cardW - 22, cy + 9, real ? 0xFFE5EDF5 : 0xFF667582, false);
-            if (on) d.fill(cx + cardW - 31, cy + 23, cx + cardW - 10, cy + 25, colorFor(name));
+        for (String name : filtered) {
+            if (yy + cardH >= y && yy <= y + h) {
+                boolean real = implemented(name);
+                boolean on = enabled(name);
+                boolean sel = name.equals(selected);
+                int bg = sel ? 0xFF233E52 : (on ? 0xFF193040 : 0xA8141D24);
+                int border = sel ? 0xFF6A91AD : 0xFF294354;
+                d.fill(x, yy, x + w, yy + cardH, bg);
+                d.drawBorder(x, yy, w, cardH, border);
+                drawText(d, name, x + 10, yy + 9, real ? 0xFFFFFFFF : 0xFF7E8A94, real && (on || sel));
+                if (on) d.fill(x + 8, yy + 26, x + w - 8, yy + 28, 0xFFFFFFFF);
+                drawText(d, real ? "»" : "·", x + w - 18, yy + 8, 0xFFBAC4CC, false);
+            }
+            yy += rowH;
         }
     }
 
     private void drawSettings(DrawContext d, int x, int y, int w, int h) {
         if (!implemented(selected)) {
-            text(d, "Select one of the implemented modules.", x, y + 12, 0xFF8B99A7, false);
-            text(d, "Settings are shown here, on the left side", x, y + 31, 0xFF738291, false);
-            text(d, "of the Hub as requested.", x, y + 48, 0xFF738291, false);
+            drawText(d, "Select an implemented module.", x, y + 18, 0xFFFFFFFF, true);
+            drawText(d, "The settings panel stays here and", x, y + 40, 0xFF9AA7B1, false);
+            drawText(d, "never renders outside its bounds.", x, y + 58, 0xFF9AA7B1, false);
             return;
         }
 
         int yy = y - (int) settingsScroll;
-        String desc = switch (selected) {
-            case "Nuker [Multi]" -> "Automatically breaks blocks around you.";
-            case "X-Ray" -> "Shows only selected blocks through the world.";
-            case "Fullbright" -> "Makes dark areas bright without a server effect.";
-            default -> "Automatically throws useless items and sorts inventory.";
-        };
-        text(d, selected, x, yy, colorFor(selected), true); yy += 18;
-        text(d, desc, x, yy, 0xFF9BA9B7, false); yy += 23;
+        drawText(d, selected, x, yy + 2, 0xFFFFFFFF, true); yy += 20;
+        drawText(d, description(selected), x, yy, 0xFF9AA7B1, false); yy += 24;
 
-        rowToggle(d, x, yy, w, "Enable", enabled(selected)); yy += 30;
-        rowValue(d, x, yy, w, "Keybind", keyName(selected)); yy += 30;
+        rowToggle(d, x, yy, w, "Enable", enabled(selected)); yy += 34;
+        rowValue(d, x, yy, w, "Keybind", keyName(selected)); yy += 34;
 
         switch (selected) {
-            case "Nuker [Multi]" -> yy = nukerSettings(d, x, yy, w);
-            case "X-Ray" -> yy = xraySettings(d, x, yy, w);
-            case "Fullbright" -> yy = fullbrightSettings(d, x, yy, w);
-            case "InventoryCleaner" -> yy = cleanerSettings(d, x, yy, w);
+            case "Nuker [Multi]" -> drawNuker(d, x, yy, w);
+            case "X-Ray" -> drawXray(d, x, yy, w);
+            case "Fullbright" -> drawFullbright(d, x, yy, w);
+            case "InventoryCleaner" -> drawCleaner(d, x, yy, w);
         }
     }
 
-    private int nukerSettings(DrawContext d, int x, int y, int w) {
-        section(d, x, y, "Mining"); y += 22;
-        rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerMode); y += 30;
-        rowValue(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti + " blocks"); y += 30;
-        rowValue(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown + " ticks"); y += 30;
-        rowValue(d, x, y, w, "Shape", PeoClient.CFG.nukerShape); y += 30;
-        rowValue(d, x, y, w, "Range", String.format(Locale.ROOT, "%.1f", PeoClient.CFG.nukerRange)); y += 30;
-        rowValue(d, x, y, w, "Sort", PeoClient.CFG.nukerSort); y += 30;
-
-        section(d, x, y, "Filter"); y += 22;
-        rowToggle(d, x, y, w, "Filter", PeoClient.CFG.nukerFilter); y += 30;
-        rowValue(d, x, y, w, "Filter mode", PeoClient.CFG.nukerWhitelist ? "Whitelist" : "Blacklist"); y += 30;
-        rowValue(d, x, y, w, "Edit blocks", PeoClient.CFG.nukerFilterIds.isBlank() ? "Empty list" : "Custom list"); y += 30;
-
-        section(d, x, y, "Mining behavior"); y += 22;
-        rowToggle(d, x, y, w, "Raycast", PeoClient.CFG.nukerRaycast); y += 30;
-        rowToggle(d, x, y, w, "Flatten", PeoClient.CFG.nukerFlatten); y += 30;
-        rowToggle(d, x, y, w, "Rotate", PeoClient.CFG.nukerRotate); y += 30;
-        rowToggle(d, x, y, w, "NoParticles", PeoClient.CFG.nukerNoParticles); y += 30;
-
-        section(d, x, y, "Render"); y += 22;
-        rowToggle(d, x, y, w, "Highlight", PeoClient.CFG.nukerHighlight); y += 30;
-        rowValue(d, x, y, w, "Highlight mode", "Opacity / Expand"); y += 30;
-        rowToggle(d, x, y, w, "RangeHighlight", PeoClient.CFG.nukerRangeHighlight); y += 30;
-        rowValue(d, x, y, w, "Range width", "3.0");
-        return y + 30;
+    private String description(String name) {
+        return switch (name) {
+            case "Nuker [Multi]" -> "Breaks blocks around you.";
+            case "X-Ray" -> "Shows selected blocks through the world.";
+            case "Fullbright" -> "Keeps dark areas bright.";
+            default -> "Sorts and removes unwanted inventory items.";
+        };
     }
 
-    private int xraySettings(DrawContext d, int x, int y, int w) {
-        section(d, x, y, "X-Ray"); y += 22;
-        rowValue(d, x, y, w, "Ores / blocks", PeoClient.CFG.xrayBlocks.size() + " selected"); y += 30;
-        rowToggle(d, x, y, w, "Only show exposed", PeoClient.CFG.xrayExposedOnly); y += 30;
-        rowValue(d, x, y, w, "Opacity", opacityText()); y += 30;
-        text(d, "Default list follows Wurst's X-Ray target set.", x, y, 0xFF7F8D9B, false); y += 18;
-        text(d, "Includes ores, chests, spawners and utility blocks.", x, y, 0xFF7F8D9B, false); y += 26;
-        rowToggle(d, x, y, w, "Fluids", true); y += 30;
-        text(d, "Water/lava are treated as X-Ray targets.", x, y, 0xFF7F8D9B, false);
-        return y + 28;
+    private void drawNuker(DrawContext d, int x, int y, int w) {
+        int yy = y;
+        yy = section(d, x, yy, "Mining");
+        yy = rowValue(d, x, yy, w, "Mode", PeoClient.CFG.nukerMode);
+        yy = rowValue(d, x, yy, w, "Multi", PeoClient.CFG.nukerMulti + " blocks");
+        yy = rowValue(d, x, yy, w, "Cooldown", PeoClient.CFG.nukerCooldown + " ticks");
+        yy = rowValue(d, x, yy, w, "Shape", PeoClient.CFG.nukerShape);
+        yy = rowValue(d, x, yy, w, "Range", String.format(Locale.ROOT, "%.1f", PeoClient.CFG.nukerRange));
+        yy = rowValue(d, x, yy, w, "Sort", PeoClient.CFG.nukerSort);
+        yy = section(d, x, yy + 4, "Filter");
+        yy = rowToggle(d, x, yy, w, "Filter", PeoClient.CFG.nukerFilter);
+        yy = rowValue(d, x, yy, w, "Filter mode", PeoClient.CFG.nukerWhitelist ? "Whitelist" : "Blacklist");
+        yy = rowValue(d, x, yy, w, "Edit blocks", PeoClient.CFG.nukerFilterIds.isBlank() ? "Empty list" : "Custom list");
+        yy = section(d, x, yy + 4, "Mining behavior");
+        yy = rowToggle(d, x, yy, w, "Raycast", PeoClient.CFG.nukerRaycast);
+        yy = rowToggle(d, x, yy, w, "Flatten", PeoClient.CFG.nukerFlatten);
+        yy = rowToggle(d, x, yy, w, "Rotate", PeoClient.CFG.nukerRotate);
+        yy = rowToggle(d, x, yy, w, "No particles", PeoClient.CFG.nukerNoParticles);
+        yy = section(d, x, yy + 4, "Render");
+        yy = rowToggle(d, x, yy, w, "Highlight", PeoClient.CFG.nukerHighlight);
+        yy = rowValue(d, x, yy, w, "Highlight mode", "Opacity / expand");
+        yy = rowToggle(d, x, yy, w, "Range highlight", PeoClient.CFG.nukerRangeHighlight);
+        rowValue(d, x, yy, w, "Range width", "3.0");
+    }
+
+    private void drawXray(DrawContext d, int x, int y, int w) {
+        int yy = section(d, x, y, "X-Ray");
+        yy = rowValue(d, x, yy, w, "Blocks", PeoClient.CFG.xrayBlocks.size() + " selected");
+        yy = rowToggle(d, x, yy, w, "Only show exposed", PeoClient.CFG.xrayExposedOnly);
+        yy = rowValue(d, x, yy, w, "Opacity", opacityText());
+        yy = rowToggle(d, x, yy, w, "Fluids", PeoClient.CFG.xrayFluids);
+        drawText(d, "Tip: right-click the module to select settings.", x, yy + 6, 0xFF7F8B95, false);
     }
 
     private String opacityText() {
@@ -292,61 +292,60 @@ public final class PoeScreen extends Screen {
         return a == 0 ? "Off" : Math.round(a * 100f / 255f) + "%";
     }
 
-    private int fullbrightSettings(DrawContext d, int x, int y, int w) {
-        section(d, x, y, "Fullbright"); y += 22;
-        rowValue(d, x, y, w, "Method", PeoClient.CFG.fullbrightMethod); y += 30;
-        rowToggle(d, x, y, w, "Fade", PeoClient.CFG.fullbrightFade); y += 30;
-        rowValue(d, x, y, w, "Default brightness",
-                String.format(Locale.ROOT, "%.0f%%", PeoClient.CFG.fullbrightDefaultBrightness * 100)); y += 30;
-        text(d, "Gamma = forced brightness 1600%.", x, y, 0xFF7F8D9B, false); y += 18;
-        text(d, "Night Vision = Wurst-style alternate method.", x, y, 0xFF7F8D9B, false);
-        return y + 28;
+    private void drawFullbright(DrawContext d, int x, int y, int w) {
+        int yy = section(d, x, y, "Fullbright");
+        yy = rowValue(d, x, yy, w, "Method", PeoClient.CFG.fullbrightMethod);
+        yy = rowToggle(d, x, yy, w, "Fade", PeoClient.CFG.fullbrightFade);
+        rowValue(d, x, yy, w, "Default brightness",
+                String.format(Locale.ROOT, "%.0f%%", PeoClient.CFG.fullbrightDefaultBrightness * 100));
     }
 
-    private int cleanerSettings(DrawContext d, int x, int y, int w) {
-        section(d, x, y, "Inventory cleanup"); y += 22;
-        rowToggle(d, x, y, w, "Greedy", PeoClient.CFG.cleanerGreedy); y += 30;
-        rowToggle(d, x, y, w, "Merge stacks", PeoClient.CFG.cleanerMergeStacks); y += 30;
-        rowToggle(d, x, y, w, "Touch hotbar", PeoClient.CFG.cleanerTouchHotbar); y += 30;
-        rowValue(d, x, y, w, "Action delay", PeoClient.CFG.cleanerActionDelay + " ticks"); y += 30;
-        rowValue(d, x, y, w, "Ack timeout", PeoClient.CFG.cleanerAckTimeout + " ticks"); y += 30;
-
-        section(d, x, y, "Maximum amounts"); y += 22;
-        rowValue(d, x, y, w, "Blocks", String.valueOf(PeoClient.CFG.maxBlocks)); y += 30;
-        rowValue(d, x, y, w, "Arrows", String.valueOf(PeoClient.CFG.maxArrows)); y += 30;
-        rowValue(d, x, y, w, "Throwables", String.valueOf(PeoClient.CFG.maxThrowables)); y += 30;
-        rowValue(d, x, y, w, "Food points", String.valueOf(PeoClient.CFG.maxFoods)); y += 30;
-        rowValue(d, x, y, w, "Water buckets", String.valueOf(PeoClient.CFG.maxWaterBuckets)); y += 30;
-        rowValue(d, x, y, w, "Lava buckets", String.valueOf(PeoClient.CFG.maxLavaBuckets)); y += 30;
-        rowValue(d, x, y, w, "Milk buckets", String.valueOf(PeoClient.CFG.maxMilkBuckets)); y += 30;
-
-        section(d, x, y, "Hotbar / offhand"); y += 22;
-        rowValue(d, x, y, w, "OffHandItem", PeoClient.CFG.offHandItem); y += 30;
+    private void drawCleaner(DrawContext d, int x, int y, int w) {
+        int yy = section(d, x, y, "Inventory cleanup");
+        yy = rowToggle(d, x, yy, w, "Greedy", PeoClient.CFG.cleanerGreedy);
+        yy = rowToggle(d, x, yy, w, "Merge stacks", PeoClient.CFG.cleanerMergeStacks);
+        yy = rowToggle(d, x, yy, w, "Touch hotbar", PeoClient.CFG.cleanerTouchHotbar);
+        yy = rowValue(d, x, yy, w, "Action delay", PeoClient.CFG.cleanerActionDelay + " ticks");
+        yy = rowValue(d, x, yy, w, "Ack timeout", PeoClient.CFG.cleanerAckTimeout + " ticks");
+        yy = section(d, x, yy + 4, "Maximum amounts");
+        yy = rowValue(d, x, yy, w, "Blocks", String.valueOf(PeoClient.CFG.maxBlocks));
+        yy = rowValue(d, x, yy, w, "Arrows", String.valueOf(PeoClient.CFG.maxArrows));
+        yy = rowValue(d, x, yy, w, "Throwables", String.valueOf(PeoClient.CFG.maxThrowables));
+        yy = rowValue(d, x, yy, w, "Food points", String.valueOf(PeoClient.CFG.maxFoods));
+        yy = rowValue(d, x, yy, w, "Water buckets", String.valueOf(PeoClient.CFG.maxWaterBuckets));
+        yy = rowValue(d, x, yy, w, "Lava buckets", String.valueOf(PeoClient.CFG.maxLavaBuckets));
+        yy = rowValue(d, x, yy, w, "Milk buckets", String.valueOf(PeoClient.CFG.maxMilkBuckets));
+        yy = section(d, x, yy + 4, "Hotbar / offhand");
+        yy = rowValue(d, x, yy, w, "Off hand", PeoClient.CFG.offHandItem);
         for (int i = 0; i < 9; i++) {
             String value = PeoClient.CFG.slotItems[Math.min(i, PeoClient.CFG.slotItems.length - 1)];
-            rowValue(d, x, y, w, "SlotItem-" + (i + 1), value); y += 30;
+            yy = rowValue(d, x, yy, w, "Slot " + (i + 1), value);
         }
-        rowValue(d, x, y, w, "ItemsBlacklist", PeoClient.CFG.itemsBlacklist.isBlank() ? "Empty" : "Configured");
-        return y + 30;
+        rowValue(d, x, yy, w, "Items blacklist", PeoClient.CFG.itemsBlacklist.isBlank() ? "Empty" : "Configured");
     }
 
-    private void section(DrawContext d, int x, int y, String title) {
-        d.fill(x, y + 15, x + 100, y + 16, 0xFF294A63);
-        text(d, title, x, y, 0xFF7FCFFF, true);
+    private int section(DrawContext d, int x, int y, String title) {
+        drawText(d, title, x, y + 2, 0xFFFFFFFF, true);
+        d.fill(x, y + 18, x + Math.min(150, 100 + textRenderer.getWidth(title) / 2), y + 19, 0xFF3B586D);
+        return y + 24;
     }
 
-    private void rowValue(DrawContext d, int x, int y, int w, String label, String value) {
-        d.fill(x, y, x + w, y + 26, 0xA6131D27);
-        text(d, label, x + 8, y + 8, 0xFFE2E8EE, false);
+    private int rowValue(DrawContext d, int x, int y, int w, String label, String value) {
+        d.fill(x, y, x + w, y + 28, 0xB7152029);
+        d.drawBorder(x, y, w, 28, 0xFF294354);
+        drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
         int tw = textRenderer.getWidth(value);
-        text(d, value, x + w - tw - 8, y + 8, 0xFFB9D4E8, false);
-        d.drawBorder(x, y, w, 26, 0xFF20394D);
+        drawText(d, value, Math.max(x + 10, x + w - tw - 10), y + 9, 0xFFDDE5EB, false);
+        return y + 34;
     }
 
-    private void rowToggle(DrawContext d, int x, int y, int w, String label, boolean value) {
-        rowValue(d, x, y, w, label, value ? "ON" : "OFF");
-        int c = value ? 0xFF48E96A : 0xFF6E7B87;
-        d.fill(x + w - 28, y + 8, x + w - 12, y + 18, c);
+    private int rowToggle(DrawContext d, int x, int y, int w, String label, boolean value) {
+        int next = rowValue(d, x, y, w, label, value ? "ON" : "OFF");
+        int tx = x + w - 42;
+        int color = value ? 0xFFFFFFFF : 0xFF6E7A84;
+        d.fill(tx, y + 8, tx + 26, y + 20, color);
+        drawText(d, value ? "ON" : "OFF", tx + 3, y + 9, value ? 0xFF0A1014 : 0xFFFFFFFF, true);
+        return next;
     }
 
     private List<String> filtered() {
@@ -360,115 +359,128 @@ public final class PoeScreen extends Screen {
         return search == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
     }
 
+    private int[] layout() {
+        int gap = 12;
+        int leftW = Math.min(310, Math.max(260, width / 4));
+        int rightW = Math.min(230, Math.max(210, width / 6));
+        int settingsX = 14 + leftW + gap;
+        int rightX = width - rightW - 14;
+        int settingsW = Math.max(360, rightX - settingsX - gap);
+        return new int[]{14, leftW, settingsX, settingsW, rightX, rightW, 90, height - 24};
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        int top = 88, bottom = height - 24;
-        int hackX = 14, hackW = 208;
-        int settingsX = hackX + hackW + 10, settingsW = 330;
-        int mainX = settingsX + settingsW + 12;
-        int mainW = width - mainX - 14;
+        super.mouseClicked(mouseX, mouseY, button);
+        int[] l = layout();
+        int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], rightX = l[4], rightW = l[5], top = l[6], bottom = l[7];
+        int listTop = top + 40;
 
-        // Hack list selection.
-        if (mouseX >= hackX && mouseX <= hackX + hackW && mouseY >= top + 38 && mouseY < bottom) {
-            List<String> list = filtered();
-            int rowH = 16;
-            int yy = top + 42 - (int) hackScroll;
-            for (String name : list) {
-                if (mouseY >= yy - 2 && mouseY <= yy + 14) {
-                    if (implemented(name)) selected = name;
+        if (mouseY < listTop || mouseY >= bottom) return super.mouseClicked(mouseX, mouseY, button);
+
+        if (mouseX >= leftX && mouseX <= leftX + leftW) {
+            int rowH = 20;
+            int yy = listTop - (int) hackScroll;
+            for (String name : filtered()) {
+                if (mouseY >= yy && mouseY < yy + rowH) {
+                    if (implemented(name)) select(name);
                     return true;
                 }
                 yy += rowH;
             }
+            return true;
         }
 
-        // Module grid.
-        if (mouseX >= mainX && mouseX <= mainX + mainW && mouseY >= top + 38 && mouseY < bottom) {
-            List<String> list = filtered();
-            int cols = mainW - 24 >= 720 ? 3 : 2;
-            int gap = 8;
-            int cardW = Math.max(150, (mainW - 24 - gap * (cols - 1)) / cols);
-            int rowH = 34, cardH = 29;
-            int yy = top + 42 - (int) moduleScroll;
-            for (int i = 0; i < list.size(); i++) {
-                int col = i % cols, row = i / cols;
-                int cx = mainX + 12 + col * (cardW + gap);
-                int cy = yy + row * rowH;
-                if (mouseX >= cx && mouseX <= cx + cardW && mouseY >= cy && mouseY <= cy + cardH) {
-                    String name = list.get(i);
+        if (mouseX >= rightX && mouseX <= rightX + rightW) {
+            int rowH = 34;
+            int yy = listTop - (int) moduleScroll;
+            for (String name : filtered()) {
+                if (mouseY >= yy && mouseY < yy + 30) {
                     if (implemented(name)) {
-                        selected = name;
-                        if (button == 0) toggle(name);
+                        select(name);
+                        if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) toggle(name);
                     }
                     return true;
                 }
+                yy += rowH;
             }
+            return true;
         }
 
-        // Settings panel is deliberately LEFT of the module grid.
-        if (mouseX >= settingsX && mouseX <= settingsX + settingsW && mouseY >= top + 38 && mouseY < bottom
-                && implemented(selected)) {
-            int y = top + 42 - (int) settingsScroll;
-            if (hit(mouseY, y + 41)) { toggle(selected); return true; }
-            y += 71;
-            if (hit(mouseY, y)) { openBind(selected); return true; }
-            y += 30;
+        if (mouseX >= settingsX && mouseX <= settingsX + settingsW && implemented(selected)) {
+            int y = listTop - (int) settingsScroll;
+            if (mouseY >= y + 44 && mouseY < y + 72) { toggle(selected); return true; }
+            if (mouseY >= y + 78 && mouseY < y + 106) { openBind(selected); return true; }
+
             switch (selected) {
-                case "Nuker [Multi]" -> { if (clickNuker(mouseY, y)) return true; }
-                case "X-Ray" -> { if (clickXray(mouseY, y)) return true; }
-                case "Fullbright" -> { if (clickFullbright(mouseY, y)) return true; }
-                case "InventoryCleaner" -> { if (clickCleaner(mouseY, y)) return true; }
+                case "Nuker [Multi]" -> clickNuker(mouseY, y + 112, settingsW);
+                case "X-Ray" -> clickXray(mouseY, y + 112);
+                case "Fullbright" -> clickFullbright(mouseY, y + 112);
+                case "InventoryCleaner" -> clickCleaner(mouseY, y + 112);
             }
+            return true;
         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
+        return true;
     }
 
-    private boolean clickNuker(double my, int y) {
-        int i = 0;
-        if (hit(my, y + 22 + i++ * 30)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi", "Instant"); return save(); }
-        if (hit(my, y + 22 + i++ * 30)) { PeoClient.CFG.nukerMulti = next(PeoClient.CFG.nukerMulti, 1, 10); return save(); }
-        if (hit(my, y + 22 + i++ * 30)) { PeoClient.CFG.nukerCooldown = next(PeoClient.CFG.nukerCooldown, 0, 4); return save(); }
-        if (hit(my, y + 22 + i++ * 30)) { PeoClient.CFG.nukerShape = cycle(PeoClient.CFG.nukerShape, "Cube", "Sphere"); return save(); }
-        if (hit(my, y + 22 + i++ * 30)) { PeoClient.CFG.nukerRange = PeoClient.CFG.nukerRange >= 6 ? 1 : PeoClient.CFG.nukerRange + .5; return save(); }
-        if (hit(my, y + 22 + i++ * 30)) { PeoClient.CFG.nukerSort = cycle(PeoClient.CFG.nukerSort, "Closest", "Furthest", "Softest", "Hardest", "None"); return save(); }
-        if (hit(my, y + 224)) { PeoClient.CFG.nukerFilter = !PeoClient.CFG.nukerFilter; return save(); }
-        if (hit(my, y + 254)) { PeoClient.CFG.nukerWhitelist = !PeoClient.CFG.nukerWhitelist; return save(); }
-        if (hit(my, y + 336)) { PeoClient.CFG.nukerRaycast = !PeoClient.CFG.nukerRaycast; return save(); }
-        if (hit(my, y + 366)) { PeoClient.CFG.nukerFlatten = !PeoClient.CFG.nukerFlatten; return save(); }
-        if (hit(my, y + 396)) { PeoClient.CFG.nukerRotate = !PeoClient.CFG.nukerRotate; return save(); }
-        if (hit(my, y + 426)) { PeoClient.CFG.nukerNoParticles = !PeoClient.CFG.nukerNoParticles; return save(); }
-        if (hit(my, y + 478)) { PeoClient.CFG.nukerHighlight = !PeoClient.CFG.nukerHighlight; return save(); }
-        if (hit(my, y + 538)) { PeoClient.CFG.nukerRangeHighlight = !PeoClient.CFG.nukerRangeHighlight; return save(); }
-        return false;
+    private void clickNuker(double my, int y, int w) {
+        int p = y + 24; // first row after the Mining section heading
+        if (hit(my, p)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi", "Instant"); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerMulti = next(PeoClient.CFG.nukerMulti, 1, 10); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerCooldown = next(PeoClient.CFG.nukerCooldown, 0, 4); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerShape = cycle(PeoClient.CFG.nukerShape, "Cube", "Sphere"); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerRange = PeoClient.CFG.nukerRange >= 6 ? 1 : PeoClient.CFG.nukerRange + .5; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerSort = cycle(PeoClient.CFG.nukerSort, "Closest", "Furthest", "Softest", "Hardest", "None"); save(); return; } p += 38;
+        p += 24;
+        if (hit(my, p)) { PeoClient.CFG.nukerFilter = !PeoClient.CFG.nukerFilter; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerWhitelist = !PeoClient.CFG.nukerWhitelist; save(); return; } p += 68;
+        p += 4;
+        if (hit(my, p)) { PeoClient.CFG.nukerRaycast = !PeoClient.CFG.nukerRaycast; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerFlatten = !PeoClient.CFG.nukerFlatten; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerRotate = !PeoClient.CFG.nukerRotate; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerNoParticles = !PeoClient.CFG.nukerNoParticles; save(); return; } p += 62;
+        if (hit(my, p)) { PeoClient.CFG.nukerHighlight = !PeoClient.CFG.nukerHighlight; save(); return; } p += 68;
+        if (hit(my, p)) { PeoClient.CFG.nukerRangeHighlight = !PeoClient.CFG.nukerRangeHighlight; save(); }
     }
 
-    private boolean clickXray(double my, int y) {
-        if (hit(my, y + 52)) { PeoClient.CFG.xrayExposedOnly = !PeoClient.CFG.xrayExposedOnly; return save(); }
-        if (hit(my, y + 82)) { PeoClient.CFG.xrayBackgroundOpacity = PeoClient.CFG.xrayBackgroundOpacity >= 252 ? 0 : PeoClient.CFG.xrayBackgroundOpacity + 28; return save(); }
-        return false;
+    private void clickXray(double my, int y) {
+        int p = y;
+        p += 58;
+        if (hit(my, p)) { PeoClient.CFG.xrayExposedOnly = !PeoClient.CFG.xrayExposedOnly; save(); return; }
+        p += 34;
+        if (hit(my, p)) { PeoClient.CFG.xrayBackgroundOpacity = PeoClient.CFG.xrayBackgroundOpacity >= 252 ? 0 : PeoClient.CFG.xrayBackgroundOpacity + 28; save(); return; }
+        p += 34;
+        if (hit(my, p)) { PeoClient.CFG.xrayFluids = !PeoClient.CFG.xrayFluids; save(); }
     }
 
-    private boolean clickFullbright(double my, int y) {
-        if (hit(my, y + 22)) { PeoClient.CFG.fullbrightMethod = cycle(PeoClient.CFG.fullbrightMethod, "Gamma", "Night Vision"); return save(); }
-        if (hit(my, y + 52)) { PeoClient.CFG.fullbrightFade = !PeoClient.CFG.fullbrightFade; return save(); }
-        if (hit(my, y + 82)) { PeoClient.CFG.fullbrightDefaultBrightness = PeoClient.CFG.fullbrightDefaultBrightness >= 1 ? 0 : PeoClient.CFG.fullbrightDefaultBrightness + .1; return save(); }
-        return false;
+    private void clickFullbright(double my, int y) {
+        int p = y + 24;
+        if (hit(my, p)) { PeoClient.CFG.fullbrightMethod = cycle(PeoClient.CFG.fullbrightMethod, "Gamma", "Night Vision"); save(); return; }
+        p += 34;
+        if (hit(my, p)) { PeoClient.CFG.fullbrightFade = !PeoClient.CFG.fullbrightFade; save(); return; }
+        p += 34;
+        if (hit(my, p)) { PeoClient.CFG.fullbrightDefaultBrightness = PeoClient.CFG.fullbrightDefaultBrightness >= 1 ? 0 : PeoClient.CFG.fullbrightDefaultBrightness + .1; save(); }
     }
 
-    private boolean clickCleaner(double my, int y) {
-        if (hit(my, y + 22)) { PeoClient.CFG.cleanerGreedy = !PeoClient.CFG.cleanerGreedy; return save(); }
-        if (hit(my, y + 52)) { PeoClient.CFG.cleanerMergeStacks = !PeoClient.CFG.cleanerMergeStacks; return save(); }
-        if (hit(my, y + 82)) { PeoClient.CFG.cleanerTouchHotbar = !PeoClient.CFG.cleanerTouchHotbar; return save(); }
-        if (hit(my, y + 112)) { PeoClient.CFG.cleanerActionDelay = next(PeoClient.CFG.cleanerActionDelay, 0, 10); return save(); }
-        if (hit(my, y + 142)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 60 ? 5 : PeoClient.CFG.cleanerAckTimeout + 5; return save(); }
-        return false;
+    private void clickCleaner(double my, int y) {
+        int p = y + 24;
+        for (int i = 0; i < 3; i++) {
+            if (hit(my, p)) {
+                if (i == 0) PeoClient.CFG.cleanerGreedy = !PeoClient.CFG.cleanerGreedy;
+                if (i == 1) PeoClient.CFG.cleanerMergeStacks = !PeoClient.CFG.cleanerMergeStacks;
+                if (i == 2) PeoClient.CFG.cleanerTouchHotbar = !PeoClient.CFG.cleanerTouchHotbar;
+                save(); return;
+            }
+            p += 34;
+        }
+        if (hit(my, p)) { PeoClient.CFG.cleanerActionDelay = next(PeoClient.CFG.cleanerActionDelay, 0, 10); save(); return; }
+        p += 34;
+        if (hit(my, p)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 60 ? 5 : PeoClient.CFG.cleanerAckTimeout + 5; save(); }
     }
 
-    private boolean hit(double mouseY, int y) { return mouseY >= y && mouseY <= y + 26; }
-
-    private boolean save() { PeoClient.CFG.save(); return true; }
-
+    private boolean hit(double mouseY, int y) { return mouseY >= y && mouseY < y + 28; }
+    private void save() { PeoClient.CFG.save(); }
     private int next(int value, int min, int max) { return value >= max ? min : value + 1; }
 
     private String cycle(String value, String... values) {
@@ -478,31 +490,32 @@ public final class PoeScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        int top = 88, bottom = height - 24;
-        int hackX = 14, hackW = 208;
-        int settingsX = hackX + hackW + 10, settingsW = 330;
-        int mainX = settingsX + settingsW + 12;
-        if (mouseY < top || mouseY > bottom) return super.mouseScrolled(mouseX, mouseY, horizontalAmount, verticalAmount);
-        if (mouseX >= hackX && mouseX <= hackX + hackW) hackScroll = clampScroll(hackScroll - verticalAmount * 18, 0, filtered().size() * 16 - (height - top - 60));
-        else if (mouseX >= settingsX && mouseX <= settingsX + settingsW) settingsScroll = clampScroll(settingsScroll - verticalAmount * 24, 0, Math.max(0, settingsContentHeight() - (height - top - 60)));
-        else if (mouseX >= mainX) {
-            int cols = width - mainX - 26 >= 720 ? 3 : 2;
-            int rows = (int)Math.ceil(filtered().size() / (double)cols);
-            moduleScroll = clampScroll(moduleScroll - verticalAmount * 28, 0, rows * 34 - (height - top - 60));
+        int[] l = layout();
+        int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], rightX = l[4], rightW = l[5], top = l[6], bottom = l[7];
+        if (mouseY < top + 40 || mouseY > bottom) return true;
+        if (mouseX >= leftX && mouseX <= leftX + leftW) {
+            double max = Math.max(0, filtered().size() * 20 - (bottom - top - 48));
+            hackScroll = clampScroll(hackScroll - verticalAmount * 26, 0, max);
+        } else if (mouseX >= settingsX && mouseX <= settingsX + settingsW) {
+            double max = Math.max(0, settingsContentHeight() - (bottom - top - 48));
+            settingsScroll = clampScroll(settingsScroll - verticalAmount * 30, 0, max);
+        } else if (mouseX >= rightX && mouseX <= rightX + rightW) {
+            double max = Math.max(0, filtered().size() * 34 - (bottom - top - 48));
+            moduleScroll = clampScroll(moduleScroll - verticalAmount * 30, 0, max);
         }
         return true;
     }
 
-
     private int settingsContentHeight() {
         return switch (selected) {
-            case "Nuker [Multi]" -> 920;
-            case "X-Ray" -> 330;
-            case "Fullbright" -> 210;
-            case "InventoryCleaner" -> 660;
+            case "Nuker [Multi]" -> 760;
+            case "X-Ray" -> 240;
+            case "Fullbright" -> 170;
+            case "InventoryCleaner" -> 910;
             default -> 120;
         };
     }
+
     private double clampScroll(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
 
     @Override
@@ -513,15 +526,5 @@ public final class PoeScreen extends Screen {
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
-    }
-
-    private int colorFor(String s) {
-        return switch (s) {
-            case "Fullbright" -> 0xFF70FF70;
-            case "X-Ray" -> 0xFF42D9FF;
-            case "Nuker [Multi]" -> 0xFFFFB21C;
-            case "InventoryCleaner" -> 0xFFFF63E8;
-            default -> 0xFFE5ECF3;
-        };
     }
 }

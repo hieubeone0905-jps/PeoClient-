@@ -72,3 +72,11 @@ Requires Java 21 and a network-capable Gradle environment:
 The generated jar is under `build/libs/`.
 
 A full build was attempted in the current environment, but Gradle 8.12.1 could not be downloaded because `services.gradle.org` is unreachable from this environment.
+
+
+## PeoClient GUI updates
+- Hub uses clipped per-panel scrolling so module settings cannot render outside their panel.
+- Enabled-module HUD text is white and bold for readability.
+- Added `Peo Account` settings on the title, Multiplayer, and Singleplayer screens.
+- Username override is intended for offline/cracked or local use; authenticated online servers can reject a mismatched name.
+- Added optional random SOCKS proxy selection per client process. A real public IP change requires working proxies; the client cannot invent a public IP by itself.

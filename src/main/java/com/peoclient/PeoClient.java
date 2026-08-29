@@ -34,10 +34,13 @@ public final class PeoClient implements ClientModInitializer {
     public static final Config CFG = new Config();
 
     public static KeyBinding menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey;
+    private static String originalUsername = "Player";
     private int saveTick;
+    private boolean networkConfigured;
 
     @Override
     public void onInitializeClient() {
+        originalUsername = MinecraftClient.getInstance().getSession().getUsername();
         CFG.load();
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
@@ -56,6 +59,12 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     private void tick(MinecraftClient mc) {
+        if (!networkConfigured) {
+            networkConfigured = true;
+            if (CFG.usernameOverride != null && !CFG.usernameOverride.isBlank()) setUsernameOverride(CFG.usernameOverride);
+            applyProxySettings(mc);
+        }
+
         while (menuKey.wasPressed()) mc.setScreen(new PoeScreen());
 
         while (xrayKey.wasPressed()) toggleXray(mc);
@@ -201,6 +210,9 @@ public final class PeoClient implements ClientModInitializer {
                 slotItems = c.slotItems != null ? c.slotItems : slotItems;
 
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
+                usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
+                randomProxy = c.randomProxy;
+                proxyList = c.proxyList != null ? c.proxyList : proxyList;
                 xrayFullBright = c.xrayFullBright;
                 xrayExposedOnly = c.xrayExposedOnly;
                 xrayFluids = c.xrayFluids;
@@ -244,6 +256,53 @@ public final class PeoClient implements ClientModInitializer {
                         new GsonBuilder().setPrettyPrinting().create().toJson(this));
             } catch (IOException ignored) {
             }
+        }
+    }
+
+    public static String getDisplayUsername() {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        String override = CFG.usernameOverride == null ? "" : CFG.usernameOverride.trim();
+        if (!override.isEmpty()) return override;
+        return originalUsername;
+    }
+
+    public static void setUsernameOverride(String name) {
+        String clean = name == null ? "" : name.trim();
+        if (clean.length() > 16) clean = clean.substring(0, 16);
+        CFG.usernameOverride = clean;
+        try {
+            ((com.peoclient.mixin.SessionAccessor) (Object) MinecraftClient.getInstance().getSession())
+                    .peo$setUsername(clean.isEmpty() ? originalUsername : clean);
+        } catch (Throwable ignored) {
+        }
+        CFG.save();
+    }
+
+    public static void applyProxySettings(MinecraftClient mc) {
+        if (!CFG.randomProxy || CFG.proxyList == null || CFG.proxyList.isEmpty()) return;
+        java.net.Proxy proxy = java.net.Proxy.NO_PROXY;
+        {
+            String entry = CFG.proxyList.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(CFG.proxyList.size()));
+            try {
+                String value = entry.trim();
+                boolean socks = value.toLowerCase(java.util.Locale.ROOT).startsWith("socks5://")
+                        || value.toLowerCase(java.util.Locale.ROOT).startsWith("socks4://");
+                int protoEnd = value.indexOf("://");
+                if (protoEnd >= 0) value = value.substring(protoEnd + 3);
+                int colon = value.lastIndexOf(':');
+                if (colon > 0) {
+                    String host = value.substring(0, colon);
+                    int port = Integer.parseInt(value.substring(colon + 1));
+                    proxy = new java.net.Proxy(java.net.Proxy.Type.SOCKS,
+                            new java.net.InetSocketAddress(host, port));
+                }
+            } catch (Exception ignored) {
+                proxy = java.net.Proxy.NO_PROXY;
+            }
+        }
+        try {
+            ((com.peoclient.mixin.MinecraftClientAccessor) (Object) mc).peo$setNetworkProxy(proxy);
+        } catch (Throwable ignored) {
         }
     }
 
@@ -471,13 +530,11 @@ public final class PeoClient implements ClientModInitializer {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null) return;
 
-            // PeoClient HUD: fixed to the top-left, with the client version first
-            // and only currently enabled modules listed underneath it.
-            int left = 8;
+            // Clean Wurst-style status: active modules are shown top-right, white + bold.
             String title = "PeoClient 1.21.4 V1";
             int titleW = mc.textRenderer.getWidth(title) + 10;
-            d.fill(left - 4, 4, left + titleW, 20, 0x78070B10);
-            d.drawTextWithShadow(mc.textRenderer, title, left, 8, 0xFFFFFFFF);
+            d.fill(6, 6, 6 + titleW, 21, 0x65070B10);
+            d.drawTextWithShadow(mc.textRenderer, title, 10, 9, 0xFFFFFFFF);
 
             List<String> active = new ArrayList<>();
             if (CFG.xray) active.add("X-Ray");
@@ -485,19 +542,14 @@ public final class PeoClient implements ClientModInitializer {
             if (CFG.nuker) active.add("Nuker [" + CFG.nukerMode + "]");
             if (CFG.cleaner) active.add("InventoryCleaner");
 
-            // Wurst-like readable top-left module list: strong shadow, dark backing,
-            // and enough vertical spacing that enabled modules never overlap.
-            int y = 23;
+            int right = mc.getWindow().getScaledWidth() - 8;
+            int y = 8;
             for (String name : active) {
-                int color = switch (name.startsWith("X-Ray") ? "X-Ray" : name.startsWith("Fullbright") ? "Fullbright" : name.startsWith("Nuker") ? "Nuker" : "InventoryCleaner") {
-                    case "X-Ray" -> 0xFF43D8FF;
-                    case "Fullbright" -> 0xFF71FF78;
-                    case "Nuker" -> 0xFFFFB21C;
-                    default -> 0xFFFF63E8;
-                };
-                int w = mc.textRenderer.getWidth(name) + 8;
-                d.fill(left - 4, y - 2, left + w, y + 11, 0x66070B10);
-                d.drawTextWithShadow(mc.textRenderer, name, left, y, color);
+                int tw = mc.textRenderer.getWidth(name);
+                int x = right - tw - 8;
+                d.fill(x - 4, y - 3, right, y + 11, 0x65070B10);
+                d.drawTextWithShadow(mc.textRenderer, name, x, y, 0xFFFFFFFF);
+                d.drawTextWithShadow(mc.textRenderer, name, x + 1, y, 0xFFFFFFFF);
                 y += 15;
             }
         }

@@ -7,7 +7,12 @@
     "ParticleManagerMixin",
     "BlockRenderManagerMixin",
     "SimpleOptionAccessor",
-    "ClientPlayNetworkHandlerMixin"
+    "ClientPlayNetworkHandlerMixin",
+    "SessionAccessor",
+    "MinecraftClientAccessor",
+    "TitleScreenMixin",
+    "MultiplayerScreenMixin",
+    "SelectWorldScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
