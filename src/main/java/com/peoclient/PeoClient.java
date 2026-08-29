@@ -504,7 +504,14 @@ public final class PeoClient implements ClientModInitializer {
             float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
             if (delta <= 0) return;
 
-            if (CFG.nukerRotate) rotateTo(mc, target.pos);
+            // Rotate first and let the next tick send the updated player rotation before
+            // starting the server-facing block-break action. This keeps the interaction
+            // closer to vanilla click/rotation ordering instead of changing view and
+            // immediately sending an action in the same tick.
+            if (CFG.nukerRotate && rotateTo(mc, target.pos)) {
+                cooldown = Math.max(1, CFG.nukerCooldown);
+                return;
+            }
 
             boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
                     || breakingSide != target.side;
@@ -609,17 +616,31 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         private static Direction bestSide(MinecraftClient mc, BlockPos pos) {
-            for (Direction d : Direction.values()) {
-                BlockPos neighbour = pos.offset(d);
-                if (!mc.world.getBlockState(neighbour).isFullCube(mc.world, neighbour)) {
-                    Vec3d center = Vec3d.ofCenter(pos);
-                    Vec3d eye = mc.player.getEyePos();
-                    Vec3d delta = center.subtract(eye);
-                    if (delta.lengthSquared() <= (CFG.nukerRange + 1.0) * (CFG.nukerRange + 1.0))
-                        return d;
+            Vec3d eye = mc.player.getEyePos();
+            Vec3d center = Vec3d.ofCenter(pos);
+
+            // Prefer the exact face that a vanilla-style ray from the player's eye
+            // actually hits. The old implementation picked the first adjacent air
+            // face, which could be a different face from the one visible to the player,
+            // especially when mining from above/below.
+            try {
+                BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
+                        eye, center,
+                        net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
+                        net.minecraft.world.RaycastContext.FluidHandling.NONE,
+                        mc.player));
+                if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
+                    return hit.getSide();
                 }
+            } catch (Throwable ignored) {
             }
-            return null;
+
+            // Raycast mode should never guess a face that cannot be verified.
+            if (CFG.nukerRaycast) return null;
+
+            Vec3d toPlayer = eye.subtract(center);
+            Direction facing = Direction.getFacing(toPlayer.x, toPlayer.y, toPlayer.z);
+            return facing;
         }
 
         private static int mode() {
@@ -631,13 +652,18 @@ public final class PeoClient implements ClientModInitializer {
             };
         }
 
-        private static void rotateTo(MinecraftClient mc, BlockPos pos) {
+        private static boolean rotateTo(MinecraftClient mc, BlockPos pos) {
             Vec3d v = Vec3d.ofCenter(pos).subtract(mc.player.getEyePos());
             double horizontal = Math.sqrt(v.x * v.x + v.z * v.z);
             float yaw = (float) (Math.toDegrees(Math.atan2(v.z, v.x)) - 90.0);
             float pitch = (float) -Math.toDegrees(Math.atan2(v.y, horizontal));
+
+            float yawDelta = MathHelper.wrapDegrees(yaw - mc.player.getYaw());
+            float pitchDelta = pitch - mc.player.getPitch();
+            boolean changed = Math.abs(yawDelta) > 2.0f || Math.abs(pitchDelta) > 2.0f;
             mc.player.setYaw(yaw);
             mc.player.setPitch(MathHelper.clamp(pitch, -90, 90));
+            return changed;
         }
 
         private record Target(BlockPos pos, Direction side) {}
