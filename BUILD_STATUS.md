@@ -1,10 +1,7 @@
-PeoClient 1.21.4 - GUI panel overflow fix (Fix9)
+# Build Status
 
-Changes:
-- Reworked two-column Hub layout to keep both panels fully inside the viewport at all resolutions.
-- Settings panel receives remaining width instead of exceeding the screen.
-- Long setting values are ellipsized to remain inside their row.
-- Footer/header anchors are clamped to the viewport.
-- Preserves independent scissoring and scroll behavior.
+Patch: Nuker survival block-breaking synchronization.
 
-Target: Minecraft 1.21.4 / Fabric.
+Changed `NukerLogic` to use a real `attackBlock()` start followed by `updateBlockBreakingProgress()` on subsequent ticks, with a tracked breaking position/face and cancellation when switching targets. This avoids sending progress updates for a break that was never started.
+
+This is intended to improve vanilla/server-compatible block breaking. It does not attempt to bypass anti-cheat or server protections.

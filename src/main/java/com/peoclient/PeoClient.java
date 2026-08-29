@@ -461,6 +461,8 @@ public final class PeoClient implements ClientModInitializer {
     public static final class NukerLogic {
         private static final List<BlockPos> renderBlocks = new ArrayList<>();
         private static int cooldown;
+        private static BlockPos breakingPos;
+        private static Direction breakingSide;
 
         private NukerLogic() {}
 
@@ -488,25 +490,43 @@ public final class PeoClient implements ClientModInitializer {
                 default -> 1;
             };
 
-            int broken = 0;
-            for (Target target : targets) {
-                BlockState state = mc.world.getBlockState(target.pos);
-                float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
+            // Survival/server-safe progression: keep one legitimate break state alive
+            // across ticks. Calling updateBlockBreakingProgress() without first starting
+            // the break is rejected by stricter servers and can leave the client
+            // swinging at a block that never actually disappears.
+            Target target = targets.get(0);
+            BlockState state = mc.world.getBlockState(target.pos);
+            float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
+            if (delta <= 0) return;
 
-                if (delta <= 0) continue;
+            if (CFG.nukerRotate) rotateTo(mc, target.pos);
 
-                // Survival-safe serial progress: never pretend a server accepted an
-                // impossible instant break.
-                if (mode == 1 && broken > 0) break;
-
-                if (CFG.nukerRotate) rotateTo(mc, target.pos);
-
+            boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
+                    || breakingSide != target.side;
+            if (newTarget) {
+                if (breakingPos != null) {
+                    mc.interactionManager.cancelBlockBreaking();
+                }
+                boolean started = mc.interactionManager.attackBlock(target.pos, target.side);
+                if (!started) {
+                    breakingPos = null;
+                    breakingSide = null;
+                    return;
+                }
+                breakingPos = target.pos.toImmutable();
+                breakingSide = target.side;
+            } else {
                 mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
-                mc.player.swingHand(Hand.MAIN_HAND);
-                renderBlocks.add(target.pos);
-                broken++;
+            }
 
-                if (mode == 0 || mode == 3 || broken >= limit) break;
+            mc.player.swingHand(Hand.MAIN_HAND);
+            renderBlocks.add(target.pos);
+
+            // If the block was actually broken by the server/world update, forget the
+            // active target so the next tick can start a fresh legitimate break.
+            if (mc.world.getBlockState(target.pos).isAir()) {
+                breakingPos = null;
+                breakingSide = null;
             }
 
             cooldown = Math.max(0, CFG.nukerCooldown);
