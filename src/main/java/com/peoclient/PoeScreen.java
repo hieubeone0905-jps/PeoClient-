@@ -170,7 +170,7 @@ public final class PoeScreen extends Screen {
     private void drawText(DrawContext d, String s, int x, int y, int color, boolean bold) {
         d.drawText(textRenderer,
                 Text.literal(s).styled(style -> style.withBold(bold)),
-                x, y, color);
+                x, y, color, false);
     }
 
     private void drawHackList(DrawContext d, int x, int y, int w, int h) {
