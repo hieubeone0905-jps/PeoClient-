@@ -118,9 +118,9 @@ public final class PoeScreen extends Screen {
         drawText(d, "P", 18, 20, 0xFFFFFFFF, true);
         drawText(d, "PeoClient", 42, 16, 0xFFFFFFFF, true);
         drawText(d, "1.21.4", 42, 34, 0xFFAAB5BE, false);
-        drawText(d, "Right Shift • Hub", width - 190, 18, 0xFFFFFFFF, false);
+        drawText(d, "Right Shift • Hub", Math.max(18, width - 190), 18, 0xFFFFFFFF, false);
         drawText(d, listening ? "Press a key (ESC cancels)" : "Left click = toggle  •  Right click = settings",
-                width - 380, 42, 0xFFB6C0C8, false);
+                Math.max(18, width - 380), 42, 0xFFB6C0C8, false);
 
         super.render(d, mouseX, mouseY, delta);
 
@@ -144,7 +144,7 @@ public final class PoeScreen extends Screen {
         d.disableScissor();
 
         drawText(d, "Wheel: scroll hovered panel", 14, height - 16, 0xFF73808B, false);
-        drawText(d, "ESC: close", width - 80, height - 16, 0xFF73808B, false);
+        drawText(d, "ESC: close", Math.max(18, width - textRenderer.getWidth("ESC: close") - 14), height - 16, 0xFF73808B, false);
     }
 
     private void panel(DrawContext d, int x, int y, int w, int h) {
@@ -282,9 +282,31 @@ public final class PoeScreen extends Screen {
         d.fill(x, y, x + w, y + 28, 0xB7152029);
         d.drawBorder(x, y, w, 28, 0xFF294354);
         drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
-        int tw = textRenderer.getWidth(value);
-        drawText(d, value, Math.max(x + 100, x + w - tw - 10), y + 9, 0xFFE1E6EA, false);
+
+        // Keep long setting values inside the panel. This is especially important
+        // for block-filter lists, long proxy/account values, and translated names.
+        int labelReserve = Math.max(150, textRenderer.getWidth(label) + 22);
+        int valueLeft = x + labelReserve;
+        int valueRight = x + w - 10;
+        int maxValueWidth = Math.max(80, valueRight - valueLeft);
+        String shown = fitText(value, maxValueWidth);
+        int tw = textRenderer.getWidth(shown);
+        drawText(d, shown, Math.max(valueLeft, valueRight - tw), y + 9, 0xFFE1E6EA, false);
         return y + 34;
+    }
+
+    private String fitText(String value, int maxWidth) {
+        if (value == null || value.isBlank()) return "";
+        if (textRenderer.getWidth(value) <= maxWidth) return value;
+        String suffix = "...";
+        int room = Math.max(0, maxWidth - textRenderer.getWidth(suffix));
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < value.length(); i++) {
+            String candidate = out.toString() + value.charAt(i);
+            if (textRenderer.getWidth(candidate) > room) break;
+            out.append(value.charAt(i));
+        }
+        return out + suffix;
     }
 
     private int rowToggle(DrawContext d, int x, int y, int w, String label, boolean value) {
@@ -332,14 +354,29 @@ public final class PoeScreen extends Screen {
     }
 
     private int[] layout() {
-        int margin = 28;
-        int gap = 18;
+        // Wurst-like two-column layout: both panels always remain fully inside
+        // the viewport, with the settings panel getting the remaining space.
+        int margin = Math.max(18, Math.min(32, width / 40));
+        int gap = Math.max(14, Math.min(20, width / 90));
         int top = 92;
         int bottom = Math.max(top + 260, height - 28);
-        int usable = width - margin * 2 - gap;
-        int leftW = Math.min(360, Math.max(270, (int) (usable * 0.28)));
-        int settingsW = Math.max(420, usable - leftW);
-        return new int[]{margin, leftW, margin + leftW + gap, settingsW, top, bottom};
+        int usable = Math.max(520, width - margin * 2 - gap);
+
+        int leftW = Math.round(usable * 0.29f);
+        leftW = Math.max(300, Math.min(390, leftW));
+
+        int settingsW = usable - leftW;
+        if (settingsW < 420) {
+            int neededLeft = Math.max(260, usable - 420);
+            leftW = Math.min(leftW, neededLeft);
+            settingsW = usable - leftW;
+        }
+
+        int leftX = margin;
+        int settingsX = leftX + leftW + gap;
+        // Final safety clamp so neither border can ever be drawn beyond the screen.
+        settingsW = Math.max(1, Math.min(settingsW, width - margin - settingsX));
+        return new int[]{leftX, leftW, settingsX, settingsW, top, bottom};
     }
 
     @Override
