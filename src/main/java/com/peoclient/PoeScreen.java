@@ -81,6 +81,7 @@ public final class PoeScreen extends Screen {
         if (!name.equals(selected)) {
             selected = name;
             settingsScroll = 0;
+            moduleScroll = 0;
         }
     }
 
@@ -167,8 +168,9 @@ public final class PoeScreen extends Screen {
     }
 
     private void drawText(DrawContext d, String s, int x, int y, int color, boolean bold) {
-        d.drawTextWithShadow(textRenderer, s, x, y, color);
-        if (bold) d.drawTextWithShadow(textRenderer, s, x + 1, y, color);
+        d.drawText(textRenderer,
+                Text.literal(s).styled(style -> style.withBold(bold)),
+                x, y, color);
     }
 
     private void drawHackList(DrawContext d, int x, int y, int w, int h) {
@@ -198,7 +200,7 @@ public final class PoeScreen extends Screen {
                 d.fill(x, yy, x + w, yy + cardH, sel ? 0xFF233E52 : 0xA8141D24);
                 d.drawBorder(x, yy, w, cardH, sel ? 0xFF6A91AD : 0xFF294354);
                 drawText(d, name, x + 10, yy + 9, real ? 0xFFFFFFFF : 0xFF7E8A94, real && (on || sel));
-                if (on) d.fill(x + 8, yy + 26, x + w - 8, yy + 28, 0xFFFFFFFF);
+                if (on) drawText(d, "ON", x + w - 28, yy + 9, 0xFFFFFFFF, true);
             }
             yy += rowH;
         }
@@ -356,13 +358,15 @@ public final class PoeScreen extends Screen {
     }
 
     private int[] layout() {
-        int gap = 12;
-        int leftW = Math.min(310, Math.max(260, width / 4));
-        int rightW = Math.min(230, Math.max(210, width / 6));
-        int settingsX = 14 + leftW + gap;
-        int rightX = width - rightW - 14;
-        int settingsW = Math.max(360, rightX - settingsX - gap);
-        return new int[]{14, leftW, settingsX, settingsW, rightX, rightW, 90, height - 24};
+        int margin = 18;
+        int gap = 14;
+        int usable = width - margin * 2 - gap * 2;
+        int leftW = Math.max(250, (int)(usable * 0.25));
+        int rightW = Math.max(250, (int)(usable * 0.22));
+        int settingsW = Math.max(360, usable - leftW - rightW);
+        int settingsX = margin + leftW + gap;
+        int rightX = settingsX + settingsW + gap;
+        return new int[]{margin, leftW, settingsX, settingsW, rightX, rightW, 92, height - 28};
     }
 
     @Override
@@ -542,8 +546,8 @@ public final class PoeScreen extends Screen {
 
     private int settingsContentHeight() {
         return switch (selected) {
-            case "Nuker [Multi]" -> 800;
-            case "InventoryCleaner" -> 1050;
+            case "Nuker [Multi]" -> 820;
+            case "InventoryCleaner" -> 980;
             case "X-Ray" -> 220;
             case "Fullbright" -> 220;
             default -> 120;

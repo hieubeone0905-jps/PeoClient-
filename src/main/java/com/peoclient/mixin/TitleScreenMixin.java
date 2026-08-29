@@ -22,6 +22,6 @@ public final class TitleScreenMixin {
         ((ScreenAccessor) screen).peo$addDrawableChild(ButtonWidget.builder(
                 net.minecraft.text.Text.literal("Peo Account: " + PeoClient.getDisplayUsername()),
                 b -> net.minecraft.client.MinecraftClient.getInstance().setScreen(new AccountScreen(screen)))
-                .dimensions(x, y, 200, 20).build());
+                .dimensions(x, y + 2, 200, 20).build());
     }
 }

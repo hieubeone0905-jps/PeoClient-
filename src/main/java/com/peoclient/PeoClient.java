@@ -118,6 +118,7 @@ public final class PeoClient implements ClientModInitializer {
         public String usernameOverride = "";
         public boolean randomProxy = false;
         public List<String> proxyList = new ArrayList<>();
+        public List<String> savedAccounts = new ArrayList<>();
 
         // Wurst/LiquidBounce-style X-Ray settings.
         // Wurst-style X-Ray settings: block list, exposed-only and opacity.
@@ -223,6 +224,7 @@ public final class PeoClient implements ClientModInitializer {
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
                 proxyList = c.proxyList != null ? c.proxyList : proxyList;
+                savedAccounts = c.savedAccounts != null ? c.savedAccounts : savedAccounts;
                 xrayFullBright = c.xrayFullBright;
                 xrayExposedOnly = c.xrayExposedOnly;
                 xrayFluids = c.xrayFluids;
@@ -272,6 +274,9 @@ public final class PeoClient implements ClientModInitializer {
                 if (offHandItem == null) offHandItem = "SHIELD";
                 if (usernameOverride == null) usernameOverride = "";
                 if (proxyList == null) proxyList = new ArrayList<>();
+                if (savedAccounts == null) savedAccounts = new ArrayList<>();
+                savedAccounts.removeIf(v -> v == null || v.isBlank());
+                if (savedAccounts.size() > 20) savedAccounts = new ArrayList<>(savedAccounts.subList(0, 20));
             } catch (Exception ignored) {
             }
         }
@@ -559,28 +564,22 @@ public final class PeoClient implements ClientModInitializer {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.player == null) return;
 
-            // Clean Wurst-style status: active modules are shown top-right, white + bold.
-            String title = "PeoClient 1.21.4 V1";
-            int titleW = mc.textRenderer.getWidth(title) + 10;
-            d.fill(6, 6, 6 + titleW, 21, 0x65070B10);
-            d.drawTextWithShadow(mc.textRenderer, title, 10, 9, 0xFFFFFFFF);
+            // Wurst-style compact HUD: logo at top-left, active modules directly underneath.
+            var title = Text.literal("PeoClient 1.21.4 V1")
+                    .styled(style -> style.withBold(true));
+            d.drawText(mc.textRenderer, title, 10, 8, 0xFFFFFFFF);
 
-            List<String> active = new ArrayList<>();
-            if (CFG.xray) active.add("X-Ray");
-            if (CFG.fullbright) active.add("Fullbright");
-            if (CFG.nuker) active.add("Nuker [" + CFG.nukerMode + "]");
-            if (CFG.cleaner) active.add("InventoryCleaner");
-
-            int right = mc.getWindow().getScaledWidth() - 8;
-            int y = 8;
-            for (String name : active) {
-                int tw = mc.textRenderer.getWidth(name);
-                int x = right - tw - 8;
-                d.fill(x - 4, y - 3, right, y + 11, 0x65070B10);
-                d.drawTextWithShadow(mc.textRenderer, name, x, y, 0xFFFFFFFF);
-                d.drawTextWithShadow(mc.textRenderer, name, x + 1, y, 0xFFFFFFFF);
-                y += 15;
-            }
+            int y = 24;
+            if (CFG.xray) y = active(d, mc, "X-Ray", y);
+            if (CFG.fullbright) y = active(d, mc, "Fullbright", y);
+            if (CFG.nuker) y = active(d, mc, "Nuker [" + CFG.nukerMode + "]", y);
+            if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
         }
-    }
-}
+
+        private static int active(net.minecraft.client.gui.DrawContext d, MinecraftClient mc, String name, int y) {
+            d.drawText(mc.textRenderer,
+                    Text.literal(name).styled(style -> style.withBold(true)),
+                    10, y, 0xFFFFFFFF);
+            return y + 14;
+        }
+    }}
