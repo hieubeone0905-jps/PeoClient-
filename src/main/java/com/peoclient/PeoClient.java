@@ -1,5 +1,7 @@
 package com.peoclient;
 
+import com.peoclient.modules.AntiPeoModule;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
@@ -46,6 +48,8 @@ public final class PeoClient implements ClientModInitializer {
     public void onInitializeClient() {
         originalUsername = class_310.method_1551().method_1548().method_1676();
         CFG.load();
+        if (CFG.antiPeo && !AntiPeoModule.isEnabled()) AntiPeoModule.toggle();
+        if (!CFG.antiPeo && AntiPeoModule.isEnabled()) AntiPeoModule.toggle();
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
         registerModuleKeys();
@@ -72,6 +76,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "InventoryCleaner" -> GLFW.GLFW_KEY_I;
                 case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
+                case "AntiPeo" -> GLFW.GLFW_KEY_P;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
             Integer stored = CFG.keybinds.get(module);
@@ -98,6 +103,7 @@ public final class PeoClient implements ClientModInitializer {
             case "InventoryCleaner" -> GLFW.GLFW_KEY_I;
             case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
+            case "AntiPeo" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
     }
@@ -145,6 +151,7 @@ public final class PeoClient implements ClientModInitializer {
             case "Nuker [Multi]" -> CFG.nuker = !CFG.nuker;
             case "Fullbright" -> toggleFullbright(mc);
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
+            case "AntiPeo" -> { AntiPeoModule.toggle(); CFG.antiPeo = AntiPeoModule.isEnabled(); }
             default -> { /* reserved for modules that are not implemented yet */ }
         }
         CFG.save();
@@ -170,7 +177,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class Config {
-        public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
+        public boolean xray = false, nuker = false, fullbright = false, cleaner = false, antiPeo = false;
         public Map<String, Integer> keybinds = new LinkedHashMap<>();
 
         // Account/network settings.  A username override only changes the client-side
@@ -280,7 +287,7 @@ public final class PeoClient implements ClientModInitializer {
                         ? c.cleanerBlacklistSet : cleanerBlacklistSet;
                 slotItems = c.slotItems != null ? c.slotItems : slotItems;
 
-                xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
+                xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner; antiPeo = c.antiPeo;
                 keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
@@ -603,8 +610,8 @@ public final class PeoClient implements ClientModInitializer {
                     breakingSide = null;
                 }
 
-                if (CFG.nukerCooldown > 0) {
-                    cooldown = CFG.nukerCooldown;
+                if (CFG.nukerCooldown > 0 || AntiPeoModule.getActionDelayTicks() > 0) {
+                    cooldown = Math.max(CFG.nukerCooldown, AntiPeoModule.getActionDelayTicks());
                     break;
                 }
             }
@@ -782,6 +789,7 @@ public final class PeoClient implements ClientModInitializer {
             if (NukerCompatibility.isEnabled()) y = active(d, mc, "Nuker Compatibility", y);
             if (NukerAreaLimiter.isLocked()) y = active(d, mc, CFG.nukerRangeHighlight ? "Nuker Area [VISIBLE]" : "Nuker Area [LOCKED]", y);
             if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
+            if (AntiPeoModule.isEnabled()) y = active(d, mc, "AntiPeo [SAFE]", y);
         }
 
         private static int active(net.minecraft.class_332 d, class_310 mc, String name, int y) {

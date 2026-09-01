@@ -13,7 +13,8 @@
     "MinecraftClientAccessor",
     "TitleScreenMixin",
     "MultiplayerScreenMixin",
-    "SelectWorldScreenMixin"
+    "SelectWorldScreenMixin",
+    "ClientPlayerInteractionManagerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

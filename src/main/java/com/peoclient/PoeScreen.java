@@ -1,5 +1,7 @@
 package com.peoclient;
 
+import com.peoclient.modules.AntiPeoModule;
+
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -35,7 +37,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiPeo",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
@@ -65,7 +67,7 @@ public final class PoeScreen extends class_437 {
 
     private boolean implemented(String name) {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
-                || name.equals("Nuker [Multi]") || name.equals("X-Ray");
+                || name.equals("Nuker [Multi]") || name.equals("X-Ray") || name.equals("AntiPeo");
     }
 
     private boolean enabled(String name) {
@@ -74,6 +76,7 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> PeoClient.CFG.cleaner;
             case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.CFG.xray;
+            case "AntiPeo" -> AntiPeoModule.isEnabled();
             default -> false;
         };
     }
@@ -84,6 +87,7 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> PeoClient.CFG.cleaner = !PeoClient.CFG.cleaner;
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
+            case "AntiPeo" -> { AntiPeoModule.toggle(); PeoClient.CFG.antiPeo = AntiPeoModule.isEnabled(); }
         }
         PeoClient.CFG.save();
     }
@@ -194,6 +198,7 @@ public final class PoeScreen extends class_437 {
                 case "InventoryCleaner" -> drawCleaner(d, x, yy, w);
                 case "X-Ray" -> drawXray(d, x, yy, w);
                 case "Fullbright" -> drawFullbright(d, x, yy, w);
+                case "AntiPeo" -> drawAntiPeo(d, x, yy, w);
             }
         } else {
             rowValue(d, x, yy, w, "Keybind", keyName(selected));
@@ -313,6 +318,13 @@ public final class PoeScreen extends class_437 {
         return y;
     }
 
+    private int drawAntiPeo(class_332 d, int x, int y, int w) {
+        y = section(d, x, y, "Safety / compatibility");
+        y = rowToggle(d, x, y, w, "Conservative mode", AntiPeoModule.isEnabled());
+        y = rowValue(d, x, y, w, "Action delay", AntiPeoModule.getActionDelayTicks() + " ticks");
+        return y;
+    }
+
     private int drawFullbright(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Brightness");
         y = rowValue(d, x, y, w, "Method", PeoClient.CFG.fullbrightMethod);
@@ -391,6 +403,7 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> "Cleans and sorts your inventory automatically.";
             case "Fullbright" -> "Makes dark areas bright.";
             case "X-Ray" -> "Shows selected blocks through the world.";
+            case "AntiPeo" -> "Adds conservative delays to automated client actions.";
             default -> "";
         };
     }

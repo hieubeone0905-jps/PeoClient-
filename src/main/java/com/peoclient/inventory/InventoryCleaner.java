@@ -1,6 +1,7 @@
 package com.peoclient.inventory;
 
 import com.peoclient.PeoClient;
+import com.peoclient.modules.AntiPeoModule;
 import net.minecraft.class_1713;
 import net.minecraft.class_1743;
 import net.minecraft.class_1744;
@@ -325,7 +326,7 @@ public final class InventoryCleaner {
     }
 
     private static void afterAction(int extraTicks) {
-        cooldown = Math.max(cooldown, PeoClient.CFG.cleanerActionDelay + extraTicks);
+        cooldown = Math.max(cooldown, PeoClient.CFG.cleanerActionDelay + extraTicks + AntiPeoModule.getActionDelayTicks());
     }
 
     private static String id(class_1799 stack) {
