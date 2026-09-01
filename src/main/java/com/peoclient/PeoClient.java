@@ -479,6 +479,25 @@ public final class PeoClient implements ClientModInitializer {
 
         private NukerLogic() {}
 
+        /**
+         * Public render snapshot used by the Highlight renderer.
+         * A copy is returned so rendering cannot mutate the active target list.
+         */
+        public static List<BlockPos> getRenderBlocks() {
+            return List.copyOf(renderBlocks);
+        }
+
+        /**
+         * Vanilla breaking progress is exposed through the interaction manager
+         * public API. The renderer expects a normalized 0..1 value.
+         */
+        public static float getBreakingProgress() {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.interactionManager == null) return 0.0f;
+            float progress = mc.interactionManager.getBlockBreakingProgress();
+            return MathHelper.clamp(progress, 0.0f, 1.0f);
+        }
+
         public static void tick(MinecraftClient mc) {
             if (mc.interactionManager == null || mc.player == null || mc.world == null
                     || mc.currentScreen != null) return;
