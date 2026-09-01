@@ -53,6 +53,9 @@ public final class PeoClient implements ClientModInitializer {
         fullbrightKey = MODULE_KEYS.get("Fullbright");
         cleanerKey = MODULE_KEYS.get("InventoryCleaner");
 
+        // Register the Nuker bypass key (B) in addition to the normal Nuker key (N).
+        com.peoclient.nuker.BypassKeyHandler.register();
+
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         HudRenderCallback.EVENT.register((draw, delta) -> Hud.render(draw));
     }
@@ -121,8 +124,13 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         FullbrightLogic.tick(mc);
+        com.peoclient.nuker.BypassKeyHandler.tick();
 
-        if (CFG.nuker) NukerLogic.tick(mc);
+        if (CFG.nuker) {
+            com.peoclient.nuker.NukerBypassIntegration.tick();
+        } else {
+            com.peoclient.nuker.NukerBypassManager.reset();
+        }
         if (CFG.cleaner) InventoryCleaner.tick(mc);
 
         if (++saveTick >= 100) {
@@ -134,7 +142,10 @@ public final class PeoClient implements ClientModInitializer {
     public static void toggleModuleByName(String module, MinecraftClient mc) {
         switch (module) {
             case "X-Ray" -> toggleXray(mc);
-            case "Nuker [Multi]" -> CFG.nuker = !CFG.nuker;
+            case "Nuker [Multi]" -> {
+                CFG.nuker = !CFG.nuker;
+                if (!CFG.nuker) com.peoclient.nuker.NukerBypassManager.reset();
+            }
             case "Fullbright" -> toggleFullbright(mc);
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             default -> { /* reserved for modules that are not implemented yet */ }
