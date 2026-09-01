@@ -109,6 +109,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     private void tick(class_310 mc) {
+        AntiPeoModule.tick();
         if (!networkConfigured) {
             networkConfigured = true;
             if (CFG.usernameOverride != null && !CFG.usernameOverride.isBlank()) setUsernameOverride(CFG.usernameOverride);
@@ -531,6 +532,10 @@ public final class PeoClient implements ClientModInitializer {
                 if (breakingPos != null) renderBlocks.add(breakingPos);
                 return;
             }
+            if (!AntiPeoModule.canAct()) {
+                if (breakingPos != null) renderBlocks.add(breakingPos);
+                return;
+            }
 
             // Build a fresh queue when the old one is exhausted or its active target became invalid.
             if (queue.isEmpty() || !activeTargetStillValid(mc)) {
@@ -593,6 +598,7 @@ public final class PeoClient implements ClientModInitializer {
 
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
+                AntiPeoModule.onAction();
                 renderBlocks.add(target.pos);
                 processed++;
 
@@ -610,8 +616,8 @@ public final class PeoClient implements ClientModInitializer {
                     breakingSide = null;
                 }
 
-                if (CFG.nukerCooldown > 0 || AntiPeoModule.getActionDelayTicks() > 0) {
-                    cooldown = Math.max(CFG.nukerCooldown, AntiPeoModule.getActionDelayTicks());
+                if (CFG.nukerCooldown > 0) {
+                    cooldown = CFG.nukerCooldown;
                     break;
                 }
             }

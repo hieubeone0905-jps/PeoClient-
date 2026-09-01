@@ -70,6 +70,8 @@ public final class InventoryCleaner {
             return;
         }
 
+        if (!AntiPeoModule.canAct()) return;
+
         List<Entry> entries = snapshot(mc);
 
         // LiquidBounce workflow: hotbar swaps -> stack merges -> disposal.
@@ -326,7 +328,8 @@ public final class InventoryCleaner {
     }
 
     private static void afterAction(int extraTicks) {
-        cooldown = Math.max(cooldown, PeoClient.CFG.cleanerActionDelay + extraTicks + AntiPeoModule.getActionDelayTicks());
+        cooldown = Math.max(cooldown, PeoClient.CFG.cleanerActionDelay + extraTicks);
+        AntiPeoModule.onAction();
     }
 
     private static String id(class_1799 stack) {
