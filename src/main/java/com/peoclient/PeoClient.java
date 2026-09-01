@@ -3,6 +3,7 @@ package com.peoclient;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
+import com.peoclient.nuker.compat.NukerCompatibility;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -35,7 +36,7 @@ import java.util.*;
 public final class PeoClient implements ClientModInitializer {
     public static final Config CFG = new Config();
 
-    public static KeyBinding menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey;
+    public static KeyBinding menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey, nukerBypassKey;
     public static final Map<String, KeyBinding> MODULE_KEYS = new LinkedHashMap<>();
     private static String originalUsername = "Player";
     private int saveTick;
@@ -52,9 +53,7 @@ public final class PeoClient implements ClientModInitializer {
         nukerKey = MODULE_KEYS.get("Nuker [Multi]");
         fullbrightKey = MODULE_KEYS.get("Fullbright");
         cleanerKey = MODULE_KEYS.get("InventoryCleaner");
-
-        // Register the Nuker bypass key (B) in addition to the normal Nuker key (N).
-        com.peoclient.nuker.BypassKeyHandler.register();
+        nukerBypassKey = key("PeoClient Nuker Compatibility", GLFW.GLFW_KEY_B);
 
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
         HudRenderCallback.EVENT.register((draw, delta) -> Hud.render(draw));
@@ -114,6 +113,7 @@ public final class PeoClient implements ClientModInitializer {
         for (Map.Entry<String, KeyBinding> entry : MODULE_KEYS.entrySet()) {
             while (entry.getValue().wasPressed()) toggleModuleByName(entry.getKey(), mc);
         }
+        while (nukerBypassKey.wasPressed()) NukerCompatibility.toggle();
 
         if (mc.player == null || mc.world == null) {
             if (++saveTick >= 100) {
@@ -124,13 +124,8 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         FullbrightLogic.tick(mc);
-        com.peoclient.nuker.BypassKeyHandler.tick();
 
-        if (CFG.nuker) {
-            com.peoclient.nuker.NukerBypassIntegration.tick();
-        } else {
-            com.peoclient.nuker.NukerBypassManager.reset();
-        }
+        if (CFG.nuker) NukerCompatibility.tick(mc);
         if (CFG.cleaner) InventoryCleaner.tick(mc);
 
         if (++saveTick >= 100) {
@@ -142,10 +137,7 @@ public final class PeoClient implements ClientModInitializer {
     public static void toggleModuleByName(String module, MinecraftClient mc) {
         switch (module) {
             case "X-Ray" -> toggleXray(mc);
-            case "Nuker [Multi]" -> {
-                CFG.nuker = !CFG.nuker;
-                if (!CFG.nuker) com.peoclient.nuker.NukerBypassManager.reset();
-            }
+            case "Nuker [Multi]" -> CFG.nuker = !CFG.nuker;
             case "Fullbright" -> toggleFullbright(mc);
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             default -> { /* reserved for modules that are not implemented yet */ }

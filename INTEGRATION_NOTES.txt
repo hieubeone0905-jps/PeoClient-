@@ -1,6 +1,0 @@
-PeoClient integration
-- Added com.peoclient.nuker package with the compatible 1.21.4 bypass classes.
-- Added B key registration/tick handling.
-- Nuker now routes through NukerBypassIntegration while enabled and resets bypass state when disabled.
-- Excluded the uploaded legacy NukerBypass implementation using net.minecraft.client.Minecraft/CPacket* (old Minecraft API), because including it would cause 1.21.4 compilation conflicts.
-- Updated packet class names to 1.21.4 PlayerMoveC2SPacket/PlayerActionC2SPacket.
