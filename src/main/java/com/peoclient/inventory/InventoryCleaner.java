@@ -325,7 +325,7 @@ public final class InventoryCleaner {
         int screenSlot = playerInventoryScreenSlot(playerSlot);
         pendingSlot = playerSlot;
         pendingScreenSlot = screenSlot;
-        pendingWait = Math.max(2, PeoClient.CFG.cleanerAckTimeout);
+        pendingWait = Math.max(1, PeoClient.CFG.cleanerAckTimeout);
         pendingServerAck = false;
         mc.field_1761.method_2906(mc.field_1724.field_7512.field_7763, screenSlot, 1,
                 class_1713.field_7795, mc.field_1724);
@@ -336,7 +336,7 @@ public final class InventoryCleaner {
         class_310 mc = class_310.method_1551();
         if (mc.field_1724 == null || mc.field_1724.field_7512 == null) return;
         if (pendingSlot < 0 || syncId != mc.field_1724.field_7512.field_7763 || screenSlot != pendingScreenSlot) return;
-        if (serverStack.method_7960()) pendingServerAck = true;
+        pendingServerAck = true;
     }
 
     private static void swapWithHotbar(class_310 mc, int playerSlot, int hotbarSlot) {

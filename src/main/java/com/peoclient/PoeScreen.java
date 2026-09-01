@@ -659,7 +659,7 @@ public final class PoeScreen extends class_437 {
         p += 60;
         if (hit(my, p)) { PeoClient.CFG.cleanerMergeStacks = !PeoClient.CFG.cleanerMergeStacks; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.cleanerActionDelay = step(PeoClient.CFG.cleanerActionDelay, 0, 10); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 30 ? 2 : PeoClient.CFG.cleanerAckTimeout + 2; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 29 ? 1 : PeoClient.CFG.cleanerAckTimeout + 2; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.cleanerTouchHotbar = !PeoClient.CFG.cleanerTouchHotbar; save(); }
     }
 

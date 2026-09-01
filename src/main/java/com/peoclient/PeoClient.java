@@ -254,7 +254,7 @@ public final class PeoClient implements ClientModInitializer {
         public int cleanerActionDelay = 0;
         // Keep at least a small server acknowledgement window so fast disposal
         // does not outrun the server and create client/server ghost items.
-        public int cleanerAckTimeout = 2;
+        public int cleanerAckTimeout = 1;
         public int maxBlocks = 512, maxArrows = 128, maxThrowables = 64, maxFoods = 200;
         public int maxWaterBuckets = 2, maxLavaBuckets = 2, maxMilkBuckets = 2;
         public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
@@ -359,7 +359,7 @@ public final class PeoClient implements ClientModInitializer {
                 savedAccounts.removeIf(v -> v == null || v.isBlank());
                 if (savedAccounts.size() > 20) savedAccounts = new ArrayList<>(savedAccounts.subList(0, 20));
                 if (cleanerDropFilter == null) cleanerDropFilter = new LinkedHashSet<>();
-                if (cleanerAckTimeout < 2) cleanerAckTimeout = 2;
+                if (cleanerAckTimeout < 1) cleanerAckTimeout = 1;
                 if (xrayBlocks == null || xrayBlocks.isEmpty()) xrayBlocks = defaultOreBlocks();
             } catch (Exception ignored) {
             }
