@@ -23,6 +23,8 @@ import net.minecraft.class_1823;
 import net.minecraft.class_1829;
 import net.minecraft.class_1835;
 import net.minecraft.class_310;
+import net.minecraft.class_408;
+import net.minecraft.class_490;
 import net.minecraft.class_3532;
 import net.minecraft.class_7923;
 import net.minecraft.class_9239;
@@ -51,7 +53,14 @@ public final class InventoryCleaner {
     private static int pendingExpectedRevision = -1;
 
     public static void tick(class_310 mc) {
-        if (mc.field_1724 == null || mc.field_1761 == null || mc.field_1755 != null) return;
+        if (mc.field_1724 == null || mc.field_1761 == null) return;
+
+        // Keep cleaning while the player's own inventory or chat screen is open.
+        // Do not operate through other handled screens (chests, shulkers, etc.),
+        // because their slot layout is different and could cause container desync.
+        if (mc.field_1755 != null
+                && !(mc.field_1755 instanceof class_490)
+                && !(mc.field_1755 instanceof class_408)) return;
 
         // Aggressive mode: perform several locally-predicted inventory actions in
         // the same client tick. We deliberately cap the batch so the client does

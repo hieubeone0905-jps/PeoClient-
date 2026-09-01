@@ -22,8 +22,10 @@ public final class BlockRenderManagerMixin {
                           class_5819 random, CallbackInfo ci) {
         if (!PeoClient.CFG.xray) return;
 
-        // AFK performance mode: cancel every block model so the world becomes
-        // effectively sky-only. This is client-side rendering only.
+        // Sky-only performance mode: cancel EVERY terrain block model before
+        // vanilla has a chance to emit vertices. This intentionally includes
+        // stone, dirt, grass, wood, ores and every other block. It is purely
+        // client-side rendering; the actual world/chunks are not modified.
         if (PeoClient.CFG.xraySkyOnly) {
             ci.cancel();
             return;
@@ -54,6 +56,13 @@ public final class BlockRenderManagerMixin {
             // Keep X-Ray stable by cancelling non-target blocks when the configured
             // background opacity is zero; otherwise let vanilla render them.
         }
+    }
+
+    @Inject(method = "method_3353", at = @At("HEAD"), cancellable = true)
+    private void peo$xraySkyOnlyEntity(class_2680 state, class_4587 matrices,
+                                        net.minecraft.class_4597 vertexConsumers, int light, int overlay,
+                                        CallbackInfo ci) {
+        if (PeoClient.CFG.xray && PeoClient.CFG.xraySkyOnly) ci.cancel();
     }
 
     @Inject(method = "method_3352", at = @At("HEAD"), cancellable = true)

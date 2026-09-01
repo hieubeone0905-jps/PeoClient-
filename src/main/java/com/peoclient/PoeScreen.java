@@ -318,7 +318,7 @@ public final class PoeScreen extends class_437 {
         y = rowValue(d, x, y, w, "Edit blocks", shortSet(PeoClient.CFG.xrayBlocks));
         y += 8;
         y = section(d, x, y, "Visibility");
-        y = rowToggle(d, x, y, w, "Sky only (AFK / low lag)", PeoClient.CFG.xraySkyOnly);
+        y = rowToggle(d, x, y, w, "Delete all blocks (Sky only / AFK)", PeoClient.CFG.xraySkyOnly);
         y = rowToggle(d, x, y, w, "Exposed only", PeoClient.CFG.xrayExposedOnly);
         y = rowToggle(d, x, y, w, "Fluids", PeoClient.CFG.xrayFluids);
         y = rowValue(d, x, y, w, "Background opacity", PeoClient.CFG.xrayBackgroundOpacity + "/255");
