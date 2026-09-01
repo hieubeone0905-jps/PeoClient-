@@ -5,7 +5,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.VertexConsumer;
 import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.render.VertexRendering;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
@@ -49,7 +49,7 @@ public final class NukerAreaLimiter {
                     center.x + range, center.y + range, center.z + range
             ).offset(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-            WorldRenderer.drawBox(
+            VertexRendering.drawBox(
                     context.matrixStack(), vertexConsumer, box,
                     1.0f, 0.25f, 0.25f, 1.0f
             );
