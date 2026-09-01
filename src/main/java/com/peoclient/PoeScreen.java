@@ -854,7 +854,7 @@ public final class PoeScreen extends class_437 {
         return super.method_25404(keyCode, scanCode, modifiers);
     }
     /** Item-only picker for InventoryCleaner's explicit drop filter. */
-    private static final class CleanerItemPickerScreen extends class_437 {
+    private final class CleanerItemPickerScreen extends class_437 {
         private final PoeScreen parent;
         private class_342 search;
         private double scroll;
