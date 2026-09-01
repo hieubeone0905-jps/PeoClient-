@@ -472,45 +472,35 @@ public final class PeoClient implements ClientModInitializer {
     public static final class NukerLogic {
         private static final List<BlockPos> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
-
         private static int cooldown;
         private static BlockPos breakingPos;
         private static Direction breakingSide;
-
-        // Watchdog for a breaking state that stopped advancing.  This is deliberately
-        // client-side state recovery; it does not alter or spoof network packets.
-        private static float lastProgress = -1.0f;
-        private static int stagnantTicks;
-        private static int recoveryTicks;
-        private static boolean internalInteraction;
+        private static int staleTicks;
 
         private NukerLogic() {}
 
         public static void tick(MinecraftClient mc) {
             if (mc.interactionManager == null || mc.player == null || mc.world == null
-                    || mc.currentScreen != null) {
-                resetState();
-                return;
-            }
+                    || mc.currentScreen != null) return;
 
             renderBlocks.clear();
 
-            // Give a manual attack input a single tick to settle instead of allowing
-            // the Nuker state machine to fight with the vanilla interaction manager.
-            // The Nuker itself never needs a manual click to resume.
-            if (mc.options.attackKey.isPressed() && !internalInteraction) {
-                if (breakingPos != null) {
-                    // We do not cancel here: vanilla can finish its own input first.
-                    // The state check below will recover on the next tick if needed.
-                    renderBlocks.add(breakingPos);
+            // Recover only when the vanilla interaction manager no longer owns our
+            // active target. This avoids the aggressive per-target resets from the
+            // previous build while still recovering after manual mouse interaction.
+            if (breakingPos != null) {
+                net.minecraft.util.math.BlockPos managerPos =
+                        ((com.peoclient.mixin.ClientPlayerInteractionManagerAccessor) mc.interactionManager).peo$getCurrentBreakingPos();
+                if (managerPos != null && !managerPos.equals(breakingPos)) {
+                    staleTicks++;
+                } else {
+                    staleTicks = 0;
                 }
-                return;
-            }
-
-            if (recoveryTicks > 0) {
-                recoveryTicks--;
-                if (breakingPos != null) renderBlocks.add(breakingPos);
-                return;
+                if (staleTicks >= 2) {
+                    breakingPos = null;
+                    breakingSide = null;
+                    staleTicks = 0;
+                }
             }
 
             if (cooldown > 0) {
@@ -519,188 +509,76 @@ public final class PeoClient implements ClientModInitializer {
                 return;
             }
 
-            // If the player/client changed the active breaking position manually,
-            // abandon that stale Nuker state and establish a clean one.
-            if (breakingPos != null) {
-                BlockPos managerPos = ((com.peoclient.mixin.ClientPlayerInteractionManagerAccessor)
-                        (Object) mc.interactionManager).peo$getCurrentBreakingPos();
-
-                if (managerPos != null && !managerPos.equals(breakingPos)) {
-                    safeCancel(mc);
+            // Build a fresh queue when the old one is exhausted or its active target became invalid.
+            if (queue.isEmpty() || !activeTargetStillValid(mc)) {
+                if (breakingPos != null) {
+                    mc.interactionManager.cancelBlockBreaking();
                     breakingPos = null;
                     breakingSide = null;
-                    lastProgress = -1.0f;
-                    stagnantTicks = 0;
                 }
-            }
-
-            // A stale/finished target must never leave the queue permanently blocked.
-            if (breakingPos != null && !activeTargetStillValid(mc)) {
-                safeCancel(mc);
-                breakingPos = null;
-                breakingSide = null;
-                lastProgress = -1.0f;
-                stagnantTicks = 0;
-            }
-
-            if (queue.isEmpty()) {
+                queue.clear();
                 queue.addAll(collect(mc));
                 queue.sort(comparator(mc));
             }
 
             int batch = MathHelper.clamp(CFG.nukerMulti, 1, 10);
-
-            // Keep a rolling batch.  In SurvMulti we still maintain one legitimate
-            // vanilla breaking state, but rotate through valid targets as soon as a
-            // target completes or becomes invalid.
-            if (!queue.isEmpty() && ("Multi".equalsIgnoreCase(CFG.nukerMode)
-                    || "SurvMulti".equalsIgnoreCase(CFG.nukerMode))) {
-                int limit = Math.min(batch, queue.size());
-                for (int i = 0; i < limit; i++) {
-                    renderBlocks.add(queue.get(i).pos);
-                }
+            if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
+                // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
+                if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
             } else if (!queue.isEmpty()) {
-                renderBlocks.add(queue.get(0).pos);
+                queue.subList(1, queue.size()).clear();
             }
 
-            if (queue.isEmpty()) return;
-
-            Target target = queue.get(0);
-
-            if (!isValidTarget(mc, target)) {
-                queue.remove(0);
-                return;
-            }
-
-            BlockState state = mc.world.getBlockState(target.pos);
-            float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
-            if (delta <= 0.0f) {
-                queue.remove(0);
-                return;
-            }
-
-            if (breakingPos != null && !breakingPos.equals(target.pos)) {
-                // Do not keep two simultaneous vanilla breaking sessions.
-                safeCancel(mc);
-                breakingPos = null;
-                breakingSide = null;
-                lastProgress = -1.0f;
-                stagnantTicks = 0;
-            }
-
-            if (CFG.nukerRotate) {
-                rotateTo(mc, target.pos);
-            }
-
-            if (breakingPos == null) {
-                internalInteraction = true;
-                boolean started;
-                try {
-                    started = mc.interactionManager.attackBlock(target.pos, target.side);
-                } finally {
-                    internalInteraction = false;
+            while (!queue.isEmpty()) {
+                Target target = queue.get(0);
+                if (!isValidTarget(mc, target)) {
+                    queue.remove(0);
+                    continue;
                 }
 
-                if (!started) {
+                BlockState state = mc.world.getBlockState(target.pos);
+                float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
+                if (delta <= 0) {
                     queue.remove(0);
+                    continue;
+                }
+
+                if (CFG.nukerRotate && rotateTo(mc, target.pos)) {
+                    cooldown = 1;
+                    renderBlocks.add(target.pos);
                     return;
                 }
 
-                breakingPos = target.pos.toImmutable();
-                breakingSide = target.side;
-                lastProgress = mc.interactionManager.getBlockBreakingProgress();
-                stagnantTicks = 0;
-            }
+                boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
+                        || breakingSide != target.side;
+                if (newTarget) {
+                    if (breakingPos != null) mc.interactionManager.cancelBlockBreaking();
+                    if (!mc.interactionManager.attackBlock(target.pos, target.side)) {
+                        queue.remove(0);
+                        breakingPos = null;
+                        breakingSide = null;
+                        continue;
+                    }
+                    breakingPos = target.pos.toImmutable();
+                    breakingSide = target.side;
+                } else {
+                    mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
+                }
 
-            // Continue exactly the active target; do not submit a second target while
-            // vanilla is still progressing the first one.
-            internalInteraction = true;
-            try {
-                mc.interactionManager.updateBlockBreakingProgress(breakingPos, breakingSide);
-            } finally {
-                internalInteraction = false;
-            }
+                mc.player.swingHand(Hand.MAIN_HAND);
+                renderBlocks.add(target.pos);
 
-            mc.player.swingHand(Hand.MAIN_HAND);
-
-            float progress = mc.interactionManager.getBlockBreakingProgress();
-            if (progress > lastProgress + 0.0001f) {
-                lastProgress = progress;
-                stagnantTicks = 0;
-            } else {
-                stagnantTicks++;
-            }
-
-            if (mc.world.getBlockState(breakingPos).isAir()) {
-                queue.removeIf(t -> t.pos.equals(breakingPos));
-                breakingPos = null;
-                breakingSide = null;
-                lastProgress = -1.0f;
-                stagnantTicks = 0;
+                if (mc.world.getBlockState(target.pos).isAir()) {
+                    queue.remove(0);
+                    breakingPos = null;
+                    breakingSide = null;
+                    // Advance immediately only after the world confirms the previous block is gone.
+                    cooldown = Math.max(0, CFG.nukerCooldown);
+                } else {
+                    cooldown = Math.max(0, CFG.nukerCooldown);
+                }
                 return;
             }
-
-            // If progress is genuinely stuck, recover without requiring a mouse click.
-            // A few ticks are allowed for normal server/client latency.
-            if (stagnantTicks >= 10) {
-                safeCancel(mc);
-                breakingPos = null;
-                breakingSide = null;
-                lastProgress = -1.0f;
-                stagnantTicks = 0;
-                recoveryTicks = 1;
-                return;
-            }
-
-            // Rebuild after completing a target; otherwise keep the active target.
-            if (!activeTargetStillValid(mc)) {
-                safeCancel(mc);
-                breakingPos = null;
-                breakingSide = null;
-                lastProgress = -1.0f;
-                stagnantTicks = 0;
-                queue.removeIf(t -> t.pos.equals(target.pos));
-            }
-
-            if (CFG.nukerCooldown > 0) {
-                cooldown = CFG.nukerCooldown;
-            }
-        }
-
-        private static void safeCancel(MinecraftClient mc) {
-            if (mc.interactionManager == null) return;
-            internalInteraction = true;
-            try {
-                mc.interactionManager.cancelBlockBreaking();
-            } catch (Throwable ignored) {
-            } finally {
-                internalInteraction = false;
-            }
-        }
-
-        private static void resetState() {
-            renderBlocks.clear();
-            queue.clear();
-            cooldown = 0;
-            breakingPos = null;
-            breakingSide = null;
-            lastProgress = -1.0f;
-            stagnantTicks = 0;
-            recoveryTicks = 0;
-        }
-
-        public static List<BlockPos> getRenderBlocks() {
-            return new ArrayList<>(renderBlocks);
-        }
-
-        public static float getBreakingProgress() {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.interactionManager == null) return 0.0f;
-            return MathHelper.clamp(mc.interactionManager.getBlockBreakingProgress() / 10.0f, 0.0f, 1.0f);
-        }
-
-        public static boolean isInternalInteraction() {
-            return internalInteraction;
         }
 
         private static boolean activeTargetStillValid(MinecraftClient mc) {
@@ -708,9 +586,7 @@ public final class PeoClient implements ClientModInitializer {
             BlockState state = mc.world.getBlockState(breakingPos);
             return !state.isAir() && !(state.getBlock() instanceof FluidBlock)
                     && NukerAreaLimiter.contains(breakingPos)
-                    && (!CFG.nukerFilter || passesFilter(state.getBlock()))
-                    && mc.player.getEyePos().distanceTo(Vec3d.ofCenter(breakingPos))
-                    <= MathHelper.clamp(CFG.nukerRange, 1.0, 6.0) + 0.25;
+                    && (!CFG.nukerFilter || passesFilter(state.getBlock()));
         }
 
         private static boolean isValidTarget(MinecraftClient mc, Target target) {
@@ -790,28 +666,20 @@ public final class PeoClient implements ClientModInitializer {
 
         private static Direction bestSide(MinecraftClient mc, BlockPos pos) {
             Vec3d eye = mc.player.getEyePos();
-            for (Direction side : Direction.values()) {
-                BlockPos neighbour = pos.offset(side);
-                if (!mc.world.getBlockState(neighbour).isFullCube(mc.world, neighbour)) {
-                    Vec3d face = Vec3d.ofCenter(pos).add(
-                            side.getOffsetX() * 0.49,
-                            side.getOffsetY() * 0.49,
-                            side.getOffsetZ() * 0.49);
-                    try {
-                        BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
-                                eye, face,
-                                net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
-                                net.minecraft.world.RaycastContext.FluidHandling.NONE,
-                                mc.player));
-                        if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
-                            return side;
-                        }
-                    } catch (Throwable ignored) {
-                    }
+            Vec3d center = Vec3d.ofCenter(pos);
+            try {
+                BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
+                        eye, center,
+                        net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
+                        net.minecraft.world.RaycastContext.FluidHandling.NONE,
+                        mc.player));
+                if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
+                    return hit.getSide();
                 }
+            } catch (Throwable ignored) {
             }
             if (CFG.nukerRaycast) return null;
-            Vec3d toPlayer = eye.subtract(Vec3d.ofCenter(pos));
+            Vec3d toPlayer = eye.subtract(center);
             return Direction.getFacing(toPlayer.x, toPlayer.y, toPlayer.z);
         }
 
@@ -820,8 +688,9 @@ public final class PeoClient implements ClientModInitializer {
             double horizontal = Math.sqrt(v.x * v.x + v.z * v.z);
             float yaw = (float) (Math.toDegrees(Math.atan2(v.z, v.x)) - 90.0);
             float pitch = (float) -Math.toDegrees(Math.atan2(v.y, horizontal));
-            boolean changed = Math.abs(MathHelper.wrapDegrees(yaw - mc.player.getYaw())) > 2.0f
-                    || Math.abs(pitch - mc.player.getPitch()) > 2.0f;
+            float yawDelta = MathHelper.wrapDegrees(yaw - mc.player.getYaw());
+            float pitchDelta = pitch - mc.player.getPitch();
+            boolean changed = Math.abs(yawDelta) > 2.0f || Math.abs(pitchDelta) > 2.0f;
             mc.player.setYaw(yaw);
             mc.player.setPitch(MathHelper.clamp(pitch, -90, 90));
             return changed;
