@@ -1,14 +1,14 @@
 package com.peoclient.mixin;
 
-import net.minecraft.class_364;
-import net.minecraft.class_4068;
-import net.minecraft.class_437;
-import net.minecraft.class_6379;
+import net.minecraft.client.gui.Element;
+import net.minecraft.client.gui.Drawable;
+import net.minecraft.client.gui.Selectable;
+import net.minecraft.client.gui.screen.Screen;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(class_437.class)
+@Mixin(Screen.class)
 public interface ScreenAccessor {
     @Invoker("addDrawableChild")
-    <T extends class_364 & class_4068 & class_6379> T peo$addDrawableChild(T drawableElement);
+    <T extends Element & Drawable & Selectable> T peo$addDrawableChild(T drawableElement);
 }

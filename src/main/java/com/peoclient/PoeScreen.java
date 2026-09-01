@@ -76,7 +76,7 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> PeoClient.CFG.cleaner;
             case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.CFG.xray;
-            case "AntiVipProMax" -> com.peoclient.modules.AntiCheatModule.isEnabled();
+            case "AntiVipProMax" -> AntiVipProMaxModule.isEnabled();
             default -> false;
         };
     }
@@ -88,7 +88,6 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
-            case "AntiVipProMax" -> com.peoclient.modules.AntiCheatModule.toggle();
         }
         PeoClient.CFG.save();
     }

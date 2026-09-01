@@ -1,10 +1,10 @@
 package com.peoclient.mixin;
 
-import net.minecraft.class_7172;
+import net.minecraft.client.option.SimpleOption;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 
-@Mixin(class_7172.class)
+@Mixin(SimpleOption.class)
 public interface SimpleOptionAccessor {
     @Accessor("value")
     void peo$setValue(Object value);
