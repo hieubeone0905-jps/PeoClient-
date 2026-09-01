@@ -48,6 +48,7 @@ public final class InventoryCleaner {
     private static int pendingScreenSlot = -1;
     private static int pendingWait;
     private static boolean pendingServerAck;
+    private static int pendingExpectedRevision = -1;
 
     public static void tick(class_310 mc) {
         if (mc.field_1724 == null || mc.field_1761 == null || mc.field_1755 != null) return;
@@ -58,6 +59,7 @@ public final class InventoryCleaner {
                 pendingScreenSlot = -1;
                 pendingWait = 0;
                 pendingServerAck = false;
+                pendingExpectedRevision = -1;
             } else {
                 return;
             }
@@ -293,7 +295,7 @@ public final class InventoryCleaner {
         int screenSlot = playerInventoryScreenSlot(playerSlot);
         pendingSlot = playerSlot;
         pendingScreenSlot = screenSlot;
-        pendingWait = Math.max(4, PeoClient.CFG.cleanerAckTimeout);
+        pendingWait = Math.max(2, PeoClient.CFG.cleanerAckTimeout);
         pendingServerAck = false;
         mc.field_1761.method_2906(mc.field_1724.field_7512.field_7763, screenSlot, 1,
                 class_1713.field_7795, mc.field_1724);

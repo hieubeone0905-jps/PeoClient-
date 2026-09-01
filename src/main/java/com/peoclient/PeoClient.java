@@ -194,6 +194,8 @@ public final class PeoClient implements ClientModInitializer {
         // Wurst-style X-Ray settings: block list, exposed-only and opacity.
         // Fluids are included in the target list, matching Wurst's default X-Ray list.
         public boolean xrayFullBright = true;
+        /** Performance mode: suppress all terrain block geometry so only the sky remains. */
+        public boolean xraySkyOnly = false;
         public boolean xrayExposedOnly = false;
         public boolean xrayFluids = true;
         public int xrayBackgroundOpacity = 0;
@@ -257,7 +259,10 @@ public final class PeoClient implements ClientModInitializer {
         public boolean cleanerMergeStacks = true;
         public boolean cleanerTouchHotbar = false;
         public int cleanerActionDelay = 0;
-        public int cleanerAckTimeout = 30;
+        public int cleanerAckTimeout = 4;
+        /** Conservative client-side pacing; does not spoof packets or bypass server validation. */
+        public boolean nukerCompatibilitySafeMode = true;
+        public int nukerCompatibilityActionsPerTick = 1;
         public int maxBlocks = 512, maxArrows = 128, maxThrowables = 64, maxFoods = 200;
         public int maxWaterBuckets = 2, maxLavaBuckets = 2, maxMilkBuckets = 2;
         public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
@@ -297,6 +302,7 @@ public final class PeoClient implements ClientModInitializer {
                 proxyList = c.proxyList != null ? c.proxyList : proxyList;
                 savedAccounts = c.savedAccounts != null ? c.savedAccounts : savedAccounts;
                 xrayFullBright = c.xrayFullBright;
+                xraySkyOnly = c.xraySkyOnly;
                 xrayExposedOnly = c.xrayExposedOnly;
                 xrayFluids = c.xrayFluids;
                 xrayBackgroundOpacity = c.xrayBackgroundOpacity;
@@ -325,6 +331,8 @@ public final class PeoClient implements ClientModInitializer {
                 cleanerTouchHotbar = c.cleanerTouchHotbar;
                 cleanerActionDelay = c.cleanerActionDelay;
                 cleanerAckTimeout = c.cleanerAckTimeout;
+                nukerCompatibilitySafeMode = c.nukerCompatibilitySafeMode;
+                nukerCompatibilityActionsPerTick = c.nukerCompatibilityActionsPerTick;
                 maxBlocks = c.maxBlocks; maxArrows = c.maxArrows;
                 maxThrowables = c.maxThrowables; maxFoods = c.maxFoods;
                 maxWaterBuckets = c.maxWaterBuckets; maxLavaBuckets = c.maxLavaBuckets;
@@ -550,7 +558,11 @@ public final class PeoClient implements ClientModInitializer {
                 queue.sort(comparator(mc));
             }
 
-            int batch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
+            int requestedBatch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
+            int safeCap = CFG.nukerCompatibilitySafeMode
+                    ? class_3532.method_15340(CFG.nukerCompatibilityActionsPerTick, 1, 3)
+                    : 10;
+            int batch = Math.min(requestedBatch, safeCap);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
                 // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
@@ -646,6 +658,10 @@ public final class PeoClient implements ClientModInitializer {
 
         private static boolean activeTargetStillValid(class_310 mc) {
             if (breakingPos == null) return false;
+            if (CFG.nukerCompatibilitySafeMode) {
+                class_2350 side = bestSide(mc, breakingPos);
+                if (side == null) return false;
+            }
             class_2680 state = mc.field_1687.method_8320(breakingPos);
             return !state.method_26215() && !(state.method_26204() instanceof class_2404)
                     && NukerAreaLimiter.contains(breakingPos)
@@ -792,6 +808,7 @@ public final class PeoClient implements ClientModInitializer {
             if (NukerCompatibility.isEnabled()) y = active(d, mc, "Nuker Compatibility", y);
             if (NukerAreaLimiter.isLocked()) y = active(d, mc, CFG.nukerRangeHighlight ? "Nuker Area [VISIBLE]" : "Nuker Area [LOCKED]", y);
             if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
+            if (CFG.antiVipProMax) y = active(d, mc, "AntiVipProMax [" + AntiVipProMaxModule.getStatus() + "]", y);
         }
 
         private static int active(net.minecraft.class_332 d, class_310 mc, String name, int y) {

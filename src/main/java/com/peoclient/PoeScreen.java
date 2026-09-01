@@ -225,6 +225,9 @@ public final class PoeScreen extends class_437 {
         y = rowToggle(d, x, y, w, "Flatten", PeoClient.CFG.nukerFlatten);
         y = rowToggle(d, x, y, w, "Rotate", PeoClient.CFG.nukerRotate);
         y = rowToggle(d, x, y, w, "NoParticles", PeoClient.CFG.nukerNoParticles);
+        y = section(d, x, y, "Compatibility");
+        y = rowToggle(d, x, y, w, "Safe pacing", PeoClient.CFG.nukerCompatibilitySafeMode);
+        y = sliderRow(d, x, y, w, "Actions / tick", PeoClient.CFG.nukerCompatibilityActionsPerTick, 1, 3, "%.0f");
 
         y = section(d, x, y, "Highlight");
         y = rowToggle(d, x, y, w, "Highlight", PeoClient.CFG.nukerHighlight);
@@ -301,7 +304,7 @@ public final class PoeScreen extends class_437 {
         y = section(d, x, y, "PeoClient extensions");
         y = rowToggle(d, x, y, w, "Merge partial stacks", PeoClient.CFG.cleanerMergeStacks);
         y = rowValue(d, x, y, w, "Action delay", PeoClient.CFG.cleanerActionDelay + " ticks");
-        y = rowValue(d, x, y, w, "Server ack timeout", PeoClient.CFG.cleanerAckTimeout + " ticks");
+        y = rowValue(d, x, y, w, "Server ack timeout", PeoClient.CFG.cleanerAckTimeout + " ticks (lower = faster)");
         y = rowToggle(d, x, y, w, "Touch hotbar", PeoClient.CFG.cleanerTouchHotbar);
         return y;
     }
@@ -311,6 +314,7 @@ public final class PoeScreen extends class_437 {
         y = rowValue(d, x, y, w, "Edit blocks", shortSet(PeoClient.CFG.xrayBlocks));
         y += 8;
         y = section(d, x, y, "Visibility");
+        y = rowToggle(d, x, y, w, "Sky only (AFK / low lag)", PeoClient.CFG.xraySkyOnly);
         y = rowToggle(d, x, y, w, "Exposed only", PeoClient.CFG.xrayExposedOnly);
         y = rowToggle(d, x, y, w, "Fluids", PeoClient.CFG.xrayFluids);
         y = rowValue(d, x, y, w, "Background opacity", PeoClient.CFG.xrayBackgroundOpacity + "/255");
@@ -408,6 +412,7 @@ public final class PoeScreen extends class_437 {
         y = sliderRow(d, x, y, w, "Intensity", AntiVipProMaxModule.getIntensity(), 1, 10, "%.0f");
         y = rowToggle(d, x, y, w, "Auto Adjust", AntiVipProMaxModule.isAutoAdjust());
         y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
+        y = rowValue(d, x, y, w, "Mode", "Compatibility/status only; no anti-cheat bypass");
         return y;
     }
 
@@ -610,6 +615,12 @@ public final class PoeScreen extends class_437 {
         if (hit(my, p)) { PeoClient.CFG.nukerRotate = !PeoClient.CFG.nukerRotate; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerNoParticles = !PeoClient.CFG.nukerNoParticles; save(); return; } p += 60;
 
+        if (hit(my, p)) { PeoClient.CFG.nukerCompatibilitySafeMode = !PeoClient.CFG.nukerCompatibilitySafeMode; save(); return; } p += 34;
+        if (hit(my, p)) {
+            PeoClient.CFG.nukerCompatibilityActionsPerTick = (int)Math.round(sliderValue(mx, x, w, 1, 3, "Actions / tick"));
+            save(); return;
+        } p += 60;
+
         if (hit(my, p)) { PeoClient.CFG.nukerHighlight = !PeoClient.CFG.nukerHighlight; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightMode = cycle(PeoClient.CFG.nukerHighlightMode, "Opacity", "Expand"); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightColor = cycleList(PeoClient.CFG.nukerHighlightColor, "255,128,128", "255,255,255", "255,200,80"); save(); return; } p += 34;
@@ -645,7 +656,7 @@ public final class PoeScreen extends class_437 {
         p += 60;
         if (hit(my, p)) { PeoClient.CFG.cleanerMergeStacks = !PeoClient.CFG.cleanerMergeStacks; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.cleanerActionDelay = step(PeoClient.CFG.cleanerActionDelay, 0, 10); save(); return; } p += 34;
-        if (hit(my, p)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 60 ? 5 : PeoClient.CFG.cleanerAckTimeout + 5; save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.cleanerAckTimeout = PeoClient.CFG.cleanerAckTimeout >= 30 ? 2 : PeoClient.CFG.cleanerAckTimeout + 2; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.cleanerTouchHotbar = !PeoClient.CFG.cleanerTouchHotbar; save(); }
     }
 
@@ -664,6 +675,7 @@ public final class PoeScreen extends class_437 {
     private void clickXray(double my, int y) {
         int p = y + 26;
         if (hit(my, p)) { field_22787.method_1507(new BlockPickerScreen(this, false)); return; } p += 68;
+        if (hit(my, p)) { PeoClient.CFG.xraySkyOnly = !PeoClient.CFG.xraySkyOnly; PeoClient.reload(field_22787); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayExposedOnly = !PeoClient.CFG.xrayExposedOnly; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayFluids = !PeoClient.CFG.xrayFluids; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayBackgroundOpacity = PeoClient.CFG.xrayBackgroundOpacity >= 255 ? 0 : PeoClient.CFG.xrayBackgroundOpacity + 32; save(); return; } p += 34;
@@ -800,7 +812,7 @@ public final class PoeScreen extends class_437 {
 
     private int settingsContentHeight() {
         return switch (selected) {
-            case "Nuker [Multi]" -> 1120;
+            case "Nuker [Multi]" -> 1240;
             case "InventoryCleaner" -> 900;
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;

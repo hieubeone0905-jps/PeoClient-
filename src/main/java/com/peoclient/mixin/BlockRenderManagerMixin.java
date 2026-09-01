@@ -22,6 +22,13 @@ public final class BlockRenderManagerMixin {
                           class_5819 random, CallbackInfo ci) {
         if (!PeoClient.CFG.xray) return;
 
+        // AFK performance mode: cancel every block model so the world becomes
+        // effectively sky-only. This is client-side rendering only.
+        if (PeoClient.CFG.xraySkyOnly) {
+            ci.cancel();
+            return;
+        }
+
         boolean target = PeoClient.isXrayBlock(state.method_26204());
         if (target && PeoClient.CFG.xrayExposedOnly) {
             boolean exposed = false;
@@ -52,6 +59,6 @@ public final class BlockRenderManagerMixin {
     @Inject(method = "method_3352", at = @At("HEAD"), cancellable = true)
     private void peo$xrayFluid(class_2338 pos, class_1920 world, class_4588 consumer,
                                class_2680 blockState, class_3610 fluidState, CallbackInfo ci) {
-        if (PeoClient.CFG.xray && !PeoClient.CFG.xrayFluids) ci.cancel();
+        if (PeoClient.CFG.xray && (PeoClient.CFG.xraySkyOnly || !PeoClient.CFG.xrayFluids)) ci.cancel();
     }
 }

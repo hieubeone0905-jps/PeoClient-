@@ -25,3 +25,8 @@ Workflow:
 3. Dispose blacklisted or unneeded items while respecting category quotas.
 
 The PeoClient extensions `Merge partial stacks`, `Action delay`, `Server ack timeout` and `Touch hotbar` are retained for reliable Fabric-server interaction.
+
+
+## Speed / ghost-item safety
+
+The cleaner keeps a single pending inventory transaction and waits for the server slot update before continuing. The acknowledgement timeout is now 6 ticks by default (configurable down to 2 ticks), reducing unnecessary idle time on responsive servers while retaining the server-acknowledgement gate. Lowering the timeout can increase throughput on laggy servers at the cost of higher desync risk; the cleaner does not intentionally bypass server inventory validation.
