@@ -579,7 +579,7 @@ public final class PeoClient implements ClientModInitializer {
         public static float getBreakingProgress() {
             MinecraftClient mc = MinecraftClient.getInstance();
             if (mc.interactionManager == null) return 0.0f;
-            return MathHelper.clamp(mc.interactionManager.currentBreakingProgress, 0.0f, 1.0f);
+            return MathHelper.clamp(mc.interactionManager.getBlockBreakingProgress() / 10.0f, 0.0f, 1.0f);
         }
 
         private static boolean activeTargetStillValid(MinecraftClient mc) {
