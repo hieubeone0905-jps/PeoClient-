@@ -2,7 +2,6 @@
   "required": true,
   "package": "com.peoclient.mixin",
   "compatibilityLevel": "JAVA_21",
-  "refmap": "peoclient.refmap.json",
   "client": [
     "ChunkOcclusionDataBuilderMixin",
     "ParticleManagerMixin",
@@ -14,7 +13,8 @@
     "MinecraftClientAccessor",
     "TitleScreenMixin",
     "MultiplayerScreenMixin",
-    "SelectWorldScreenMixin"
+    "SelectWorldScreenMixin",
+    "ClientPlayerInteractionManagerAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

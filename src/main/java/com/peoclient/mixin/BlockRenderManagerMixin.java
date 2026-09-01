@@ -32,13 +32,21 @@ public final class BlockRenderManagerMixin {
                     break;
                 }
             }
-            if (!exposed) ci.cancel();
-            return;
+            if (!exposed) {
+                ci.cancel();
+                return;
+            }
         }
-
-        // In X-Ray mode, hide non-target blocks when background opacity is zero.
-        // Otherwise vanilla rendering is retained to avoid corrupting the render pipeline.
-        if (!target && PeoClient.CFG.xrayBackgroundOpacity <= 0) ci.cancel();
+        if (!target) {
+            int alpha = Math.max(0, Math.min(255, PeoClient.CFG.xrayBackgroundOpacity));
+            if (alpha == 0) {
+                ci.cancel();
+                return;
+            }
+            // VertexConsumer in Minecraft 1.21.4 does not expose fixedColor().
+            // Keep X-Ray stable by cancelling non-target blocks when the configured
+            // background opacity is zero; otherwise let vanilla render them.
+        }
     }
 
     @Inject(method = "renderFluid", at = @At("HEAD"), cancellable = true)

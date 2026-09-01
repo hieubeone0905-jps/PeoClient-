@@ -1,6 +1,6 @@
 package com.peoclient;
 
-import com.peoclient.modules.AntiPeoModule;
+import com.peoclient.modules.AntiVipProMaxModule;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -37,7 +37,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiPeo",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
@@ -67,7 +67,7 @@ public final class PoeScreen extends class_437 {
 
     private boolean implemented(String name) {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
-                || name.equals("Nuker [Multi]") || name.equals("X-Ray") || name.equals("AntiPeo");
+                || name.equals("Nuker [Multi]") || name.equals("X-Ray") || name.equals("AntiVipProMax");
     }
 
     private boolean enabled(String name) {
@@ -76,7 +76,7 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> PeoClient.CFG.cleaner;
             case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.CFG.xray;
-            case "AntiPeo" -> AntiPeoModule.isEnabled();
+            case "AntiVipProMax" -> com.peoclient.modules.AntiCheatModule.isEnabled();
             default -> false;
         };
     }
@@ -87,7 +87,8 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> PeoClient.CFG.cleaner = !PeoClient.CFG.cleaner;
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
-            case "AntiPeo" -> { AntiPeoModule.toggle(); PeoClient.CFG.antiPeo = AntiPeoModule.isEnabled(); }
+            case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
+            case "AntiVipProMax" -> com.peoclient.modules.AntiCheatModule.toggle();
         }
         PeoClient.CFG.save();
     }
@@ -198,7 +199,7 @@ public final class PoeScreen extends class_437 {
                 case "InventoryCleaner" -> drawCleaner(d, x, yy, w);
                 case "X-Ray" -> drawXray(d, x, yy, w);
                 case "Fullbright" -> drawFullbright(d, x, yy, w);
-                case "AntiPeo" -> drawAntiPeo(d, x, yy, w);
+                case "AntiVipProMax" -> drawAntiVipProMax(d, x, yy, w);
             }
         } else {
             rowValue(d, x, yy, w, "Keybind", keyName(selected));
@@ -318,13 +319,6 @@ public final class PoeScreen extends class_437 {
         return y;
     }
 
-    private int drawAntiPeo(class_332 d, int x, int y, int w) {
-        y = section(d, x, y, "Safety / compatibility");
-        y = rowToggle(d, x, y, w, "Conservative mode", AntiPeoModule.isEnabled());
-        y = rowValue(d, x, y, w, "Action delay", AntiPeoModule.getActionDelayTicks() + " ticks");
-        return y;
-    }
-
     private int drawFullbright(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Brightness");
         y = rowValue(d, x, y, w, "Method", PeoClient.CFG.fullbrightMethod);
@@ -403,9 +397,19 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> "Cleans and sorts your inventory automatically.";
             case "Fullbright" -> "Makes dark areas bright.";
             case "X-Ray" -> "Shows selected blocks through the world.";
-            case "AntiPeo" -> "Adds conservative delays to automated client actions.";
+            case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
             default -> "";
         };
+    }
+
+    private int drawAntiVipProMax(class_332 d, int x, int y, int w) {
+        y = section(d, x, y, "AntiVipProMax");
+        y = rowToggle(d, x, y, w, "Grim Mode", AntiVipProMaxModule.isGrimMode());
+        y = rowToggle(d, x, y, w, "Vulcan Mode", AntiVipProMaxModule.isVulcanMode());
+        y = sliderRow(d, x, y, w, "Intensity", AntiVipProMaxModule.getIntensity(), 1, 10, "%.0f");
+        y = rowToggle(d, x, y, w, "Auto Adjust", AntiVipProMaxModule.isAutoAdjust());
+        y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
+        return y;
     }
 
     private String shortList(String value) {
@@ -535,6 +539,7 @@ public final class PoeScreen extends class_437 {
                 case "InventoryCleaner" -> clickCleaner(mouseY, contentY);
                 case "X-Ray" -> clickXray(mouseY, contentY);
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
+                case "AntiVipProMax" -> clickAntiVipProMax(mouseX, mouseY, settingsX, settingsW, contentY);
             }
             return true;
         }
@@ -551,6 +556,17 @@ public final class PoeScreen extends class_437 {
     private double roundSlider(double value, double min, double max, double step) {
         double v = class_3532.method_15350(value, min, max);
         return Math.round(v / step) * step;
+    }
+
+    private void clickAntiVipProMax(double mx, double my, int x, int w, int y) {
+        int p = y + 26;
+        if (hit(my, p)) { AntiVipProMaxModule.setGrimMode(!AntiVipProMaxModule.isGrimMode()); save(); return; } p += 34;
+        if (hit(my, p)) { AntiVipProMaxModule.setVulcanMode(!AntiVipProMaxModule.isVulcanMode()); save(); return; } p += 34;
+        if (hit(my, p)) {
+            AntiVipProMaxModule.setIntensity((int)Math.round(sliderValue(mx, x, w, 1, 10, "Intensity")));
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) { AntiVipProMaxModule.setAutoAdjust(!AntiVipProMaxModule.isAutoAdjust()); save(); }
     }
 
     private void clickNuker(double mx, double my, int x, int w, int y) {
@@ -789,6 +805,7 @@ public final class PoeScreen extends class_437 {
             case "InventoryCleaner" -> 900;
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;
+            case "AntiVipProMax" -> 300;
             default -> 120;
         };
     }
