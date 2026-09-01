@@ -6,6 +6,15 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 base { archivesName = project.archives_base_name }
+
+// Minecraft 1.21.4 uses an obfuscated runtime namespace. Keep the legacy
+// Mixin annotation processor enabled so the refmap is generated reliably in CI.
+loom {
+    mixin {
+        useLegacyMixinAp = true
+        defaultRefmapName = "peoclient.refmap.json"
+    }
+}
 repositories {
     maven { url = "https://maven.fabricmc.net/" }
     mavenCentral()

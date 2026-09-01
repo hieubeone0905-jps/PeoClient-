@@ -29,3 +29,11 @@ The included Gradle wrapper is configured for Gradle 8.12.1. In this execution
 environment, `gradlew build` could not download the wrapper distribution because
 `services.gradle.org` is unreachable. The source tree itself has been updated;
 run `gradlew.bat build` on a Windows machine with Internet access and Java 21.
+
+
+## CI fix (2026-09-01)
+The previous GitHub Actions build failed during Java compilation with 10 `Mixin has no targets` errors.
+This patch enables Loom's legacy Mixin annotation processor and explicitly sets `peoclient.refmap.json`,
+then declares the same refmap in `peoclient.mixins.json`. The stale `ClientPlayerInteractionManagerAccessor`
+entry was also removed because that source file is not present in this tree. GitHub Actions was updated to
+checkout/upload-artifact v5 to avoid the Node.js 20 deprecation warning.
