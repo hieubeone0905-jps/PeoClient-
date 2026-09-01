@@ -2,14 +2,14 @@ package com.peoclient.nuker.compat;
 
 import com.peoclient.PeoClient;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.VertexRendering;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Box;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.class_1921;
+import net.minecraft.class_2338;
+import net.minecraft.class_238;
+import net.minecraft.class_243;
+import net.minecraft.class_310;
+import net.minecraft.class_4588;
+import net.minecraft.class_4597;
+import net.minecraft.class_9974;
 
 /**
  * Nuker work-area + BleachHack-style visual highlight.
@@ -21,31 +21,31 @@ import net.minecraft.util.math.Vec3d;
 public final class NukerAreaLimiter {
     private static boolean locked;
     private static boolean lastHighlightState;
-    private static Vec3d center;
+    private static class_243 center;
     private static double range;
 
     private NukerAreaLimiter() {}
 
     public static void registerRender() {
         WorldRenderEvents.LAST.register(context -> {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.player == null || mc.world == null) return;
+            class_310 mc = class_310.method_1551();
+            if (mc.field_1724 == null || mc.field_1687 == null) return;
 
-            VertexConsumerProvider consumers = context.consumers();
+            class_4597 consumers = context.consumers();
             if (consumers == null) return;
-            VertexConsumer vc = consumers.getBuffer(RenderLayer.getLines());
+            class_4588 vc = consumers.getBuffer(class_1921.method_23594());
 
-            Vec3d camera = context.camera().getPos();
+            class_243 camera = context.camera().method_19326();
 
             // Range highlight: visible while enabled, centered on player while enabled.
             if (PeoClient.CFG.nukerRangeHighlight && locked && center != null) {
-                Box box = new Box(
-                        center.x - range, center.y - range, center.z - range,
-                        center.x + range, center.y + range, center.z + range
-                ).offset(-camera.x, -camera.y, -camera.z);
+                class_238 box = new class_238(
+                        center.field_1352 - range, center.field_1351 - range, center.field_1350 - range,
+                        center.field_1352 + range, center.field_1351 + range, center.field_1350 + range
+                ).method_989(-camera.field_1352, -camera.field_1351, -camera.field_1350);
                 int[] rgb = parseColor(PeoClient.CFG.nukerRangeColor, 255, 0, 0);
                 float alpha = 1.0f;
-                VertexRendering.drawBox(context.matrixStack(), vc, box,
+                class_9974.method_62295(context.matrixStack(), vc, box,
                         rgb[0] / 255.0f, rgb[1] / 255.0f, rgb[2] / 255.0f, alpha);
             }
 
@@ -53,28 +53,28 @@ public final class NukerAreaLimiter {
             if (PeoClient.CFG.nukerHighlight) {
                 int[] rgb = parseColor(PeoClient.CFG.nukerHighlightColor, 255, 128, 128);
                 float progress = PeoClient.NukerLogic.getBreakingProgress();
-                for (BlockPos pos : PeoClient.NukerLogic.getRenderBlocks()) {
-                    if (mc.world.getBlockState(pos).isAir()) continue;
-                    Box full = new Box(pos).offset(-camera.x, -camera.y, -camera.z);
-                    Box draw = full;
+                for (class_2338 pos : PeoClient.NukerLogic.getRenderBlocks()) {
+                    if (mc.field_1687.method_8320(pos).method_26215()) continue;
+                    class_238 full = new class_238(pos).method_989(-camera.field_1352, -camera.field_1351, -camera.field_1350);
+                    class_238 draw = full;
                     float alpha = Math.max(0.15f, Math.min(1.0f, progress));
                     if ("Expand".equalsIgnoreCase(PeoClient.CFG.nukerHighlightMode)) {
-                        Vec3d c = full.getCenter();
-                        double sx = Math.max(0.02, (full.maxX - full.minX) * Math.max(0.05, progress) * 0.5);
-                        double sy = Math.max(0.02, (full.maxY - full.minY) * Math.max(0.05, progress) * 0.5);
-                        double sz = Math.max(0.02, (full.maxZ - full.minZ) * Math.max(0.05, progress) * 0.5);
-                        draw = new Box(c.x - sx, c.y - sy, c.z - sz, c.x + sx, c.y + sy, c.z + sz);
+                        class_243 c = full.method_1005();
+                        double sx = Math.max(0.02, (full.field_1320 - full.field_1323) * Math.max(0.05, progress) * 0.5);
+                        double sy = Math.max(0.02, (full.field_1325 - full.field_1322) * Math.max(0.05, progress) * 0.5);
+                        double sz = Math.max(0.02, (full.field_1324 - full.field_1321) * Math.max(0.05, progress) * 0.5);
+                        draw = new class_238(c.field_1352 - sx, c.field_1351 - sy, c.field_1350 - sz, c.field_1352 + sx, c.field_1351 + sy, c.field_1350 + sz);
                         alpha = 0.55f;
                     }
-                    VertexRendering.drawBox(context.matrixStack(), vc, draw,
+                    class_9974.method_62295(context.matrixStack(), vc, draw,
                             rgb[0] / 255.0f, rgb[1] / 255.0f, rgb[2] / 255.0f, alpha);
                 }
             }
         });
     }
 
-    public static void tick(MinecraftClient mc, boolean highlightEnabled, double configuredRange) {
-        if (mc.player == null || mc.world == null) {
+    public static void tick(class_310 mc, boolean highlightEnabled, double configuredRange) {
+        if (mc.field_1724 == null || mc.field_1687 == null) {
             reset();
             return;
         }
@@ -83,7 +83,7 @@ public final class NukerAreaLimiter {
         // While visible, keep the area centered on the player. This is what makes
         // the highlight behave like a player-centered mining range.
         if (highlightEnabled) {
-            center = new Vec3d(mc.player.getX(), mc.player.getY(), mc.player.getZ());
+            center = new class_243(mc.field_1724.method_23317(), mc.field_1724.method_23318(), mc.field_1724.method_23321());
             range = r;
             locked = true;
         }
@@ -99,17 +99,17 @@ public final class NukerAreaLimiter {
         return locked && lastHighlightState && center != null;
     }
 
-    public static boolean contains(BlockPos pos) {
+    public static boolean contains(class_2338 pos) {
         if (!isLocked()) return true;
-        double x = pos.getX() + 0.5;
-        double y = pos.getY() + 0.5;
-        double z = pos.getZ() + 0.5;
-        return x >= center.x - range && x <= center.x + range
-                && y >= center.y - range && y <= center.y + range
-                && z >= center.z - range && z <= center.z + range;
+        double x = pos.method_10263() + 0.5;
+        double y = pos.method_10264() + 0.5;
+        double z = pos.method_10260() + 0.5;
+        return x >= center.field_1352 - range && x <= center.field_1352 + range
+                && y >= center.field_1351 - range && y <= center.field_1351 + range
+                && z >= center.field_1350 - range && z <= center.field_1350 + range;
     }
 
-    public static Vec3d getCenter() { return center; }
+    public static class_243 getCenter() { return center; }
     public static double getRange() { return range; }
 
     private static int[] parseColor(String raw, int r, int g, int b) {

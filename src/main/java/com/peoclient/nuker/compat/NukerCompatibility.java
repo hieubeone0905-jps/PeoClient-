@@ -1,9 +1,7 @@
 package com.peoclient.nuker.compat;
 
 import com.peoclient.PeoClient;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.class_310;
 
 /**
  * Server-compatibility controller for Nuker.
@@ -18,8 +16,8 @@ public final class NukerCompatibility {
 
     private NukerCompatibility() {}
 
-    public static void tick(MinecraftClient mc) {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+    public static void tick(class_310 mc) {
+        if (mc.field_1724 == null || mc.field_1687 == null || mc.field_1761 == null) return;
         if (!PeoClient.CFG.nuker) return;
 
         // Keep the controller on the client tick; never create a background thread.

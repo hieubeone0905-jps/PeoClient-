@@ -1,18 +1,5 @@
 package com.peoclient;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.item.BlockItem;
-import net.minecraft.block.Block;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
@@ -21,10 +8,22 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import net.minecraft.class_1747;
+import net.minecraft.class_1792;
+import net.minecraft.class_1799;
+import net.minecraft.class_2248;
+import net.minecraft.class_2561;
+import net.minecraft.class_2960;
+import net.minecraft.class_310;
+import net.minecraft.class_332;
+import net.minecraft.class_342;
+import net.minecraft.class_3532;
+import net.minecraft.class_437;
+import net.minecraft.class_7923;
 
 /** Wurst-inspired, restrained PeoClient hub with independently clipped panels. */
-public final class PoeScreen extends Screen {
-    private TextFieldWidget search;
+public final class PoeScreen extends class_437 {
+    private class_342 search;
     private String selected = "Nuker [Multi]";
     private boolean listening;
     private String bindTarget;
@@ -51,17 +50,17 @@ public final class PoeScreen extends Screen {
     );
 
     public PoeScreen() {
-        super(Text.literal("PeoClient 1.21.4 V1"));
+        super(class_2561.method_43470("PeoClient 1.21.4 V1"));
     }
 
     @Override
-    protected void init() {
-        int searchW = Math.min(420, Math.max(260, width - 520));
-        search = new TextFieldWidget(textRenderer, width / 2 - searchW / 2, 17, searchW, 22,
-                Text.literal("Search"));
-        search.setMaxLength(64);
-        search.setPlaceholder(Text.literal("Search modules..."));
-        addDrawableChild(search);
+    protected void method_25426() {
+        int searchW = Math.min(420, Math.max(260, field_22789 - 520));
+        search = new class_342(field_22793, field_22789 / 2 - searchW / 2, 17, searchW, 22,
+                class_2561.method_43470("Search"));
+        search.method_1880(64);
+        search.method_47404(class_2561.method_43470("Search modules..."));
+        method_37063(search);
     }
 
     private boolean implemented(String name) {
@@ -81,10 +80,10 @@ public final class PoeScreen extends Screen {
 
     private void toggle(String name) {
         switch (name) {
-            case "Fullbright" -> PeoClient.toggleFullbright(client);
+            case "Fullbright" -> PeoClient.toggleFullbright(field_22787);
             case "InventoryCleaner" -> PeoClient.CFG.cleaner = !PeoClient.CFG.cleaner;
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
-            case "X-Ray" -> PeoClient.toggleXray(client);
+            case "X-Ray" -> PeoClient.toggleXray(field_22787);
         }
         PeoClient.CFG.save();
     }
@@ -110,24 +109,24 @@ public final class PoeScreen extends Screen {
 
     private String keyName(String module) {
         return PeoClient.MODULE_KEYS.containsKey(module)
-                ? PeoClient.MODULE_KEYS.get(module).getBoundKeyLocalizedText().getString()
+                ? PeoClient.MODULE_KEYS.get(module).method_16007().getString()
                 : "NONE";
     }
 
     @Override
-    public void render(DrawContext d, int mouseX, int mouseY, float delta) {
-        d.fill(0, 0, width, height, 0xD90A0F14);
-        d.fill(0, 0, width, 74, 0xF20B1118);
-        d.fill(0, 72, width, 75, 0xFF315873);
+    public void method_25394(class_332 d, int mouseX, int mouseY, float delta) {
+        d.method_25294(0, 0, field_22789, field_22790, 0xD90A0F14);
+        d.method_25294(0, 0, field_22789, 74, 0xF20B1118);
+        d.method_25294(0, 72, field_22789, 75, 0xFF315873);
 
         drawText(d, "P", 18, 20, 0xFFFFFFFF, true);
         drawText(d, "PeoClient", 42, 16, 0xFFFFFFFF, true);
         drawText(d, "1.21.4", 42, 34, 0xFFAAB5BE, false);
-        drawText(d, "Right Shift • Hub", Math.max(18, width - 190), 18, 0xFFFFFFFF, false);
+        drawText(d, "Right Shift • Hub", Math.max(18, field_22789 - 190), 18, 0xFFFFFFFF, false);
         drawText(d, listening ? "Press a key (ESC cancels)" : "Left click = toggle  •  Right click = settings",
-                Math.max(18, width - 380), 42, 0xFFB6C0C8, false);
+                Math.max(18, field_22789 - 380), 42, 0xFFB6C0C8, false);
 
-        super.render(d, mouseX, mouseY, delta);
+        super.method_25394(d, mouseX, mouseY, delta);
 
         int[] l = layout();
         int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], top = l[4], bottom = l[5];
@@ -140,47 +139,47 @@ public final class PoeScreen extends Screen {
 
         int listTop = top + 40;
         int listBottom = bottom - 8;
-        d.enableScissor(leftX + 1, listTop, leftX + leftW - 1, listBottom);
+        d.method_44379(leftX + 1, listTop, leftX + leftW - 1, listBottom);
         drawHackList(d, leftX + 14, listTop, leftW - 28, listBottom - listTop);
-        d.disableScissor();
+        d.method_44380();
 
-        d.enableScissor(settingsX + 1, listTop, settingsX + settingsW - 1, listBottom);
+        d.method_44379(settingsX + 1, listTop, settingsX + settingsW - 1, listBottom);
         drawSettings(d, settingsX + 14, listTop, settingsW - 28);
-        d.disableScissor();
+        d.method_44380();
         drawScrollbar(d, leftX + leftW - 7, listTop, 6, listBottom - listTop, filtered().size() * 20, listBottom - listTop, hackScroll);
         drawScrollbar(d, settingsX + settingsW - 7, listTop, 6, listBottom - listTop, settingsContentHeight(), listBottom - listTop, settingsScroll);
 
-        drawText(d, "Wheel: scroll hovered panel", 14, height - 16, 0xFF73808B, false);
-        drawText(d, "ESC: close", Math.max(18, width - textRenderer.getWidth("ESC: close") - 14), height - 16, 0xFF73808B, false);
+        drawText(d, "Wheel: scroll hovered panel", 14, field_22790 - 16, 0xFF73808B, false);
+        drawText(d, "ESC: close", Math.max(18, field_22789 - field_22793.method_1727("ESC: close") - 14), field_22790 - 16, 0xFF73808B, false);
     }
 
-    private void panel(DrawContext d, int x, int y, int w, int h) {
-        d.fill(x, y, x + w, y + h, 0xD20D151D);
-        d.drawBorder(x, y, w, h, 0xFF2A4154);
+    private void panel(class_332 d, int x, int y, int w, int h) {
+        d.method_25294(x, y, x + w, y + h, 0xD20D151D);
+        d.method_49601(x, y, w, h, 0xFF2A4154);
     }
 
-    private void drawText(DrawContext d, String s, int x, int y, int color, boolean bold) {
-        d.drawText(textRenderer,
-                Text.literal(s).styled(style -> style.withBold(bold)),
+    private void drawText(class_332 d, String s, int x, int y, int color, boolean bold) {
+        d.method_51439(field_22793,
+                class_2561.method_43470(s).method_27694(style -> style.method_10982(bold)),
                 x, y, color, false);
     }
 
-    private void drawHackList(DrawContext d, int x, int y, int w, int h) {
+    private void drawHackList(class_332 d, int x, int y, int w, int h) {
         int rowH = 20;
         int yy = y - (int) hackScroll;
         for (String name : filtered()) {
             if (yy + rowH >= y && yy <= y + h) {
                 boolean real = implemented(name);
                 boolean on = enabled(name);
-                if (name.equals(selected)) d.fill(x - 8, yy - 2, x + w, yy + 17, 0xFF1C3547);
+                if (name.equals(selected)) d.method_25294(x - 8, yy - 2, x + w, yy + 17, 0xFF1C3547);
                 drawText(d, name, x, yy + 2, real ? 0xFFFFFFFF : 0xFF7E8A94, real && (on || name.equals(selected)));
-                if (on) d.fill(x + w - 8, yy + 6, x + w - 2, yy + 12, 0xFFFFFFFF);
+                if (on) d.method_25294(x + w - 8, yy + 6, x + w - 2, yy + 12, 0xFFFFFFFF);
             }
             yy += rowH;
         }
     }
 
-    private void drawSettings(DrawContext d, int x, int y, int w) {
+    private void drawSettings(class_332 d, int x, int y, int w) {
         int yy = y - (int) settingsScroll;
         drawText(d, selected, x, yy + 2, 0xFFFFFFFF, true);
         yy += 20;
@@ -201,7 +200,7 @@ public final class PoeScreen extends Screen {
         }
     }
 
-    private int drawNuker(DrawContext d, int x, int y, int w) {
+    private int drawNuker(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Mining");
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerMode);
         y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 0, 10, "%.0f blocks");
@@ -232,23 +231,23 @@ public final class PoeScreen extends Screen {
         return y;
     }
 
-    private int drawSelectedNukerBlocks(DrawContext d, int x, int y, int w) {
+    private int drawSelectedNukerBlocks(class_332 d, int x, int y, int w) {
         List<String> ids = nukerFilterIds();
         if (ids.isEmpty()) return y + 6;
         int visible = Math.min(ids.size(), 5);
         for (int i = 0; i < visible; i++) {
             String raw = ids.get(i);
-            Identifier id = Identifier.tryParse(raw);
+            class_2960 id = class_2960.method_12829(raw);
             String name = raw;
-            ItemStack stack = ItemStack.EMPTY;
-            if (id != null && Registries.BLOCK.containsId(id)) {
-                Block block = Registries.BLOCK.get(id);
-                name = block.asItem().getDefaultStack().getName().getString();
-                stack = block.asItem().getDefaultStack();
+            class_1799 stack = class_1799.field_8037;
+            if (id != null && class_7923.field_41175.method_10250(id)) {
+                class_2248 block = class_7923.field_41175.method_63535(id);
+                name = block.method_8389().method_7854().method_7964().getString();
+                stack = block.method_8389().method_7854();
             }
-            d.fill(x, y, x + w, y + 32, 0x9A121C24);
-            d.drawBorder(x, y, w, 32, 0xFF294354);
-            if (!stack.isEmpty()) d.drawItem(stack, x + 6, y + 7);
+            d.method_25294(x, y, x + w, y + 32, 0x9A121C24);
+            d.method_49601(x, y, w, 32, 0xFF294354);
+            if (!stack.method_7960()) d.method_51427(stack, x + 6, y + 7);
             drawText(d, fitText(name, Math.max(80, w - 120)), x + 34, y + 6, 0xFFFFFFFF, false);
             drawText(d, fitText(raw, Math.max(80, w - 120)), x + 34, y + 18, 0xFF8E9AA3, false);
             drawText(d, "X", x + w - 18, y + 10, 0xFFFFFFFF, true);
@@ -275,7 +274,7 @@ public final class PoeScreen extends Screen {
         return nukerFilterIds().size();
     }
 
-    private int drawCleaner(DrawContext d, int x, int y, int w) {
+    private int drawCleaner(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Inventory quotas");
         y = rowValue(d, x, y, w, "MaximumBlocks", String.valueOf(PeoClient.CFG.maxBlocks));
         y = rowValue(d, x, y, w, "MaximumArrows", String.valueOf(PeoClient.CFG.maxArrows));
@@ -302,7 +301,7 @@ public final class PoeScreen extends Screen {
         return y;
     }
 
-    private int drawXray(DrawContext d, int x, int y, int w) {
+    private int drawXray(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Blocks");
         y = rowValue(d, x, y, w, "Edit blocks", shortSet(PeoClient.CFG.xrayBlocks));
         y += 8;
@@ -314,7 +313,7 @@ public final class PoeScreen extends Screen {
         return y;
     }
 
-    private int drawFullbright(DrawContext d, int x, int y, int w) {
+    private int drawFullbright(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Brightness");
         y = rowValue(d, x, y, w, "Method", PeoClient.CFG.fullbrightMethod);
         y = rowToggle(d, x, y, w, "Fade", PeoClient.CFG.fullbrightFade);
@@ -323,65 +322,65 @@ public final class PoeScreen extends Screen {
         return y;
     }
 
-    private int section(DrawContext d, int x, int y, String title) {
+    private int section(class_332 d, int x, int y, String title) {
         drawText(d, title, x, y + 2, 0xFFFFFFFF, true);
-        d.fill(x, y + 18, x + Math.min(170, 88 + textRenderer.getWidth(title)), y + 19, 0xFF3B586D);
+        d.method_25294(x, y + 18, x + Math.min(170, 88 + field_22793.method_1727(title)), y + 19, 0xFF3B586D);
         return y + 26;
     }
 
-    private int rowValue(DrawContext d, int x, int y, int w, String label, String value) {
-        d.fill(x, y, x + w, y + 28, 0xB7152029);
-        d.drawBorder(x, y, w, 28, 0xFF294354);
+    private int rowValue(class_332 d, int x, int y, int w, String label, String value) {
+        d.method_25294(x, y, x + w, y + 28, 0xB7152029);
+        d.method_49601(x, y, w, 28, 0xFF294354);
         drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
 
         // Keep long setting values inside the panel. This is especially important
         // for block-filter lists, long proxy/account values, and translated names.
-        int labelReserve = Math.max(150, textRenderer.getWidth(label) + 22);
+        int labelReserve = Math.max(150, field_22793.method_1727(label) + 22);
         int valueLeft = x + labelReserve;
         int valueRight = x + w - 10;
         int maxValueWidth = Math.max(80, valueRight - valueLeft);
         String shown = fitText(value, maxValueWidth);
-        int tw = textRenderer.getWidth(shown);
+        int tw = field_22793.method_1727(shown);
         drawText(d, shown, Math.max(valueLeft, valueRight - tw), y + 9, 0xFFE1E6EA, false);
         return y + 34;
     }
 
     private String fitText(String value, int maxWidth) {
         if (value == null || value.isBlank()) return "";
-        if (textRenderer.getWidth(value) <= maxWidth) return value;
+        if (field_22793.method_1727(value) <= maxWidth) return value;
         String suffix = "...";
-        int room = Math.max(0, maxWidth - textRenderer.getWidth(suffix));
+        int room = Math.max(0, maxWidth - field_22793.method_1727(suffix));
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < value.length(); i++) {
             String candidate = out.toString() + value.charAt(i);
-            if (textRenderer.getWidth(candidate) > room) break;
+            if (field_22793.method_1727(candidate) > room) break;
             out.append(value.charAt(i));
         }
         return out + suffix;
     }
 
-    private int sliderRow(DrawContext d, int x, int y, int w, String label, double value, double min, double max, String format) {
-        d.fill(x, y, x + w, y + 28, 0xB7152029);
-        d.drawBorder(x, y, w, 28, 0xFF294354);
+    private int sliderRow(class_332 d, int x, int y, int w, String label, double value, double min, double max, String format) {
+        d.method_25294(x, y, x + w, y + 28, 0xB7152029);
+        d.method_49601(x, y, w, 28, 0xFF294354);
         drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
-        int sliderX = x + Math.max(130, Math.min(175, textRenderer.getWidth(label) + 28));
+        int sliderX = x + Math.max(130, Math.min(175, field_22793.method_1727(label) + 28));
         int sliderW = Math.max(90, w - (sliderX - x) - 72);
         int trackY = y + 14;
-        d.fill(sliderX, trackY - 2, sliderX + sliderW, trackY + 2, 0xFF304B5C);
+        d.method_25294(sliderX, trackY - 2, sliderX + sliderW, trackY + 2, 0xFF304B5C);
         double norm = (value - min) / (max - min);
         norm = Math.max(0.0, Math.min(1.0, norm));
         int knobX = sliderX + (int)Math.round(norm * sliderW);
-        d.fill(sliderX, trackY - 2, knobX, trackY + 2, 0xFF8EA6B5);
-        d.fill(knobX - 3, trackY - 5, knobX + 3, trackY + 5, 0xFFFFFFFF);
+        d.method_25294(sliderX, trackY - 2, knobX, trackY + 2, 0xFF8EA6B5);
+        d.method_25294(knobX - 3, trackY - 5, knobX + 3, trackY + 5, 0xFFFFFFFF);
         String shown = String.format(Locale.ROOT, format, value);
-        drawText(d, shown, x + w - textRenderer.getWidth(shown) - 10, y + 9, 0xFFE1E6EA, false);
+        drawText(d, shown, x + w - field_22793.method_1727(shown) - 10, y + 9, 0xFFE1E6EA, false);
         return y + 34;
     }
 
-    private int rowToggle(DrawContext d, int x, int y, int w, String label, boolean value) {
+    private int rowToggle(class_332 d, int x, int y, int w, String label, boolean value) {
         rowValue(d, x, y, w, label, "");
         int bx = x + w - 39;
-        d.fill(bx, y + 7, bx + 30, y + 21, value ? 0xFFFFFFFF : 0xFF697782);
+        d.method_25294(bx, y + 7, bx + 30, y + 21, value ? 0xFFFFFFFF : 0xFF697782);
         drawText(d, value ? "ON" : "OFF", bx + 4, y + 9, value ? 0xFF0A1014 : 0xFFFFFFFF, true);
         return y + 34;
     }
@@ -419,17 +418,17 @@ public final class PoeScreen extends Screen {
     }
 
     private String query() {
-        return search == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
+        return search == null ? "" : search.method_1882().trim().toLowerCase(Locale.ROOT);
     }
 
     private int[] layout() {
         // Wurst-like two-column layout: both panels always remain fully inside
         // the viewport, with the settings panel getting the remaining space.
-        int margin = Math.max(18, Math.min(32, width / 40));
-        int gap = Math.max(14, Math.min(20, width / 90));
+        int margin = Math.max(18, Math.min(32, field_22789 / 40));
+        int gap = Math.max(14, Math.min(20, field_22789 / 90));
         int top = 92;
-        int bottom = Math.max(top + 260, height - 28);
-        int usable = Math.max(520, width - margin * 2 - gap);
+        int bottom = Math.max(top + 260, field_22790 - 28);
+        int usable = Math.max(520, field_22789 - margin * 2 - gap);
 
         int leftW = Math.round(usable * 0.29f);
         leftW = Math.max(300, Math.min(390, leftW));
@@ -444,17 +443,17 @@ public final class PoeScreen extends Screen {
         int leftX = margin;
         int settingsX = leftX + leftW + gap;
         // Final safety clamp so neither border can ever be drawn beyond the screen.
-        settingsW = Math.max(1, Math.min(settingsW, width - margin - settingsX));
+        settingsW = Math.max(1, Math.min(settingsW, field_22789 - margin - settingsX));
         return new int[]{leftX, leftW, settingsX, settingsW, top, bottom};
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        super.mouseClicked(mouseX, mouseY, button);
+    public boolean method_25402(double mouseX, double mouseY, int button) {
+        super.method_25402(mouseX, mouseY, button);
         int[] l = layout();
         int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], top = l[4], bottom = l[5];
         int listTop = top + 40;
-        if (mouseY < listTop || mouseY >= bottom) return super.mouseClicked(mouseX, mouseY, button);
+        if (mouseY < listTop || mouseY >= bottom) return super.method_25402(mouseX, mouseY, button);
 
         int viewport = bottom - listTop;
         if (button == 0 && mouseX >= leftX + leftW - 10 && mouseX < leftX + leftW && canScroll(filtered().size() * 20, viewport)) {
@@ -530,14 +529,14 @@ public final class PoeScreen extends Screen {
     }
 
     private double sliderValue(double mouseX, int x, int w, double min, double max, String label) {
-        int sliderX = x + Math.max(130, Math.min(175, textRenderer.getWidth(label) + 28));
+        int sliderX = x + Math.max(130, Math.min(175, field_22793.method_1727(label) + 28));
         int sliderW = Math.max(90, w - (sliderX - x) - 72);
-        double t = MathHelper.clamp((mouseX - sliderX) / (double) sliderW, 0.0, 1.0);
+        double t = class_3532.method_15350((mouseX - sliderX) / (double) sliderW, 0.0, 1.0);
         return min + t * (max - min);
     }
 
     private double roundSlider(double value, double min, double max, double step) {
-        double v = MathHelper.clamp(value, min, max);
+        double v = class_3532.method_15350(value, min, max);
         return Math.round(v / step) * step;
     }
 
@@ -568,7 +567,7 @@ public final class PoeScreen extends Screen {
 
         if (hit(my, p)) { PeoClient.CFG.nukerFilter = !PeoClient.CFG.nukerFilter; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerWhitelist = !PeoClient.CFG.nukerWhitelist; save(); return; } p += 34;
-        if (hit(my, p)) { client.setScreen(new BlockPickerScreen(this, true)); return; } p += 60;
+        if (hit(my, p)) { field_22787.method_1507(new BlockPickerScreen(this, true)); return; } p += 60;
 
         List<String> ids = nukerFilterIds();
         int visible = Math.min(ids.size(), 5);
@@ -636,7 +635,7 @@ public final class PoeScreen extends Screen {
 
     private void clickXray(double my, int y) {
         int p = y + 26;
-        if (hit(my, p)) { client.setScreen(new BlockPickerScreen(this, false)); return; } p += 68;
+        if (hit(my, p)) { field_22787.method_1507(new BlockPickerScreen(this, false)); return; } p += 68;
         if (hit(my, p)) { PeoClient.CFG.xrayExposedOnly = !PeoClient.CFG.xrayExposedOnly; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayFluids = !PeoClient.CFG.xrayFluids; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayBackgroundOpacity = PeoClient.CFG.xrayBackgroundOpacity >= 255 ? 0 : PeoClient.CFG.xrayBackgroundOpacity + 32; save(); return; } p += 34;
@@ -684,16 +683,16 @@ public final class PoeScreen extends Screen {
         return new int[]{thumbTop, thumbTop + thumbH};
     }
 
-    private void drawScrollbar(DrawContext d, int x, int y, int w, int h, int contentHeight, int viewHeight, double scroll) {
+    private void drawScrollbar(class_332 d, int x, int y, int w, int h, int contentHeight, int viewHeight, double scroll) {
         if (!canScroll(contentHeight, viewHeight)) return;
-        d.fill(x, y, x + w, y + h, 0x401A252E);
+        d.method_25294(x, y, x + w, y + h, 0x401A252E);
         int[] thumb = scrollbarThumb(y, h, contentHeight, viewHeight, scroll);
-        d.fill(x, thumb[0], x + w, thumb[1], 0xFF6C7D89);
-        d.drawBorder(x, thumb[0], w, Math.max(1, thumb[1] - thumb[0]), 0xFF9AA7B0);
+        d.method_25294(x, thumb[0], x + w, thumb[1], 0xFF6C7D89);
+        d.method_49601(x, thumb[0], w, Math.max(1, thumb[1] - thumb[0]), 0xFF9AA7B0);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+    public boolean method_25403(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
         if (button == 0 && draggingSlider != null) {
             int[] l = layout();
             int sx = l[2], sw = l[3], top = l[4], bottom = l[5];
@@ -724,7 +723,7 @@ public final class PoeScreen extends Screen {
             int thumbH = thumb[1] - thumb[0];
             int travel = Math.max(1, viewport - thumbH);
             int desiredTop = (int) mouseY - (int) dragScrollbarOffset;
-            int relative = MathHelper.clamp(desiredTop - listTop, 0, travel);
+            int relative = class_3532.method_15340(desiredTop - listTop, 0, travel);
             double max = Math.max(0, settingsContentHeight() - viewport);
             settingsScroll = max == 0 ? 0 : (double) relative / travel * max;
             return true;
@@ -735,26 +734,26 @@ public final class PoeScreen extends Screen {
             int thumbH = thumb[1] - thumb[0];
             int travel = Math.max(1, viewport - thumbH);
             int desiredTop = (int) mouseY - (int) dragScrollbarOffset;
-            int relative = MathHelper.clamp(desiredTop - listTop, 0, travel);
+            int relative = class_3532.method_15340(desiredTop - listTop, 0, travel);
             double max = Math.max(0, content - viewport);
             hackScroll = max == 0 ? 0 : (double) relative / travel * max;
             return true;
         }
-        return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+        return super.method_25403(mouseX, mouseY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean method_25406(double mouseX, double mouseY, int button) {
         if (button == 0) {
             draggingSettingsScrollbar = false;
             draggingHackScrollbar = false;
             draggingSlider = null;
         }
-        return super.mouseReleased(mouseX, mouseY, button);
+        return super.method_25406(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+    public boolean method_25401(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         int[] l = layout();
         int leftX = l[0], leftW = l[1], settingsX = l[2], settingsW = l[3], top = l[4], bottom = l[5];
         if (mouseY < top + 40 || mouseY > bottom) return true;
@@ -784,7 +783,7 @@ public final class PoeScreen extends Screen {
     private double clamp(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+    public boolean method_25404(int keyCode, int scanCode, int modifiers) {
         if (listening) {
             if (keyCode == GLFW.GLFW_KEY_ESCAPE) { listening = false; bindTarget = null; return true; }
             if (keyCode == GLFW.GLFW_KEY_DELETE || keyCode == GLFW.GLFW_KEY_BACKSPACE) {
@@ -795,16 +794,16 @@ public final class PoeScreen extends Screen {
             return true;
         }
         if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-            close();
+            method_25419();
             return true;
         }
-        return super.keyPressed(keyCode, scanCode, modifiers);
+        return super.method_25404(keyCode, scanCode, modifiers);
     }
     /** Dedicated item/block picker for Nuker Filter. Search by translated item name or registry id,
      * show the actual item icon, and toggle block ids without requiring manual id entry. */
-    private static final class BlockPickerScreen extends Screen {
+    private static final class BlockPickerScreen extends class_437 {
         private final PoeScreen parent;
-        private TextFieldWidget search;
+        private class_342 search;
         private double scroll;
         private boolean draggingPickerScrollbar;
         private double pickerDragOffset;
@@ -812,32 +811,32 @@ public final class PoeScreen extends Screen {
         private final boolean nukerMode;
 
         BlockPickerScreen(PoeScreen parent, boolean nukerMode) {
-            super(Text.literal(nukerMode ? "Nuker - Edit Blocks" : "X-Ray - Edit Blocks"));
+            super(class_2561.method_43470(nukerMode ? "Nuker - Edit Blocks" : "X-Ray - Edit Blocks"));
             this.parent = parent;
             this.nukerMode = nukerMode;
         }
 
         @Override
-        protected void init() {
-            int w = Math.min(520, width - 40);
-            search = new TextFieldWidget(textRenderer, width / 2 - w / 2, 34, w, 22, Text.literal("Search blocks"));
-            search.setMaxLength(96);
-            search.setPlaceholder(Text.literal("Type item/block name or minecraft:id..."));
-            addDrawableChild(search);
+        protected void method_25426() {
+            int w = Math.min(520, field_22789 - 40);
+            search = new class_342(field_22793, field_22789 / 2 - w / 2, 34, w, 22, class_2561.method_43470("Search blocks"));
+            search.method_1880(96);
+            search.method_47404(class_2561.method_43470("Type item/block name or minecraft:id..."));
+            method_37063(search);
         }
 
         private List<Entry> matches() {
-            String q = search == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
+            String q = search == null ? "" : search.method_1882().trim().toLowerCase(Locale.ROOT);
             List<Entry> out = new ArrayList<>();
-            for (Identifier id : Registries.ITEM.getIds()) {
-                Item item = Registries.ITEM.get(id);
-                if (!(item instanceof BlockItem)) continue;
-                ItemStack stack = item.getDefaultStack();
-                String name = stack.getName().getString();
+            for (class_2960 id : class_7923.field_41178.method_10235()) {
+                class_1792 item = class_7923.field_41178.method_63535(id);
+                if (!(item instanceof class_1747)) continue;
+                class_1799 stack = item.method_7854();
+                String name = stack.method_7964().getString();
                 String key = id.toString();
                 if (q.isBlank() || name.toLowerCase(Locale.ROOT).contains(q) || key.contains(q)) {
-                    Block block = ((BlockItem) item).getBlock();
-                    Identifier blockId = Registries.BLOCK.getId(block);
+                    class_2248 block = ((class_1747) item).method_7711();
+                    class_2960 blockId = class_7923.field_41175.method_10221(block);
                     out.add(new Entry(blockId, name, stack));
                 }
             }
@@ -867,22 +866,22 @@ public final class PoeScreen extends Screen {
                 PeoClient.CFG.nukerFilterIds = String.join(",", set);
             }
             PeoClient.CFG.save();
-            if (!nukerMode) PeoClient.reload(MinecraftClient.getInstance());
+            if (!nukerMode) PeoClient.reload(class_310.method_1551());
         }
 
         @Override
-        public void render(DrawContext d, int mouseX, int mouseY, float delta) {
-            renderBackground(d, mouseX, mouseY, delta);
-            int left = Math.max(24, width / 2 - 270);
-            int right = Math.min(width - 24, width / 2 + 270);
+        public void method_25394(class_332 d, int mouseX, int mouseY, float delta) {
+            method_25420(d, mouseX, mouseY, delta);
+            int left = Math.max(24, field_22789 / 2 - 270);
+            int right = Math.min(field_22789 - 24, field_22789 / 2 + 270);
             int top = 72;
-            int bottom = height - 34;
+            int bottom = field_22790 - 34;
 
-            d.fill(left - 8, top - 8, right + 8, bottom + 8, 0xEE0D151D);
-            d.drawBorder(left - 8, top - 8, right - left + 16, bottom - top + 16, 0xFF2A4154);
-            d.drawText(textRenderer, Text.literal((nukerMode ? "Nuker" : "X-Ray") + " • Edit blocks").styled(s -> s.withBold(true)), left, 12, 0xFFFFFFFF, false);
-            d.drawText(textRenderer, Text.literal("Click a block to add/remove it from the current filter."), left, 80, 0xFF9CA8B1, false);
-            d.drawText(textRenderer, Text.literal("Selected: " + selectedSet().size()), right - 110, 80, 0xFFFFFFFF, false);
+            d.method_25294(left - 8, top - 8, right + 8, bottom + 8, 0xEE0D151D);
+            d.method_49601(left - 8, top - 8, right - left + 16, bottom - top + 16, 0xFF2A4154);
+            d.method_51439(field_22793, class_2561.method_43470((nukerMode ? "Nuker" : "X-Ray") + " • Edit blocks").method_27694(s -> s.method_10982(true)), left, 12, 0xFFFFFFFF, false);
+            d.method_51439(field_22793, class_2561.method_43470("Click a block to add/remove it from the current filter."), left, 80, 0xFF9CA8B1, false);
+            d.method_51439(field_22793, class_2561.method_43470("Selected: " + selectedSet().size()), right - 110, 80, 0xFFFFFFFF, false);
 
             List<Entry> entries = matches();
             int rowH = 34;
@@ -892,12 +891,12 @@ public final class PoeScreen extends Screen {
                 if (y + rowH >= top && y <= bottom) {
                     boolean on = selected.contains(e.id.toString());
                     int bg = on ? 0xFF1C3547 : 0xB7152029;
-                    d.fill(left, y, right, y + rowH - 4, bg);
-                    d.drawBorder(left, y, right - left, rowH - 4, 0xFF294354);
-                    d.drawItem(e.stack, left + 8, y + 5);
-                    d.drawText(textRenderer, Text.literal(e.name).styled(s -> s.withBold(on)), left + 38, y + 5, 0xFFFFFFFF, false);
-                    d.drawText(textRenderer, Text.literal(e.id.toString()), left + 38, y + 18, 0xFF8E9AA3, false);
-                    d.drawText(textRenderer, Text.literal(on ? "SELECTED" : "ADD"), right - 80, y + 11, 0xFFFFFFFF, false);
+                    d.method_25294(left, y, right, y + rowH - 4, bg);
+                    d.method_49601(left, y, right - left, rowH - 4, 0xFF294354);
+                    d.method_51427(e.stack, left + 8, y + 5);
+                    d.method_51439(field_22793, class_2561.method_43470(e.name).method_27694(s -> s.method_10982(on)), left + 38, y + 5, 0xFFFFFFFF, false);
+                    d.method_51439(field_22793, class_2561.method_43470(e.id.toString()), left + 38, y + 18, 0xFF8E9AA3, false);
+                    d.method_51439(field_22793, class_2561.method_43470(on ? "SELECTED" : "ADD"), right - 80, y + 11, 0xFFFFFFFF, false);
                 }
                 y += rowH;
             }
@@ -911,24 +910,24 @@ public final class PoeScreen extends Screen {
                 int travel = Math.max(1, viewportH - thumbH);
                 int maxScroll = Math.max(0, contentH - viewportH);
                 int thumbY = trackTop + (maxScroll == 0 ? 0 : (int)((scroll / maxScroll) * travel));
-                d.fill(trackX, trackTop, trackX + 4, trackBottom, 0xFF243641);
-                d.fill(trackX, thumbY, trackX + 4, thumbY + thumbH, 0xFFE1E6EA);
+                d.method_25294(trackX, trackTop, trackX + 4, trackBottom, 0xFF243641);
+                d.method_25294(trackX, thumbY, trackX + 4, thumbY + thumbH, 0xFFE1E6EA);
             }
             if (entries.isEmpty()) {
-                d.drawText(textRenderer, Text.literal("No matching blocks."), left + 10, top + 35, 0xFFFFFFFF, false);
+                d.method_51439(field_22793, class_2561.method_43470("No matching blocks."), left + 10, top + 35, 0xFFFFFFFF, false);
             }
-            d.drawText(textRenderer, Text.literal("Mouse wheel: scroll • ESC: back"), left, bottom + 10, 0xFF98A5AE, false);
-            super.render(d, mouseX, mouseY, delta);
+            d.method_51439(field_22793, class_2561.method_43470("Mouse wheel: scroll • ESC: back"), left, bottom + 10, 0xFF98A5AE, false);
+            super.method_25394(d, mouseX, mouseY, delta);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            if (super.mouseClicked(mouseX, mouseY, button)) return true;
+        public boolean method_25402(double mouseX, double mouseY, int button) {
+            if (super.method_25402(mouseX, mouseY, button)) return true;
             if (button != 0) return false;
-            int left = Math.max(24, width / 2 - 270);
-            int right = Math.min(width - 24, width / 2 + 270);
+            int left = Math.max(24, field_22789 / 2 - 270);
+            int right = Math.min(field_22789 - 24, field_22789 / 2 + 270);
             int top = 72;
-            int bottom = height - 34;
+            int bottom = field_22790 - 34;
             if (mouseX < left || mouseX > right || mouseY < top || mouseY > bottom) return false;
             List<Entry> entries = matches();
             int rowH = 34;
@@ -961,45 +960,45 @@ public final class PoeScreen extends Screen {
         }
 
         @Override
-        public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+        public boolean method_25401(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
             int rowH = 34;
-            int visible = Math.max(1, (height - 120) / rowH);
+            int visible = Math.max(1, (field_22790 - 120) / rowH);
             int max = Math.max(0, matches().size() - visible);
-            scroll = MathHelper.clamp(scroll - verticalAmount * rowH, 0, max * rowH);
+            scroll = class_3532.method_15350(scroll - verticalAmount * rowH, 0, max * rowH);
             return true;
         }
 
         @Override
-        public boolean mouseDragged(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+        public boolean method_25403(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
             if (button == 0 && draggingPickerScrollbar) {
                 int top = 72;
-                int bottom = height - 34;
+                int bottom = field_22790 - 34;
                 int viewportH = bottom - top;
                 int contentH = Math.max(viewportH, matches().size() * 34 + 18);
                 int thumbH = Math.max(24, (int)((viewportH / (double)contentH) * viewportH));
                 int travel = Math.max(1, viewportH - thumbH);
                 int maxScroll = Math.max(0, contentH - viewportH);
                 int desired = (int)(mouseY - pickerDragOffset - top);
-                int rel = MathHelper.clamp(desired, 0, travel);
+                int rel = class_3532.method_15340(desired, 0, travel);
                 scroll = maxScroll == 0 ? 0 : (rel / (double)travel) * maxScroll;
                 return true;
             }
-            return super.mouseDragged(mouseX, mouseY, button, deltaX, deltaY);
+            return super.method_25403(mouseX, mouseY, button, deltaX, deltaY);
         }
 
         @Override
-        public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        public boolean method_25406(double mouseX, double mouseY, int button) {
             if (button == 0) draggingPickerScrollbar = false;
-            return super.mouseReleased(mouseX, mouseY, button);
+            return super.method_25406(mouseX, mouseY, button);
         }
 
         @Override
-        public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) { client.setScreen(parent); return true; }
-            return super.keyPressed(keyCode, scanCode, modifiers);
+        public boolean method_25404(int keyCode, int scanCode, int modifiers) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) { field_22787.method_1507(parent); return true; }
+            return super.method_25404(keyCode, scanCode, modifiers);
         }
 
-        private record Entry(Identifier id, String name, ItemStack stack) {}
+        private record Entry(class_2960 id, String name, class_1799 stack) {}
     }
 
 }

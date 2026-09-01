@@ -9,24 +9,23 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.FluidBlock;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.entity.effect.StatusEffectInstance;
-import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.item.ItemStack;
-import net.minecraft.registry.Registries;
-import net.minecraft.text.Text;
-import net.minecraft.util.Hand;
-import net.minecraft.util.hit.BlockHitResult;
-import net.minecraft.util.hit.HitResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.Vec3d;
+import net.minecraft.class_1268;
+import net.minecraft.class_1293;
+import net.minecraft.class_1294;
+import net.minecraft.class_2248;
+import net.minecraft.class_2338;
+import net.minecraft.class_2350;
+import net.minecraft.class_239;
+import net.minecraft.class_2404;
+import net.minecraft.class_243;
+import net.minecraft.class_2561;
+import net.minecraft.class_2680;
+import net.minecraft.class_304;
+import net.minecraft.class_310;
+import net.minecraft.class_3532;
+import net.minecraft.class_3675;
+import net.minecraft.class_3965;
+import net.minecraft.class_7923;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
@@ -37,15 +36,15 @@ import java.util.*;
 public final class PeoClient implements ClientModInitializer {
     public static final Config CFG = new Config();
 
-    public static KeyBinding menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey, nukerBypassKey;
-    public static final Map<String, KeyBinding> MODULE_KEYS = new LinkedHashMap<>();
+    public static class_304 menuKey, xrayKey, nukerKey, fullbrightKey, cleanerKey, nukerBypassKey;
+    public static final Map<String, class_304> MODULE_KEYS = new LinkedHashMap<>();
     private static String originalUsername = "Player";
     private int saveTick;
     private boolean networkConfigured;
 
     @Override
     public void onInitializeClient() {
-        originalUsername = MinecraftClient.getInstance().getSession().getUsername();
+        originalUsername = class_310.method_1551().method_1548().method_1676();
         CFG.load();
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
@@ -61,9 +60,9 @@ public final class PeoClient implements ClientModInitializer {
         HudRenderCallback.EVENT.register((draw, delta) -> Hud.render(draw));
     }
 
-    private KeyBinding key(String name, int code) {
+    private class_304 key(String name, int code) {
         return KeyBindingHelper.registerKeyBinding(
-                new KeyBinding(name, InputUtil.Type.KEYSYM, code, "PeoClient"));
+                new class_304(name, class_3675.class_307.field_1668, code, "PeoClient"));
     }
 
     private void registerModuleKeys() {
@@ -82,11 +81,11 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static boolean setModuleKey(String module, int keyCode) {
-        KeyBinding key = MODULE_KEYS.get(module);
+        class_304 key = MODULE_KEYS.get(module);
         if (key == null) return false;
-        key.setBoundKey(InputUtil.Type.KEYSYM.createFromCode(keyCode));
+        key.method_1422(class_3675.class_307.field_1668.method_1447(keyCode));
         CFG.keybinds.put(module, keyCode);
-        MinecraftClient.getInstance().options.write();
+        class_310.method_1551().field_1690.method_1640();
         CFG.save();
         return true;
     }
@@ -103,24 +102,24 @@ public final class PeoClient implements ClientModInitializer {
         };
     }
 
-    private void tick(MinecraftClient mc) {
+    private void tick(class_310 mc) {
         if (!networkConfigured) {
             networkConfigured = true;
             if (CFG.usernameOverride != null && !CFG.usernameOverride.isBlank()) setUsernameOverride(CFG.usernameOverride);
             applyProxySettings(mc);
         }
 
-        while (menuKey.wasPressed()) mc.setScreen(new PoeScreen());
+        while (menuKey.method_1436()) mc.method_1507(new PoeScreen());
 
-        for (Map.Entry<String, KeyBinding> entry : MODULE_KEYS.entrySet()) {
-            while (entry.getValue().wasPressed()) toggleModuleByName(entry.getKey(), mc);
+        for (Map.Entry<String, class_304> entry : MODULE_KEYS.entrySet()) {
+            while (entry.getValue().method_1436()) toggleModuleByName(entry.getKey(), mc);
         }
-        while (nukerBypassKey.wasPressed()) {
+        while (nukerBypassKey.method_1436()) {
             NukerCompatibility.toggle();
-            if (mc.player != null) mc.player.sendMessage(Text.literal("Nuker Compatibility: " + (NukerCompatibility.isEnabled() ? "ON" : "OFF")), true);
+            if (mc.field_1724 != null) mc.field_1724.method_7353(class_2561.method_43470("Nuker Compatibility: " + (NukerCompatibility.isEnabled() ? "ON" : "OFF")), true);
         }
 
-        if (mc.player == null || mc.world == null) {
+        if (mc.field_1724 == null || mc.field_1687 == null) {
             if (++saveTick >= 100) {
                 saveTick = 0;
                 CFG.save();
@@ -140,7 +139,7 @@ public final class PeoClient implements ClientModInitializer {
         }
     }
 
-    public static void toggleModuleByName(String module, MinecraftClient mc) {
+    public static void toggleModuleByName(String module, class_310 mc) {
         switch (module) {
             case "X-Ray" -> toggleXray(mc);
             case "Nuker [Multi]" -> CFG.nuker = !CFG.nuker;
@@ -151,23 +150,23 @@ public final class PeoClient implements ClientModInitializer {
         CFG.save();
     }
 
-    public static void toggleXray(MinecraftClient mc) {
+    public static void toggleXray(class_310 mc) {
         CFG.xray = !CFG.xray;
-        if (mc.world != null) reload(mc);
+        if (mc.field_1687 != null) reload(mc);
     }
 
-    public static void toggleFullbright(MinecraftClient mc) {
+    public static void toggleFullbright(class_310 mc) {
         CFG.fullbright = !CFG.fullbright;
         if (!CFG.fullbright) FullbrightLogic.restore(mc);
         reload(mc);
     }
 
-    public static void reload(MinecraftClient mc) {
-        if (mc.worldRenderer != null) mc.worldRenderer.reload();
+    public static void reload(class_310 mc) {
+        if (mc.field_1769 != null) mc.field_1769.method_3279();
     }
 
-    public static boolean isXrayBlock(Block block) {
-        return CFG.xrayBlocks.contains(Registries.BLOCK.getId(block).toString());
+    public static boolean isXrayBlock(class_2248 block) {
+        return CFG.xrayBlocks.contains(class_7923.field_41175.method_10221(block).toString());
     }
 
     public static final class Config {
@@ -260,7 +259,7 @@ public final class PeoClient implements ClientModInitializer {
         };
 
         private Path path() {
-            return MinecraftClient.getInstance().runDirectory.toPath()
+            return class_310.method_1551().field_1697.toPath()
                     .resolve("config/peoclient.json");
         }
 
@@ -357,7 +356,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static String getDisplayUsername() {
-        MinecraftClient mc = MinecraftClient.getInstance();
+        class_310 mc = class_310.method_1551();
         String override = CFG.usernameOverride == null ? "" : CFG.usernameOverride.trim();
         if (!override.isEmpty()) return override;
         return originalUsername;
@@ -368,14 +367,14 @@ public final class PeoClient implements ClientModInitializer {
         if (clean.length() > 16) clean = clean.substring(0, 16);
         CFG.usernameOverride = clean;
         try {
-            ((com.peoclient.mixin.SessionAccessor) (Object) MinecraftClient.getInstance().getSession())
+            ((com.peoclient.mixin.SessionAccessor) (Object) class_310.method_1551().method_1548())
                     .peo$setUsername(clean.isEmpty() ? originalUsername : clean);
         } catch (Throwable ignored) {
         }
         CFG.save();
     }
 
-    public static void applyProxySettings(MinecraftClient mc) {
+    public static void applyProxySettings(class_310 mc) {
         if (!CFG.randomProxy || CFG.proxyList == null || CFG.proxyList.isEmpty()) return;
         java.net.Proxy proxy = java.net.Proxy.NO_PROXY;
         {
@@ -409,8 +408,8 @@ public final class PeoClient implements ClientModInitializer {
 
         private FullbrightLogic() {}
 
-        public static void tick(MinecraftClient mc) {
-            if (mc.player == null) return;
+        public static void tick(class_310 mc) {
+            if (mc.field_1724 == null) return;
 
             boolean gammaActive = CFG.fullbright && "Gamma".equalsIgnoreCase(CFG.fullbrightMethod);
             boolean nightVisionActive = CFG.fullbright && "Night Vision".equalsIgnoreCase(CFG.fullbrightMethod);
@@ -418,26 +417,26 @@ public final class PeoClient implements ClientModInitializer {
             boolean brightnessActive = gammaActive || nightVisionActive || xrayBrightness;
 
             if (brightnessActive && !captured) {
-                originalGamma = mc.options.getGamma().getValue();
+                originalGamma = mc.field_1690.method_42473().method_41753();
                 captured = true;
             }
 
             // Wurst's Gamma method forces brightness to 1600%, with optional 0.5-step fade.
             if (gammaActive || xrayBrightness) {
-                double old = mc.options.getGamma().getValue();
+                double old = mc.field_1690.method_42473().method_41753();
                 double next = CFG.fullbrightFade && Math.abs(old - 16.0) > 0.5
                         ? old + (old < 16.0 ? 0.5 : -0.5)
                         : 16.0;
                 GammaUtil.forceSet(mc, next);
-                if (mc.player.hasStatusEffect(StatusEffects.NIGHT_VISION))
-                    mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
+                if (mc.field_1724.method_6059(class_1294.field_5925))
+                    mc.field_1724.method_6016(class_1294.field_5925);
                 return;
             }
 
             // Keep the alternate method available, but do not touch inventory or server state.
             if (nightVisionActive) {
-                mc.player.addStatusEffect(new StatusEffectInstance(
-                        StatusEffects.NIGHT_VISION, 20, 0, false, false, false));
+                mc.field_1724.method_6092(new class_1293(
+                        class_1294.field_5925, 20, 0, false, false, false));
                 if (captured) GammaUtil.forceSet(mc, originalGamma);
                 return;
             }
@@ -445,11 +444,11 @@ public final class PeoClient implements ClientModInitializer {
             restore(mc);
         }
 
-        public static void restore(MinecraftClient mc) {
-            if (mc.player != null && mc.player.hasStatusEffect(StatusEffects.NIGHT_VISION))
-                mc.player.removeStatusEffect(StatusEffects.NIGHT_VISION);
+        public static void restore(class_310 mc) {
+            if (mc.field_1724 != null && mc.field_1724.method_6059(class_1294.field_5925))
+                mc.field_1724.method_6016(class_1294.field_5925);
             if (captured) {
-                GammaUtil.forceSet(mc, MathHelper.clamp(originalGamma, 0.0, 16.0));
+                GammaUtil.forceSet(mc, class_3532.method_15350(originalGamma, 0.0, 16.0));
                 captured = false;
             }
         }
@@ -458,76 +457,65 @@ public final class PeoClient implements ClientModInitializer {
     public static final class GammaUtil {
         private GammaUtil() {}
 
-        public static void forceSet(MinecraftClient mc, double value) {
+        public static void forceSet(class_310 mc, double value) {
             try {
-                ((com.peoclient.mixin.SimpleOptionAccessor) (Object) mc.options.getGamma())
+                ((com.peoclient.mixin.SimpleOptionAccessor) (Object) mc.field_1690.method_42473())
                         .peo$setValue(value);
             } catch (Throwable ignored) {
                 // Fallback keeps vanilla-safe behaviour if the accessor is unavailable.
-                mc.options.getGamma().setValue(MathHelper.clamp(value, 0.0, 1.0));
+                mc.field_1690.method_42473().method_41748(class_3532.method_15350(value, 0.0, 1.0));
             }
         }
     }
 
     public static final class NukerLogic {
-        private static final List<BlockPos> renderBlocks = new ArrayList<>();
+        private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
-        private static BlockPos breakingPos;
-        private static Direction breakingSide;
-        private static int staleTicks;
+        private static class_2338 breakingPos;
+        private static class_2350 breakingSide;
+        private static int stagnantTicks;
+        private static float lastBreakingProgress;
+        private static class_2338 progressPos;
 
         private NukerLogic() {}
 
-        /**
-         * Public render snapshot used by the Highlight renderer.
-         * A copy is returned so rendering cannot mutate the active target list.
-         */
-        public static List<BlockPos> getRenderBlocks() {
-            return List.copyOf(renderBlocks);
-        }
-
-        /**
-         * Vanilla breaking progress is exposed through the interaction manager
-         * public API. The renderer expects a normalized 0..1 value.
-         */
-        public static float getBreakingProgress() {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.interactionManager == null) return 0.0f;
-            float progress = mc.interactionManager.getBlockBreakingProgress();
-            return MathHelper.clamp(progress, 0.0f, 1.0f);
-        }
-
-        public static void tick(MinecraftClient mc) {
-            if (mc.interactionManager == null || mc.player == null || mc.world == null
-                    || mc.currentScreen != null) return;
-
-            // Cooperative mouse mode: vanilla owns the interaction manager while the
-            // attack key is physically held. This prevents Nuker and manual mining
-            // from opening competing breaking sessions. Nuker resumes automatically
-            // as soon as the mouse is released.
-            if (mc.options.attackKey.isPressed()) {
-                renderBlocks.clear();
-                return;
-            }
+        public static void tick(class_310 mc) {
+            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null
+                    || mc.field_1755 != null) return;
 
             renderBlocks.clear();
 
-            // Recover only when the vanilla interaction manager no longer owns our
-            // active target. This avoids the aggressive per-target resets from the
-            // previous build while still recovering after manual mouse interaction.
+            // Lightweight local recovery: keep the fast Nuker engine intact, but
+            // recover automatically if the vanilla breaking state stops changing.
             if (breakingPos != null) {
-                net.minecraft.util.math.BlockPos managerPos =
-                        ((com.peoclient.mixin.ClientPlayerInteractionManagerAccessor) mc.interactionManager).peo$getCurrentBreakingPos();
-                if (managerPos != null && !managerPos.equals(breakingPos)) {
-                    staleTicks++;
-                } else {
-                    staleTicks = 0;
-                }
-                if (staleTicks >= 2) {
+                class_2680 activeState = mc.field_1687.method_8320(breakingPos);
+                float progress = getBreakingProgress();
+                if (activeState.method_26215()) {
+                    mc.field_1761.method_2925();
                     breakingPos = null;
                     breakingSide = null;
-                    staleTicks = 0;
+                    queue.clear();
+                    stagnantTicks = 0;
+                    lastBreakingProgress = 0.0f;
+                    progressPos = null;
+                } else {
+                    if (!breakingPos.equals(progressPos) || progress > lastBreakingProgress + 0.001f) {
+                        stagnantTicks = 0;
+                    } else {
+                        stagnantTicks++;
+                    }
+                    progressPos = breakingPos;
+                    lastBreakingProgress = progress;
+                    if (stagnantTicks >= 8) {
+                        mc.field_1761.method_2925();
+                        breakingPos = null;
+                        breakingSide = null;
+                        queue.clear();
+                        stagnantTicks = 0;
+                        lastBreakingProgress = 0.0f;
+                        progressPos = null;
+                    }
                 }
             }
 
@@ -540,16 +528,19 @@ public final class PeoClient implements ClientModInitializer {
             // Build a fresh queue when the old one is exhausted or its active target became invalid.
             if (queue.isEmpty() || !activeTargetStillValid(mc)) {
                 if (breakingPos != null) {
-                    mc.interactionManager.cancelBlockBreaking();
+                    mc.field_1761.method_2925();
                     breakingPos = null;
                     breakingSide = null;
+                    stagnantTicks = 0;
+                    lastBreakingProgress = 0.0f;
+                    progressPos = null;
                 }
                 queue.clear();
                 queue.addAll(collect(mc));
                 queue.sort(comparator(mc));
             }
 
-            int batch = MathHelper.clamp(CFG.nukerMulti, 1, 10);
+            int batch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
                 // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
@@ -557,101 +548,135 @@ public final class PeoClient implements ClientModInitializer {
                 queue.subList(1, queue.size()).clear();
             }
 
-            while (!queue.isEmpty()) {
+            int processed = 0;
+            while (!queue.isEmpty() && processed < batch) {
                 Target target = queue.get(0);
                 if (!isValidTarget(mc, target)) {
                     queue.remove(0);
                     continue;
                 }
 
-                BlockState state = mc.world.getBlockState(target.pos);
-                float delta = state.calcBlockBreakingDelta(mc.player, mc.world, target.pos);
+                class_2680 state = mc.field_1687.method_8320(target.pos);
+                float delta = state.method_26165(mc.field_1724, mc.field_1687, target.pos);
                 if (delta <= 0) {
                     queue.remove(0);
                     continue;
                 }
 
-                if (CFG.nukerRotate && rotateTo(mc, target.pos)) {
-                    cooldown = 1;
-                    renderBlocks.add(target.pos);
-                    return;
+                if (CFG.nukerRotate) {
+                    rotateTo(mc, target.pos);
                 }
 
-                boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
-                        || breakingSide != target.side;
-                if (newTarget) {
-                    if (breakingPos != null) mc.interactionManager.cancelBlockBreaking();
-                    if (!mc.interactionManager.attackBlock(target.pos, target.side)) {
+                // Use the normal interaction manager for each target. We keep one
+                // active vanilla breaking state and refresh it for the current target.
+                if (breakingPos != null && !breakingPos.equals(target.pos)) {
+                    mc.field_1761.method_2925();
+                    breakingPos = null;
+                    breakingSide = null;
+                }
+
+                if (breakingPos == null) {
+                    if (!mc.field_1761.method_2910(target.pos, target.side)) {
                         queue.remove(0);
-                        breakingPos = null;
-                        breakingSide = null;
                         continue;
                     }
-                    breakingPos = target.pos.toImmutable();
+                    breakingPos = target.pos.method_10062();
                     breakingSide = target.side;
-                } else {
-                    mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
                 }
 
-                mc.player.swingHand(Hand.MAIN_HAND);
+                mc.field_1761.method_2902(target.pos, target.side);
+                mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
+                processed++;
 
-                if (mc.world.getBlockState(target.pos).isAir()) {
+                if (mc.field_1687.method_8320(target.pos).method_26215()) {
                     queue.remove(0);
                     breakingPos = null;
                     breakingSide = null;
-                    // Advance immediately only after the world confirms the previous block is gone.
-                    cooldown = Math.max(0, CFG.nukerCooldown);
                 } else {
-                    cooldown = Math.max(0, CFG.nukerCooldown);
+                    // Keep the current target as the active vanilla breaking state.
+                    // For SurvMulti, stop after the first partially-mined block so the
+                    // next tick can resume it instead of issuing conflicting states.
+                    if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode)) break;
+                    queue.remove(0);
+                    breakingPos = null;
+                    breakingSide = null;
                 }
-                return;
+
+                if (CFG.nukerCooldown > 0) {
+                    cooldown = CFG.nukerCooldown;
+                    break;
+                }
             }
         }
 
-        private static boolean activeTargetStillValid(MinecraftClient mc) {
+        public static void resetState() {
+            class_310 mc = class_310.method_1551();
+            if (mc.field_1761 != null && breakingPos != null) {
+                mc.field_1761.method_2925();
+            }
+            queue.clear();
+            renderBlocks.clear();
+            breakingPos = null;
+            breakingSide = null;
+            stagnantTicks = 0;
+            lastBreakingProgress = 0.0f;
+            progressPos = null;
+        }
+
+        public static List<class_2338> getRenderBlocks() {
+            return new ArrayList<>(renderBlocks);
+        }
+
+        public static float getBreakingProgress() {
+            class_310 mc = class_310.method_1551();
+            if (mc.field_1761 == null) return 0.0f;
+            return class_3532.method_15363(mc.field_1761.method_51888() / 10.0f, 0.0f, 1.0f);
+        }
+
+        private static boolean activeTargetStillValid(class_310 mc) {
             if (breakingPos == null) return false;
-            BlockState state = mc.world.getBlockState(breakingPos);
-            return !state.isAir() && !(state.getBlock() instanceof FluidBlock)
+            class_2680 state = mc.field_1687.method_8320(breakingPos);
+            return !state.method_26215() && !(state.method_26204() instanceof class_2404)
                     && NukerAreaLimiter.contains(breakingPos)
-                    && (!CFG.nukerFilter || passesFilter(state.getBlock()));
+                    && (!CFG.nukerFilter || passesFilter(state.method_26204()));
         }
 
-        private static boolean isValidTarget(MinecraftClient mc, Target target) {
-            BlockState state = mc.world.getBlockState(target.pos);
-            if (state.isAir() || state.getBlock() instanceof FluidBlock) return false;
-            if (CFG.nukerFlatten && target.pos.getY() < mc.player.getBlockY() - 1) return false;
-            if (CFG.nukerFilter && !passesFilter(state.getBlock())) return false;
+        private static boolean isValidTarget(class_310 mc, Target target) {
+            class_2680 state = mc.field_1687.method_8320(target.pos);
+            if (state.method_26215() || state.method_26204() instanceof class_2404) return false;
+            if (CFG.nukerFlatten && target.pos.method_10264() < mc.field_1724.method_31478() - 1) return false;
+            if (CFG.nukerFilter && !passesFilter(state.method_26204())) return false;
             if (CFG.nukerRaycast && target.side == null) return false;
-            return mc.player.getEyePos().distanceTo(Vec3d.ofCenter(target.pos))
-                    <= MathHelper.clamp(CFG.nukerRange, 1.0, 6.0) + 0.25;
+            return mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos))
+                    <= class_3532.method_15350(CFG.nukerRange, 1.0, 6.0) + 0.25;
         }
 
-        private static List<Target> collect(MinecraftClient mc) {
-            double range = MathHelper.clamp(CFG.nukerRange, 1.0, 6.0);
-            int r = MathHelper.ceil(range);
-            BlockPos center = BlockPos.ofFloored(mc.player.getEyePos());
+        private static List<Target> collect(class_310 mc) {
+            double range = class_3532.method_15350(CFG.nukerRange, 1.0, 6.0);
+            int r = class_3532.method_15384(range);
+            class_2338 center = class_2338.method_49638(mc.field_1724.method_33571());
             List<Target> out = new ArrayList<>();
 
             for (int x = -r; x <= r; x++) {
                 for (int y = -r; y <= r; y++) {
                     for (int z = -r; z <= r; z++) {
-                        BlockPos pos = center.add(x, y, z);
+                        class_2338 pos = center.method_10069(x, y, z);
                         if (!NukerAreaLimiter.contains(pos)) continue;
-                        if (CFG.nukerFlatten && pos.getY() < mc.player.getBlockY() - 1) continue;
+                        if (CFG.nukerFlatten && pos.method_10264() < mc.field_1724.method_31478() - 1) continue;
 
                         double distance = "Cube".equalsIgnoreCase(CFG.nukerShape)
                                 ? Math.max(Math.max(Math.abs(x), Math.abs(y)), Math.abs(z))
-                                : mc.player.getEyePos().distanceTo(Vec3d.ofCenter(pos));
+                                : mc.field_1724.method_33571().method_1022(class_243.method_24953(pos));
                         if (distance > range + 0.25) continue;
 
-                        BlockState state = mc.world.getBlockState(pos);
-                        if (state.isAir() || state.getBlock() instanceof FluidBlock) continue;
-                        if (CFG.nukerFilter && !passesFilter(state.getBlock())) continue;
+                        class_2680 state = mc.field_1687.method_8320(pos);
+                        if (state.method_26215() || state.method_26204() instanceof class_2404) continue;
+                        if (CFG.nukerFilter && !passesFilter(state.method_26204())) continue;
 
-                        Direction side = bestSide(mc, pos);
+                        class_2350 side = bestSide(mc, pos);
                         if (CFG.nukerRaycast && side == null) continue;
-                        if (side == null) side = Direction.UP;
+                        if (side == null) side = class_2350.field_11036;
                         out.add(new Target(pos, side));
                     }
                 }
@@ -659,7 +684,7 @@ public final class PeoClient implements ClientModInitializer {
             return out;
         }
 
-        private static boolean passesFilter(Block block) {
+        private static boolean passesFilter(class_2248 block) {
             Set<String> filter = new LinkedHashSet<>();
             String raw = CFG.nukerFilterIds == null ? "" : CFG.nukerFilterIds;
             for (String s : raw.split("[,\\n\\s]+")) {
@@ -670,19 +695,19 @@ public final class PeoClient implements ClientModInitializer {
                 }
             }
 
-            String blockId = Registries.BLOCK.getId(block).toString().toLowerCase(Locale.ROOT);
+            String blockId = class_7923.field_41175.method_10221(block).toString().toLowerCase(Locale.ROOT);
             if (filter.isEmpty()) return !CFG.nukerWhitelist;
             boolean contains = filter.contains(blockId);
             return CFG.nukerWhitelist ? contains : !contains;
         }
 
-        private static Comparator<Target> comparator(MinecraftClient mc) {
+        private static Comparator<Target> comparator(class_310 mc) {
             Comparator<Target> keepUnder = Comparator.comparing(
-                    t -> t.pos.equals(BlockPos.ofFloored(mc.player.getPos()).down()));
+                    t -> t.pos.equals(class_2338.method_49638(mc.field_1724.method_19538()).method_10074()));
             Comparator<Target> distance = Comparator.comparingDouble(
-                    t -> mc.player.getEyePos().distanceTo(Vec3d.ofCenter(t.pos)));
+                    t -> mc.field_1724.method_33571().method_1022(class_243.method_24953(t.pos)));
             Comparator<Target> hardness = Comparator.comparingDouble(
-                    t -> mc.world.getBlockState(t.pos).getHardness(mc.world, t.pos));
+                    t -> mc.field_1687.method_8320(t.pos).method_26214(mc.field_1687, t.pos));
             Comparator<Target> result = switch (CFG.nukerSort) {
                 case "Furthest" -> distance.reversed();
                 case "Softest" -> hardness;
@@ -692,52 +717,63 @@ public final class PeoClient implements ClientModInitializer {
             return keepUnder.thenComparing(result);
         }
 
-        private static Direction bestSide(MinecraftClient mc, BlockPos pos) {
-            Vec3d eye = mc.player.getEyePos();
-            Vec3d center = Vec3d.ofCenter(pos);
-            try {
-                BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
-                        eye, center,
-                        net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
-                        net.minecraft.world.RaycastContext.FluidHandling.NONE,
-                        mc.player));
-                if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
-                    return hit.getSide();
+        private static class_2350 bestSide(class_310 mc, class_2338 pos) {
+            // BleachHack-style face selection: try every face and raycast to a point
+            // on that face instead of raycasting only to the block center. This is
+            // especially important when mining from above/below or around corners.
+            class_243 eye = mc.field_1724.method_33571();
+            for (class_2350 side : class_2350.values()) {
+                class_2338 neighbour = pos.method_10093(side);
+                if (!mc.field_1687.method_8320(neighbour).method_26234(mc.field_1687, neighbour)) {
+                    class_243 face = class_243.method_24953(pos).method_1031(
+                            side.method_10148() * 0.49,
+                            side.method_10164() * 0.49,
+                            side.method_10165() * 0.49);
+                    try {
+                        class_3965 hit = mc.field_1687.method_17742(new net.minecraft.class_3959(
+                                eye, face,
+                                net.minecraft.class_3959.class_3960.field_17559,
+                                net.minecraft.class_3959.class_242.field_1348,
+                                mc.field_1724));
+                        if (hit.method_17783() == class_239.class_240.field_1332 && hit.method_17777().equals(pos)) {
+                            return side;
+                        }
+                    } catch (Throwable ignored) {
+                    }
                 }
-            } catch (Throwable ignored) {
             }
             if (CFG.nukerRaycast) return null;
-            Vec3d toPlayer = eye.subtract(center);
-            return Direction.getFacing(toPlayer.x, toPlayer.y, toPlayer.z);
+            class_243 toPlayer = eye.method_1020(class_243.method_24953(pos));
+            return class_2350.method_10142(toPlayer.field_1352, toPlayer.field_1351, toPlayer.field_1350);
         }
 
-        private static boolean rotateTo(MinecraftClient mc, BlockPos pos) {
-            Vec3d v = Vec3d.ofCenter(pos).subtract(mc.player.getEyePos());
-            double horizontal = Math.sqrt(v.x * v.x + v.z * v.z);
-            float yaw = (float) (Math.toDegrees(Math.atan2(v.z, v.x)) - 90.0);
-            float pitch = (float) -Math.toDegrees(Math.atan2(v.y, horizontal));
-            float yawDelta = MathHelper.wrapDegrees(yaw - mc.player.getYaw());
-            float pitchDelta = pitch - mc.player.getPitch();
+        private static boolean rotateTo(class_310 mc, class_2338 pos) {
+            class_243 v = class_243.method_24953(pos).method_1020(mc.field_1724.method_33571());
+            double horizontal = Math.sqrt(v.field_1352 * v.field_1352 + v.field_1350 * v.field_1350);
+            float yaw = (float) (Math.toDegrees(Math.atan2(v.field_1350, v.field_1352)) - 90.0);
+            float pitch = (float) -Math.toDegrees(Math.atan2(v.field_1351, horizontal));
+            float yawDelta = class_3532.method_15393(yaw - mc.field_1724.method_36454());
+            float pitchDelta = pitch - mc.field_1724.method_36455();
             boolean changed = Math.abs(yawDelta) > 2.0f || Math.abs(pitchDelta) > 2.0f;
-            mc.player.setYaw(yaw);
-            mc.player.setPitch(MathHelper.clamp(pitch, -90, 90));
+            mc.field_1724.method_36456(yaw);
+            mc.field_1724.method_36457(class_3532.method_15363(pitch, -90, 90));
             return changed;
         }
 
-        private record Target(BlockPos pos, Direction side) {}
+        private record Target(class_2338 pos, class_2350 side) {}
     }
 
     public static final class Hud {
         private Hud() {}
 
-        public static void render(net.minecraft.client.gui.DrawContext d) {
-            MinecraftClient mc = MinecraftClient.getInstance();
-            if (mc.player == null) return;
+        public static void render(net.minecraft.class_332 d) {
+            class_310 mc = class_310.method_1551();
+            if (mc.field_1724 == null) return;
 
             // Wurst-style compact HUD: logo at top-left, active modules directly underneath.
-            var title = Text.literal("PeoClient 1.21.4 V1")
-                    .styled(style -> style.withBold(true));
-            d.drawText(mc.textRenderer, title, 10, 8, 0xFFFFFFFF, false);
+            var title = class_2561.method_43470("PeoClient 1.21.4 V1")
+                    .method_27694(style -> style.method_10982(true));
+            d.method_51439(mc.field_1772, title, 10, 8, 0xFFFFFFFF, false);
 
             int y = 24;
             if (CFG.xray) y = active(d, mc, "X-Ray", y);
@@ -748,9 +784,9 @@ public final class PeoClient implements ClientModInitializer {
             if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
         }
 
-        private static int active(net.minecraft.client.gui.DrawContext d, MinecraftClient mc, String name, int y) {
-            d.drawText(mc.textRenderer,
-                    Text.literal(name).styled(style -> style.withBold(true)),
+        private static int active(net.minecraft.class_332 d, class_310 mc, String name, int y) {
+            d.method_51439(mc.field_1772,
+                    class_2561.method_43470(name).method_27694(style -> style.method_10982(true)),
                     10, y, 0xFFFFFFFF, false);
             return y + 14;
         }
