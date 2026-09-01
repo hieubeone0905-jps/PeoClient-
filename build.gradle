@@ -34,7 +34,7 @@ configurations {
 }
 
 dependencies {
-    peoIntermediaryMappings "net.fabricmc:intermediary:${project.minecraft_version}"
+    peoIntermediaryMappings "net.fabricmc:intermediary:${project.minecraft_version}:v2"
 }
 
 def identityMappingsJar = layout.buildDirectory.file("generated-mappings/intermediary-identity-${project.minecraft_version}.jar")
