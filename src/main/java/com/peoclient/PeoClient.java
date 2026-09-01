@@ -502,6 +502,15 @@ public final class PeoClient implements ClientModInitializer {
             if (mc.interactionManager == null || mc.player == null || mc.world == null
                     || mc.currentScreen != null) return;
 
+            // Cooperative mouse mode: vanilla owns the interaction manager while the
+            // attack key is physically held. This prevents Nuker and manual mining
+            // from opening competing breaking sessions. Nuker resumes automatically
+            // as soon as the mouse is released.
+            if (mc.options.attackKey.isPressed()) {
+                renderBlocks.clear();
+                return;
+            }
+
             renderBlocks.clear();
 
             // Recover only when the vanilla interaction manager no longer owns our
