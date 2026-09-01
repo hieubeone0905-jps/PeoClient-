@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.nuker.compat.NukerCompatibility;
+import com.peoclient.nuker.compat.NukerAreaLimiter;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -56,6 +57,7 @@ public final class PeoClient implements ClientModInitializer {
         nukerBypassKey = key("PeoClient Nuker Compatibility", GLFW.GLFW_KEY_B);
 
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
+        NukerAreaLimiter.registerRender();
         HudRenderCallback.EVENT.register((draw, delta) -> Hud.render(draw));
     }
 
@@ -125,6 +127,7 @@ public final class PeoClient implements ClientModInitializer {
 
         FullbrightLogic.tick(mc);
 
+        NukerAreaLimiter.tick(mc, CFG.nukerRangeHighlight, CFG.nukerRange);
         if (CFG.nuker) NukerCompatibility.tick(mc);
         if (CFG.cleaner) InventoryCleaner.tick(mc);
 
@@ -583,6 +586,7 @@ public final class PeoClient implements ClientModInitializer {
                 for (int y = -r; y <= r; y++) {
                     for (int z = -r; z <= r; z++) {
                         BlockPos pos = center.add(x, y, z);
+                        if (!NukerAreaLimiter.contains(pos)) continue;
                         if (CFG.nukerFlatten && pos.getY() < mc.player.getBlockY() - 1) continue;
 
                         double distance = "Cube".equalsIgnoreCase(CFG.nukerShape)
@@ -688,6 +692,8 @@ public final class PeoClient implements ClientModInitializer {
             if (CFG.xray) y = active(d, mc, "X-Ray", y);
             if (CFG.fullbright) y = active(d, mc, "Fullbright", y);
             if (CFG.nuker) y = active(d, mc, "Nuker [" + CFG.nukerMode + "]", y);
+            if (NukerCompatibility.isEnabled()) y = active(d, mc, "Nuker Compatibility", y);
+            if (NukerAreaLimiter.isLocked()) y = active(d, mc, CFG.nukerRangeHighlight ? "Nuker Area [VISIBLE]" : "Nuker Area [LOCKED]", y);
             if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
         }
 
