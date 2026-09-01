@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(class_526.class)
 public final class SelectWorldScreenMixin {
-    @Inject(method = "init", at = @At("TAIL"))
+    @Inject(method = "method_25426", at = @At("TAIL"))
     private void peo$addAccountButton(CallbackInfo ci) {
         class_526 screen = (class_526) (Object) this;
         var mc = net.minecraft.class_310.method_1551();

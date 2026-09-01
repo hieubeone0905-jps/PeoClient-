@@ -1,14 +1,19 @@
-# PeoClient 1.21.4 - Mapping Fix
+# PeoClient 1.21.4 mapping fix
 
-## Root cause found
-The project was resolving `net.fabricmc:intermediary:1.21.4` without the `v2` classifier. That artifact contains the older Tiny v1 mapping file with only `official` and `intermediary` namespaces. The custom generator in `build.gradle` expects Tiny v2 and therefore never added the `named` namespace, producing Loom's error `Could not find 'named' mapping position!`.
+Fixed for the custom Intermediary-identity `named` namespace used by this project.
 
-## Fix
-The intermediary dependency now explicitly uses the Fabric Tiny v2 artifact:
+Changes:
+- ParticleManager `addParticle` -> intermediary `method_3058`.
+- SimpleOption accessor `value` -> `field_37868`.
+- MinecraftClient accessor `networkProxy` -> `field_1739`.
+- Session accessor `username` -> `field_1982`.
+- Screen invoker `addDrawableChild` -> `method_37063`.
+- InventoryCleaner: removed invalid `net.minecraft.item.*` import.
+- BlockRenderManager injects -> `method_3355` / `method_3352`.
+- ChunkOcclusionDataBuilder -> `method_3682`.
+- ClientPlayNetworkHandler -> `method_11109`.
+- Title/Multiplayer/SelectWorld screen init -> `method_25426`.
+- Removed nonexistent `ClientPlayerInteractionManagerAccessor` from the mixin config.
 
-`net.fabricmc:intermediary:${project.minecraft_version}:v2`
-
-The existing identity `named` generation is retained so the current Java sources can continue using Intermediary names such as `class_*`, `method_*`, and `field_*`.
-
-## Scope
-Only the Gradle mapping dependency was changed. Nuker and other Java source files were not modified by this mapping fix.
+The Gradle command remains:
+`./gradlew clean build --no-daemon --stacktrace`

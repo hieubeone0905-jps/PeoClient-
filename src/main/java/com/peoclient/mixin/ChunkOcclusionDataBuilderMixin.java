@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /** Disables vanilla chunk occlusion while X-Ray is active, matching Wurst's approach. */
 @Mixin(class_852.class)
 public final class ChunkOcclusionDataBuilderMixin {
-    @Inject(method = "markClosed", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "method_3682", at = @At("HEAD"), cancellable = true)
     private void peo$xrayNoOcclusion(class_2338 pos, CallbackInfo ci) {
         if (PeoClient.CFG.xray) ci.cancel();
     }

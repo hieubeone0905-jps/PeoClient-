@@ -10,7 +10,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(class_634.class)
 public final class ClientPlayNetworkHandlerMixin {
-    @Inject(method = "onScreenHandlerSlotUpdate", at = @At("TAIL"))
+    @Inject(method = "method_11109", at = @At("TAIL"))
     private void peo$inventoryAck(class_2653 packet, CallbackInfo ci) {
         InventoryCleaner.onServerSlotUpdate(
                 packet.method_11452(), packet.method_11450(), packet.method_11449(), packet.method_37439());

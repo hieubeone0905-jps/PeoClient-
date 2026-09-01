@@ -28,7 +28,6 @@ import net.minecraft.class_7923;
 import net.minecraft.class_9239;
 import net.minecraft.class_9334;
 import net.minecraft.class_9362;
-import net.minecraft.item.*;
 import java.util.*;
 
 /**

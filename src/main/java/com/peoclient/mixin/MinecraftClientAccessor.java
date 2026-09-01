@@ -10,6 +10,6 @@ import net.minecraft.class_310;
 @Mixin(class_310.class)
 public interface MinecraftClientAccessor {
     @Mutable
-    @Accessor("networkProxy")
+    @Accessor("field_1739")
     void peo$setNetworkProxy(Proxy proxy);
 }

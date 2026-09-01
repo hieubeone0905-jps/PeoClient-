@@ -8,6 +8,6 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 @Mixin(class_320.class)
 public interface SessionAccessor {
     @Mutable
-    @Accessor("username")
+    @Accessor("field_1982")
     void peo$setUsername(String username);
 }

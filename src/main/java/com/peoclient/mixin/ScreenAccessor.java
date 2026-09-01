@@ -9,6 +9,6 @@ import org.spongepowered.asm.mixin.gen.Invoker;
 
 @Mixin(class_437.class)
 public interface ScreenAccessor {
-    @Invoker("addDrawableChild")
+    @Invoker("method_37063")
     <T extends class_364 & class_4068 & class_6379> T peo$addDrawableChild(T drawableElement);
 }

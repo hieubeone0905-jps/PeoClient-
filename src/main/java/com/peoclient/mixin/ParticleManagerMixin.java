@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(class_702.class)
 public final class ParticleManagerMixin {
-    @Inject(method = "addParticle(Lnet/minecraft/client/particle/Particle;)V", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "method_3058", at = @At("HEAD"), cancellable = true)
     private void peo$nukerNoParticles(class_703 particle, CallbackInfo ci) {
         if (PeoClient.CFG.nuker && PeoClient.CFG.nukerNoParticles && particle instanceof class_727)
             ci.cancel();

@@ -16,7 +16,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(class_776.class)
 public final class BlockRenderManagerMixin {
-    @Inject(method = "renderBlock", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "method_3355", at = @At("HEAD"), cancellable = true)
     private void peo$xray(class_2680 state, class_2338 pos, class_1920 world,
                           class_4587 matrices, class_4588 consumer, boolean cull,
                           class_5819 random, CallbackInfo ci) {
@@ -49,7 +49,7 @@ public final class BlockRenderManagerMixin {
         }
     }
 
-    @Inject(method = "renderFluid", at = @At("HEAD"), cancellable = true)
+    @Inject(method = "method_3352", at = @At("HEAD"), cancellable = true)
     private void peo$xrayFluid(class_2338 pos, class_1920 world, class_4588 consumer,
                                class_2680 blockState, class_3610 fluidState, CallbackInfo ci) {
         if (PeoClient.CFG.xray && !PeoClient.CFG.xrayFluids) ci.cancel();

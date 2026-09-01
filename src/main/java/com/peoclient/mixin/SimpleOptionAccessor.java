@@ -6,6 +6,6 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 
 @Mixin(class_7172.class)
 public interface SimpleOptionAccessor {
-    @Accessor("value")
+    @Accessor("field_37868")
     void peo$setValue(Object value);
 }
