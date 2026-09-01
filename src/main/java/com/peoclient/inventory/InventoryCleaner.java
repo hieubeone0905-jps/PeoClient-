@@ -53,39 +53,41 @@ public final class InventoryCleaner {
     public static void tick(class_310 mc) {
         if (mc.field_1724 == null || mc.field_1761 == null || mc.field_1755 != null) return;
 
-        if (pendingSlot >= 0) {
-            if (pendingServerAck || --pendingWait <= 0) {
-                pendingSlot = -1;
-                pendingScreenSlot = -1;
-                pendingWait = 0;
-                pendingServerAck = false;
-                pendingExpectedRevision = -1;
+        // Aggressive mode: perform several locally-predicted inventory actions in
+        // the same client tick. We deliberately cap the batch so the client does
+        // not flood the connection with an unbounded number of click packets.
+        final int maxActionsPerTick = 8;
+        int actions = 0;
+
+        while (actions < maxActionsPerTick) {
+            if (cooldown > 0) {
+                cooldown--;
+                break;
+            }
+
+            List<Entry> entries = snapshot(mc);
+            boolean acted = false;
+
+            if (PeoClient.CFG.cleanerFilterOnly && !PeoClient.CFG.cleanerDropFilter.isEmpty()) {
+                acted = disposeFilteredOne(mc, entries);
             } else {
-                return;
+                if (sortOffhand(mc, entries)) acted = true;
+                else if (sortHotbar(mc, entries)) acted = true;
+                else if (PeoClient.CFG.cleanerMergeStacks && mergeOne(mc, entries)) acted = true;
+                else if (disposeOne(mc, entries)) acted = true;
+            }
+
+            if (!acted) break;
+            actions++;
+
+            // The client-side ScreenHandler is updated immediately by clickSlot,
+            // so rebuilding the snapshot here lets the next action use the new
+            // local state rather than a stale inventory snapshot.
+            if (PeoClient.CFG.cleanerActionDelay > 0) {
+                cooldown = PeoClient.CFG.cleanerActionDelay;
+                break;
             }
         }
-
-        if (cooldown > 0) {
-            cooldown--;
-            return;
-        }
-
-        List<Entry> entries = snapshot(mc);
-
-        // Filter-only mode is deliberately isolated from the normal cleaner
-        // workflow: if the user has selected explicit items, those are the only
-        // stacks that may be dropped. This also makes the operation predictable
-        // for large inventories.
-        if (PeoClient.CFG.cleanerFilterOnly && !PeoClient.CFG.cleanerDropFilter.isEmpty()) {
-            if (disposeFilteredOne(mc, entries)) return;
-            return;
-        }
-
-        // LiquidBounce workflow: hotbar swaps -> stack merges -> disposal.
-        if (sortOffhand(mc, entries)) return;
-        if (sortHotbar(mc, entries)) return;
-        if (PeoClient.CFG.cleanerMergeStacks && mergeOne(mc, entries)) return;
-        if (disposeOne(mc, entries)) return;
     }
 
     private static List<Entry> snapshot(class_310 mc) {
@@ -323,12 +325,18 @@ public final class InventoryCleaner {
 
     private static void drop(class_310 mc, int playerSlot) {
         int screenSlot = playerInventoryScreenSlot(playerSlot);
-        pendingSlot = playerSlot;
-        pendingScreenSlot = screenSlot;
-        pendingWait = Math.max(1, PeoClient.CFG.cleanerAckTimeout);
-        pendingServerAck = false;
-        mc.field_1761.method_2906(mc.field_1724.field_7512.field_7763, screenSlot, 1,
-                class_1713.field_7795, mc.field_1724);
+
+        // THROW with button 1 drops the complete stack. Do not wait for a
+        // separate slot-update packet between every action: clickSlot performs
+        // the normal client-side prediction and queues the server click packet.
+        // The batch limit in tick() prevents an unbounded packet burst.
+        mc.field_1761.method_2906(
+                mc.field_1724.field_7512.field_7763,
+                screenSlot,
+                1,
+                class_1713.field_7795,
+                mc.field_1724
+        );
         afterAction(0);
     }
 
