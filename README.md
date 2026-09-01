@@ -80,3 +80,12 @@ A full build was attempted in the current environment, but Gradle 8.12.1 could n
 - Added `Peo Account` settings on the title, Multiplayer, and Singleplayer screens.
 - Username override is intended for offline/cracked or local use; authenticated online servers can reject a mismatched name.
 - Added optional random SOCKS proxy selection per client process. A real public IP change requires working proxies; the client cannot invent a public IP by itself.
+
+
+## Latest requested changes
+- InventoryCleaner: explicit item drop filter with searchable item picker, item icons, names, registry IDs and scrollbar.
+- Filter-only mode drops only selected items, one whole stack at a time, with server acknowledgement gating to avoid ghost-item desync.
+- X-Ray: Sky-only performance mode remains available; normal preset is upgraded to Minecraft ore blocks.
+- Nuker: Range slider/validation is now 0.0–15.0; no mining timing/power logic was intentionally changed.
+- Module keybinds: calls `KeyBinding.updateKeysByCode()` immediately after rebinding so the new key works without restarting.
+- AntiVipProMax: active-module display is tied directly to its enabled state so it appears immediately in the HUD/module list.

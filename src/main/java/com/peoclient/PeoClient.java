@@ -86,6 +86,9 @@ public final class PeoClient implements ClientModInitializer {
         class_304 key = MODULE_KEYS.get(module);
         if (key == null) return false;
         key.method_1422(class_3675.class_307.field_1668.method_1447(keyCode));
+        // Rebuild the static key-code lookup immediately. Without this call,
+        // Minecraft can keep the old binding until the next client restart.
+        class_304.method_1426();
         CFG.keybinds.put(module, keyCode);
         class_310.method_1551().field_1690.method_1640();
         CFG.save();
@@ -200,31 +203,18 @@ public final class PeoClient implements ClientModInitializer {
         public boolean xrayFluids = true;
         public int xrayBackgroundOpacity = 0;
 
+        public int xrayPresetVersion = 0;
         public Set<String> xrayBlocks = new LinkedHashSet<>(Arrays.asList(
-                "minecraft:amethyst_cluster", "minecraft:ancient_debris", "minecraft:anvil",
-                "minecraft:beacon", "minecraft:bone_block", "minecraft:bookshelf",
-                "minecraft:brewing_stand", "minecraft:budding_amethyst", "minecraft:chain_command_block",
-                "minecraft:chest", "minecraft:coal_block", "minecraft:coal_ore", "minecraft:command_block",
-                "minecraft:copper_ore", "minecraft:crafter", "minecraft:crafting_table",
-                "minecraft:creaking_heart", "minecraft:decorated_pot", "minecraft:deepslate_coal_ore",
-                "minecraft:deepslate_copper_ore", "minecraft:deepslate_diamond_ore",
-                "minecraft:deepslate_emerald_ore", "minecraft:deepslate_gold_ore",
-                "minecraft:deepslate_iron_ore", "minecraft:deepslate_lapis_ore",
-                "minecraft:deepslate_redstone_ore", "minecraft:diamond_block", "minecraft:diamond_ore",
-                "minecraft:dispenser", "minecraft:dropper", "minecraft:emerald_block",
-                "minecraft:emerald_ore", "minecraft:enchanting_table", "minecraft:end_portal",
-                "minecraft:end_portal_frame", "minecraft:ender_chest", "minecraft:furnace",
-                "minecraft:glowstone", "minecraft:gold_block", "minecraft:gold_ore", "minecraft:hopper",
-                "minecraft:iron_block", "minecraft:iron_ore", "minecraft:ladder", "minecraft:lapis_block",
-                "minecraft:lapis_ore", "minecraft:lava", "minecraft:lodestone",
-                "minecraft:mossy_cobblestone", "minecraft:nether_gold_ore", "minecraft:nether_portal",
-                "minecraft:nether_quartz_ore", "minecraft:raw_copper_block", "minecraft:raw_gold_block",
-                "minecraft:raw_iron_block", "minecraft:redstone_block", "minecraft:redstone_ore",
-                "minecraft:repeating_command_block", "minecraft:sculk_catalyst", "minecraft:sculk_sensor",
-                "minecraft:sculk_shrieker", "minecraft:spawner", "minecraft:suspicious_gravel",
-                "minecraft:suspicious_sand", "minecraft:tnt", "minecraft:torch",
-                "minecraft:trapped_chest", "minecraft:trial_spawner", "minecraft:vault",
-                "minecraft:wall_torch", "minecraft:water"
+                "minecraft:coal_ore", "minecraft:deepslate_coal_ore",
+                "minecraft:copper_ore", "minecraft:deepslate_copper_ore",
+                "minecraft:iron_ore", "minecraft:deepslate_iron_ore",
+                "minecraft:gold_ore", "minecraft:deepslate_gold_ore",
+                "minecraft:redstone_ore", "minecraft:deepslate_redstone_ore",
+                "minecraft:lapis_ore", "minecraft:deepslate_lapis_ore",
+                "minecraft:diamond_ore", "minecraft:deepslate_diamond_ore",
+                "minecraft:emerald_ore", "minecraft:deepslate_emerald_ore",
+                "minecraft:nether_quartz_ore", "minecraft:nether_gold_ore",
+                "minecraft:ancient_debris"
         ));
 
         // BleachHack-inspired Nuker settings.
@@ -258,8 +248,13 @@ public final class PeoClient implements ClientModInitializer {
         public boolean cleanerGreedy = true;
         public boolean cleanerMergeStacks = true;
         public boolean cleanerTouchHotbar = false;
+        /** When enabled, only items in cleanerDropFilter are discarded. */
+        public boolean cleanerFilterOnly = false;
+        public Set<String> cleanerDropFilter = new LinkedHashSet<>();
         public int cleanerActionDelay = 0;
-        public int cleanerAckTimeout = 4;
+        // Keep at least a small server acknowledgement window so fast disposal
+        // does not outrun the server and create client/server ghost items.
+        public int cleanerAckTimeout = 2;
         /** Conservative client-side pacing; does not spoof packets or bypass server validation. */
         public boolean nukerCompatibilitySafeMode = true;
         public int nukerCompatibilityActionsPerTick = 1;
@@ -291,6 +286,14 @@ public final class PeoClient implements ClientModInitializer {
 
                 // Copy nullable collections/arrays safely so old configs remain usable.
                 xrayBlocks = c.xrayBlocks != null ? c.xrayBlocks : xrayBlocks;
+                // Existing configs from v1 used a broad Wurst-style block list.
+                // Upgrade that list once to the requested all-ores preset.
+                if (c.xrayPresetVersion < 2) {
+                    xrayBlocks = defaultOreBlocks();
+                    xrayPresetVersion = 2;
+                } else {
+                    xrayPresetVersion = c.xrayPresetVersion;
+                }
                 cleanerBlacklistSet = c.cleanerBlacklistSet != null
                         ? c.cleanerBlacklistSet : cleanerBlacklistSet;
                 slotItems = c.slotItems != null ? c.slotItems : slotItems;
@@ -329,6 +332,9 @@ public final class PeoClient implements ClientModInitializer {
                 cleanerGreedy = c.cleanerGreedy;
                 cleanerMergeStacks = c.cleanerMergeStacks;
                 cleanerTouchHotbar = c.cleanerTouchHotbar;
+                cleanerFilterOnly = c.cleanerFilterOnly;
+                cleanerDropFilter = c.cleanerDropFilter != null
+                        ? new LinkedHashSet<>(c.cleanerDropFilter) : new LinkedHashSet<>();
                 cleanerActionDelay = c.cleanerActionDelay;
                 cleanerAckTimeout = c.cleanerAckTimeout;
                 nukerCompatibilitySafeMode = c.nukerCompatibilitySafeMode;
@@ -357,8 +363,26 @@ public final class PeoClient implements ClientModInitializer {
                 if (savedAccounts == null) savedAccounts = new ArrayList<>();
                 savedAccounts.removeIf(v -> v == null || v.isBlank());
                 if (savedAccounts.size() > 20) savedAccounts = new ArrayList<>(savedAccounts.subList(0, 20));
+                if (cleanerDropFilter == null) cleanerDropFilter = new LinkedHashSet<>();
+                if (cleanerAckTimeout < 2) cleanerAckTimeout = 2;
+                if (xrayBlocks == null || xrayBlocks.isEmpty()) xrayBlocks = defaultOreBlocks();
             } catch (Exception ignored) {
             }
+        }
+
+        private static Set<String> defaultOreBlocks() {
+            return new LinkedHashSet<>(Arrays.asList(
+                    "minecraft:coal_ore", "minecraft:deepslate_coal_ore",
+                    "minecraft:copper_ore", "minecraft:deepslate_copper_ore",
+                    "minecraft:iron_ore", "minecraft:deepslate_iron_ore",
+                    "minecraft:gold_ore", "minecraft:deepslate_gold_ore",
+                    "minecraft:redstone_ore", "minecraft:deepslate_redstone_ore",
+                    "minecraft:lapis_ore", "minecraft:deepslate_lapis_ore",
+                    "minecraft:diamond_ore", "minecraft:deepslate_diamond_ore",
+                    "minecraft:emerald_ore", "minecraft:deepslate_emerald_ore",
+                    "minecraft:nether_quartz_ore", "minecraft:nether_gold_ore",
+                    "minecraft:ancient_debris"
+            ));
         }
 
         public void save() {
@@ -675,11 +699,11 @@ public final class PeoClient implements ClientModInitializer {
             if (CFG.nukerFilter && !passesFilter(state.method_26204())) return false;
             if (CFG.nukerRaycast && target.side == null) return false;
             return mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos))
-                    <= class_3532.method_15350(CFG.nukerRange, 1.0, 6.0) + 0.25;
+                    <= class_3532.method_15350(CFG.nukerRange, 0.0, 15.0) + 0.25;
         }
 
         private static List<Target> collect(class_310 mc) {
-            double range = class_3532.method_15350(CFG.nukerRange, 1.0, 6.0);
+            double range = class_3532.method_15350(CFG.nukerRange, 0.0, 15.0);
             int r = class_3532.method_15384(range);
             class_2338 center = class_2338.method_49638(mc.field_1724.method_33571());
             List<Target> out = new ArrayList<>();
@@ -808,7 +832,7 @@ public final class PeoClient implements ClientModInitializer {
             if (NukerCompatibility.isEnabled()) y = active(d, mc, "Nuker Compatibility", y);
             if (NukerAreaLimiter.isLocked()) y = active(d, mc, CFG.nukerRangeHighlight ? "Nuker Area [VISIBLE]" : "Nuker Area [LOCKED]", y);
             if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
-            if (CFG.antiVipProMax) y = active(d, mc, "AntiVipProMax [" + AntiVipProMaxModule.getStatus() + "]", y);
+            if (AntiVipProMaxModule.isEnabled()) y = active(d, mc, "AntiVipProMax", y);
         }
 
         private static int active(net.minecraft.class_332 d, class_310 mc, String name, int y) {

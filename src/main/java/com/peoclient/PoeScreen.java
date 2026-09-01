@@ -211,7 +211,7 @@ public final class PoeScreen extends class_437 {
         y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 0, 10, "%.0f blocks");
         y = sliderRow(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown, 0, 20, "%.0f ticks");
         y = rowValue(d, x, y, w, "Shape", PeoClient.CFG.nukerShape);
-        y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 0.1, 6.0, "%.1f");
+        y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 0.0, 15.0, "%.1f");
         y = rowValue(d, x, y, w, "Sort", PeoClient.CFG.nukerSort);
 
         y = section(d, x, y, "Filter");
@@ -292,6 +292,14 @@ public final class PoeScreen extends class_437 {
         y = rowValue(d, x, y, w, "MaximumLavaBuckets", String.valueOf(PeoClient.CFG.maxLavaBuckets));
         y = rowValue(d, x, y, w, "MaximumMilkBuckets", String.valueOf(PeoClient.CFG.maxMilkBuckets));
         y = rowValue(d, x, y, w, "ItemsBlacklist", shortList(PeoClient.CFG.itemsBlacklist));
+
+        y = section(d, x, y, "Drop filter");
+        y = rowValue(d, x, y, w, "Edit items", PeoClient.CFG.cleanerDropFilter.size() + " items selected");
+        y = rowToggle(d, x, y, w, "Filtered items only", PeoClient.CFG.cleanerFilterOnly);
+        y = rowValue(d, x, y, w, "Drop mode", PeoClient.CFG.cleanerFilterOnly
+                ? "Only selected items" : "Normal cleaner");
+
+        y = section(d, x, y, "General cleaner");
         y = rowToggle(d, x, y, w, "Greedy", PeoClient.CFG.cleanerGreedy);
 
         y = section(d, x, y, "Offhand");
@@ -592,7 +600,7 @@ public final class PoeScreen extends class_437 {
         if (hit(my, p)) { PeoClient.CFG.nukerShape = cycle(PeoClient.CFG.nukerShape, "Cube", "Sphere"); save(); return; } p += 34;
 
         if (hit(my, p)) {
-            PeoClient.CFG.nukerRange = roundSlider(sliderValue(mx, x, w, 0.1, 6.0, "Range"), 0.1, 6.0, 0.1);
+            PeoClient.CFG.nukerRange = roundSlider(sliderValue(mx, x, w, 0.0, 15.0, "Range"), 0.0, 15.0, 0.1);
             save(); return;
         } p += 34;
 
@@ -645,7 +653,12 @@ public final class PoeScreen extends class_437 {
             if (hit(my, p)) { int nv = maximums[i] >= maxs[i] ? mins[i] : Math.min(maxs[i], maximums[i] + (i < 4 ? 32 : 1)); setCleanerMax(i, nv); save(); return; }
             p += 34;
         }
-        if (hit(my, p)) { PeoClient.CFG.itemsBlacklist = cycleList(PeoClient.CFG.itemsBlacklist, "", "minecraft:dirt", "minecraft:dirt,minecraft:cobblestone"); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.itemsBlacklist = cycleList(PeoClient.CFG.itemsBlacklist, "", "minecraft:dirt", "minecraft:dirt,minecraft:cobblestone"); save(); return; } p += 60;
+
+        if (hit(my, p)) { field_22787.method_1507(new CleanerItemPickerScreen(this)); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.cleanerFilterOnly = !PeoClient.CFG.cleanerFilterOnly; save(); return; } p += 34;
+        p += 60; // Drop mode row + next section header
+
         if (hit(my, p)) { PeoClient.CFG.cleanerGreedy = !PeoClient.CFG.cleanerGreedy; save(); return; } p += 60;
 
         if (hit(my, p)) { PeoClient.CFG.offHandItem = cycle(PeoClient.CFG.offHandItem, "SWORD", "WEAPON", "SPEAR", "MACE", "BOW", "CROSSBOW", "AXE", "PICKAXE", "SHOVEL", "HOE", "ROD", "SHIELD", "WATER", "LAVA", "MILK", "PEARL", "GAPPLE", "FOOD", "POTION", "BLOCK", "THROWABLES", "IGNORE", "NONE"); save(); return; } p += 60;
@@ -747,7 +760,7 @@ public final class PoeScreen extends class_437 {
             } else if ("NukerCooldown".equals(draggingSlider)) {
                 PeoClient.CFG.nukerCooldown = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 20, "Cooldown"));
             } else if ("NukerRange".equals(draggingSlider)) {
-                PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 6.0, "Range"), 0.1, 6.0, 0.1);
+                PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 0.0, 15.0, "Range"), 0.0, 15.0, 0.1);
             } else if ("NukerWidth".equals(draggingSlider)) {
                 PeoClient.CFG.nukerRangeWidth = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 10.0, "Width"), 0.1, 10.0, 0.1);
             }
@@ -813,7 +826,7 @@ public final class PoeScreen extends class_437 {
     private int settingsContentHeight() {
         return switch (selected) {
             case "Nuker [Multi]" -> 1240;
-            case "InventoryCleaner" -> 900;
+            case "InventoryCleaner" -> 1060;
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;
             case "AntiVipProMax" -> 300;
@@ -840,6 +853,208 @@ public final class PoeScreen extends class_437 {
         }
         return super.method_25404(keyCode, scanCode, modifiers);
     }
+    /** Item-only picker for InventoryCleaner's explicit drop filter. */
+    private static final class CleanerItemPickerScreen extends class_437 {
+        private final PoeScreen parent;
+        private class_342 search;
+        private double scroll;
+        private boolean draggingScrollbar;
+        private double dragOffset;
+
+        CleanerItemPickerScreen(PoeScreen parent) {
+            super(class_2561.method_43470("InventoryCleaner - Drop Filter"));
+            this.parent = parent;
+        }
+
+        @Override
+        protected void method_25426() {
+            int w = Math.min(560, field_22789 - 40);
+            search = new class_342(field_22793, field_22789 / 2 - w / 2, 34, w, 22,
+                    class_2561.method_43470("Search items"));
+            search.method_1880(96);
+            search.method_47404(class_2561.method_43470("Type item name or minecraft:id..."));
+            method_37063(search);
+        }
+
+        private List<ItemEntry> matches() {
+            String q = search == null ? "" : search.method_1882().trim().toLowerCase(Locale.ROOT);
+            List<ItemEntry> out = new ArrayList<>();
+            for (class_2960 id : class_7923.field_41178.method_10235()) {
+                class_1792 item = class_7923.field_41178.method_63535(id);
+                if (item == null) continue;
+                class_1799 stack = item.method_7854();
+                String name = stack.method_7964().getString();
+                String key = id.toString();
+                if (q.isBlank() || name.toLowerCase(Locale.ROOT).contains(q) || key.contains(q)) {
+                    out.add(new ItemEntry(id, name, stack));
+                }
+            }
+            out.sort((a, b) -> {
+                String aa = (a.name + " " + a.id).toLowerCase(Locale.ROOT);
+                String bb = (b.name + " " + b.id).toLowerCase(Locale.ROOT);
+                boolean ap = !q.isBlank() && aa.startsWith(q);
+                boolean bp = !q.isBlank() && bb.startsWith(q);
+                if (ap != bp) return ap ? -1 : 1;
+                return a.name.compareToIgnoreCase(b.name);
+            });
+            return out;
+        }
+
+        private Set<String> selected() {
+            return PeoClient.CFG.cleanerDropFilter == null
+                    ? new LinkedHashSet<>() : new LinkedHashSet<>(PeoClient.CFG.cleanerDropFilter);
+        }
+
+        private void save(Set<String> selected) {
+            PeoClient.CFG.cleanerDropFilter = new LinkedHashSet<>(selected);
+            PeoClient.CFG.save();
+        }
+
+        @Override
+        public void method_25394(class_332 d, int mouseX, int mouseY, float delta) {
+            method_25420(d, mouseX, mouseY, delta);
+            int left = Math.max(24, field_22789 / 2 - 290);
+            int right = Math.min(field_22789 - 24, field_22789 / 2 + 290);
+            int top = 72;
+            int bottom = field_22790 - 34;
+
+            d.method_25294(left - 8, top - 8, right + 8, bottom + 8, 0xEE0D151D);
+            d.method_49601(left - 8, top - 8, right - left + 16, bottom - top + 16, 0xFF2A4154);
+            d.method_51439(field_22793,
+                    class_2561.method_43470("InventoryCleaner • Drop Filter")
+                            .method_27694(st -> st.method_10982(true)),
+                    left, 12, 0xFFFFFFFF, false);
+            d.method_51439(field_22793,
+                    class_2561.method_43470("Click an item to add/remove it from the filter."),
+                    left, 80, 0xFF9CA8B1, false);
+            d.method_51439(field_22793,
+                    class_2561.method_43470("Selected: " + selected().size()),
+                    right - 110, 80, 0xFFFFFFFF, false);
+
+            List<ItemEntry> entries = matches();
+            int rowH = 38;
+            int viewportH = bottom - top;
+            int contentH = Math.max(viewportH, entries.size() * rowH + 18);
+            int maxScroll = Math.max(0, contentH - viewportH);
+            scroll = class_3532.method_15350(scroll, 0, maxScroll);
+
+            d.method_44379(left, top, right - 8, bottom);
+            int y = top + 18 - (int) scroll;
+            Set<String> selected = selected();
+            for (ItemEntry e : entries) {
+                if (y + rowH >= top && y <= bottom) {
+                    boolean on = selected.contains(e.id.toString());
+                    d.method_25294(left + 2, y, right - 18, y + rowH - 4,
+                            on ? 0xFF1D3C4D : 0x9A121C24);
+                    if (on) d.method_49601(left + 2, y, 3, rowH - 4, 0xFFFFFFFF);
+                    d.method_51427(e.stack, left + 10, y + 7);
+                    drawText(d, fitText(e.name, 280), left + 48, y + 5, 0xFFFFFFFF, false);
+                    drawText(d, e.id.toString(), left + 48, y + 20, 0xFF8E9AA3, false);
+                    drawText(d, on ? "ADDED" : "ADD", right - 72, y + 12, 0xFFFFFFFF, true);
+                }
+                y += rowH;
+            }
+            d.method_44380();
+
+            if (contentH > viewportH) {
+                int trackH = viewportH;
+                int thumbH = Math.max(28, (int) Math.round(viewportH * (viewportH / (double) contentH)));
+                int travel = Math.max(1, trackH - thumbH);
+                int thumbY = top + (maxScroll == 0 ? 0
+                        : (int) Math.round((scroll / maxScroll) * travel));
+                d.method_25294(right - 8, top, right, bottom, 0x401A252E);
+                d.method_25294(right - 8, thumbY, right, thumbY + thumbH, 0xFF6C7D89);
+            }
+
+            drawText(d, "ESC: back", left, field_22790 - 18, 0xFF73808B, false);
+        }
+
+        @Override
+        public boolean method_25402(double mouseX, double mouseY, int button) {
+            if (button != 0) return super.method_25402(mouseX, mouseY, button);
+            int left = Math.max(24, field_22789 / 2 - 290);
+            int right = Math.min(field_22789 - 24, field_22789 / 2 + 290);
+            int top = 72;
+            int bottom = field_22790 - 34;
+            int viewportH = bottom - top;
+            List<ItemEntry> entries = matches();
+            int contentH = Math.max(viewportH, entries.size() * 38 + 18);
+
+            if (mouseX >= right - 10 && mouseX <= right && mouseY >= top && mouseY <= bottom
+                    && contentH > viewportH) {
+                int thumbH = Math.max(28, (int) Math.round(viewportH * (viewportH / (double) contentH)));
+                int travel = Math.max(1, viewportH - thumbH);
+                int maxScroll = Math.max(0, contentH - viewportH);
+                int thumbY = top + (maxScroll == 0 ? 0 : (int) Math.round((scroll / maxScroll) * travel));
+                if (mouseY >= thumbY && mouseY <= thumbY + thumbH) {
+                    draggingScrollbar = true;
+                    dragOffset = mouseY - thumbY;
+                    return true;
+                }
+            }
+
+            if (mouseX < left || mouseX > right - 12 || mouseY < top || mouseY > bottom) return true;
+            int y = top + 18 - (int) scroll;
+            Set<String> set = selected();
+            for (ItemEntry e : entries) {
+                if (mouseY >= y && mouseY < y + 34) {
+                    String id = e.id.toString();
+                    if (!set.add(id)) set.remove(id);
+                    save(set);
+                    return true;
+                }
+                y += 38;
+                if (y > bottom + 38) break;
+            }
+            return true;
+        }
+
+        @Override
+        public boolean method_25401(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
+            int top = 72;
+            int bottom = field_22790 - 34;
+            int viewportH = bottom - top;
+            int max = Math.max(0, matches().size() * 38 + 18 - viewportH);
+            scroll = class_3532.method_15350(scroll - verticalAmount * 38, 0, max);
+            return true;
+        }
+
+        @Override
+        public boolean method_25403(double mouseX, double mouseY, int button, double deltaX, double deltaY) {
+            if (button == 0 && draggingScrollbar) {
+                int top = 72;
+                int bottom = field_22790 - 34;
+                int viewportH = bottom - top;
+                int contentH = Math.max(viewportH, matches().size() * 38 + 18);
+                int thumbH = Math.max(28, (int) Math.round(viewportH * (viewportH / (double) contentH)));
+                int travel = Math.max(1, viewportH - thumbH);
+                int maxScroll = Math.max(0, contentH - viewportH);
+                int desired = (int) (mouseY - dragOffset - top);
+                int rel = class_3532.method_15340(desired, 0, travel);
+                scroll = maxScroll == 0 ? 0 : (rel / (double) travel) * maxScroll;
+                return true;
+            }
+            return super.method_25403(mouseX, mouseY, button, deltaX, deltaY);
+        }
+
+        @Override
+        public boolean method_25406(double mouseX, double mouseY, int button) {
+            if (button == 0) draggingScrollbar = false;
+            return super.method_25406(mouseX, mouseY, button);
+        }
+
+        @Override
+        public boolean method_25404(int keyCode, int scanCode, int modifiers) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
+                field_22787.method_1507(parent);
+                return true;
+            }
+            return super.method_25404(keyCode, scanCode, modifiers);
+        }
+
+        private record ItemEntry(class_2960 id, String name, class_1799 stack) {}
+    }
+
     /** Dedicated item/block picker for Nuker Filter. Search by translated item name or registry id,
      * show the actual item icon, and toggle block ids without requiring manual id entry. */
     private static final class BlockPickerScreen extends class_437 {

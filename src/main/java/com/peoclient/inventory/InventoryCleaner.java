@@ -72,6 +72,15 @@ public final class InventoryCleaner {
 
         List<Entry> entries = snapshot(mc);
 
+        // Filter-only mode is deliberately isolated from the normal cleaner
+        // workflow: if the user has selected explicit items, those are the only
+        // stacks that may be dropped. This also makes the operation predictable
+        // for large inventories.
+        if (PeoClient.CFG.cleanerFilterOnly && !PeoClient.CFG.cleanerDropFilter.isEmpty()) {
+            if (disposeFilteredOne(mc, entries)) return;
+            return;
+        }
+
         // LiquidBounce workflow: hotbar swaps -> stack merges -> disposal.
         if (sortOffhand(mc, entries)) return;
         if (sortHotbar(mc, entries)) return;
@@ -173,6 +182,27 @@ public final class InventoryCleaner {
             }
         }
         return false;
+    }
+
+    private static boolean disposeFilteredOne(class_310 mc, List<Entry> entries) {
+        Entry target = entries.stream()
+                .filter(e -> isDropFiltered(e.stack))
+                .filter(e -> !e.stack.method_7960())
+                .min(Comparator.comparingInt(Entry::slot))
+                .orElse(null);
+        if (target == null) return false;
+
+        // Drop the whole matching stack in one THROW action. The existing
+        // acknowledgement gate then waits for the server's slot update before
+        // touching another slot, which is the important part for avoiding
+        // client-side ghost items.
+        drop(mc, target.slot);
+        return true;
+    }
+
+    private static boolean isDropFiltered(class_1799 stack) {
+        if (PeoClient.CFG.cleanerDropFilter == null || PeoClient.CFG.cleanerDropFilter.isEmpty()) return false;
+        return PeoClient.CFG.cleanerDropFilter.contains(id(stack));
     }
 
     private static boolean disposeOne(class_310 mc, List<Entry> entries) {
