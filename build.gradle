@@ -1,31 +1,124 @@
-
 plugins {
     id 'fabric-loom' version '1.10.5'
     id 'maven-publish'
 }
+
 version = project.mod_version
 group = project.maven_group
 base { archivesName = project.archives_base_name }
+
 repositories {
     maven { url = "https://maven.fabricmc.net/" }
     mavenCentral()
 }
+
+/*
+ * PeoClient's Java sources intentionally use Fabric Intermediary names
+ * (net.minecraft.class_*, method_*, field_*).
+ *
+ * Fabric Loom normally expects a mapping set with a `named` namespace.
+ * Feeding the raw Intermediary artifact directly therefore fails during
+ * Loom configuration with:
+ *   Could not find 'named' mapping position!
+ *
+ * Generate a tiny-v2 mapping jar whose namespaces are:
+ *   official -> intermediary -> named
+ * and make `named` an identity copy of `intermediary`.
+ *
+ * This keeps the existing source untouched and lets Loom compile it in the
+ * same namespace it was written in. The resulting mod is still remapped to
+ * Intermediary for Fabric runtime as usual.
+ */
+configurations {
+    peoIntermediaryMappings
+}
+
+dependencies {
+    peoIntermediaryMappings "net.fabricmc:intermediary:${project.minecraft_version}"
+}
+
+def identityMappingsJar = layout.buildDirectory.file("generated-mappings/intermediary-identity-${project.minecraft_version}.jar")
+
+def ensureIdentityMappings = {
+    File output = identityMappingsJar.get().asFile
+    if (output.exists()) return output
+
+    File intermediaryJar = configurations.peoIntermediaryMappings.singleFile
+    def entries = zipTree(intermediaryJar).matching { include "mappings/mappings.tiny" }.files
+    if (entries.size() != 1) {
+        throw new GradleException("Expected exactly one mappings/mappings.tiny in ${intermediaryJar.name}, found ${entries.size()}")
+    }
+
+    String source = entries.iterator().next().getText("UTF-8")
+    StringBuilder out = new StringBuilder(source.length() + 1024)
+    String[] lines = source.split("\\r?\\n", -1)
+
+    for (String line : lines) {
+        if (line.startsWith("tiny\t2\t0\tofficial\tintermediary")) {
+            out.append(line).append("\tnamed\n")
+            continue
+        }
+
+        if (line.startsWith("c\t") || line.startsWith("\tf\t") || line.startsWith("\tm\t")) {
+            String[] p = line.split("\t", -1)
+            // Tiny v2 class: c <official> <intermediary>
+            // Tiny v2 field/method: <type> <desc> <official> <intermediary>
+            if (line.startsWith("c\t") && p.length >= 3) {
+                out.append(line).append("\t").append(p[2]).append("\n")
+                continue
+            }
+            if ((line.startsWith("\tf\t") || line.startsWith("\tm\t")) && p.length >= 5) {
+                out.append(line).append("\t").append(p[4]).append("\n")
+                continue
+            }
+        }
+
+        // Parameters/local-variable mappings are not needed by PeoClient's
+        // source, so omit them rather than creating a partially populated
+        // third namespace entry.
+        if (line.startsWith("\t\tp\t") || line.startsWith("\t\tv\t")) {
+            continue
+        }
+
+        // Preserve other Tiny v2 properties/comments.
+        out.append(line).append("\n")
+    }
+
+    output.parentFile.mkdirs()
+    File tmpTiny = new File(output.parentFile, "mappings.tiny")
+    tmpTiny.setText(out.toString(), "UTF-8")
+
+    ant.jar(destfile: output) {
+        zipfileset(file: tmpTiny, fullpath: "mappings/mappings.tiny")
+    }
+    tmpTiny.delete()
+    return output
+}
+
+// Resolve the small Intermediary artifact during configuration, generate the
+// synthetic named namespace, and give that mapping jar to Loom.
+File mappingJar = ensureIdentityMappings()
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings "net.fabricmc:intermediary:${project.minecraft_version}"
+    mappings files(mappingJar)
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 }
+
 processResources {
     inputs.property "version", project.version
     filesMatching("fabric.mod.json") { expand "version": project.version }
 }
+
 tasks.withType(JavaCompile).configureEach { it.options.release = 21 }
+
 java {
     withSourcesJar()
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
 }
+
 jar {
     from("LICENSE") { rename { "${it}_${project.base.archivesName.get()}" } }
 }
