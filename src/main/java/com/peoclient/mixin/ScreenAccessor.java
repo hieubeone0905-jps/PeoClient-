@@ -7,7 +7,7 @@ import net.minecraft.class_6379;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(class_437.class)
+@Mixin(targets = "net.minecraft.client.gui.screen.Screen")
 public interface ScreenAccessor {
     @Invoker("addDrawableChild")
     <T extends class_364 & class_4068 & class_6379> T peo$addDrawableChild(T drawableElement);

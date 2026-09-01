@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(class_702.class)
+@Mixin(targets = "net.minecraft.client.particle.ParticleManager")
 public final class ParticleManagerMixin {
     @Inject(method = "addParticle(Lnet/minecraft/client/particle/Particle;)V", at = @At("HEAD"), cancellable = true)
     private void peo$nukerNoParticles(class_703 particle, CallbackInfo ci) {

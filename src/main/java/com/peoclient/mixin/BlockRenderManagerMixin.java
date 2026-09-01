@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(class_776.class)
+@Mixin(targets = "net.minecraft.client.render.block.BlockRenderManager")
 public final class BlockRenderManagerMixin {
     @Inject(method = "renderBlock", at = @At("HEAD"), cancellable = true)
     private void peo$xray(class_2680 state, class_2338 pos, class_1920 world,

@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import java.net.Proxy;
 import net.minecraft.class_310;
 
-@Mixin(class_310.class)
+@Mixin(targets = "net.minecraft.client.MinecraftClient")
 public interface MinecraftClientAccessor {
     @Mutable
     @Accessor("networkProxy")

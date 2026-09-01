@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Disables vanilla chunk occlusion while X-Ray is active, matching Wurst's approach. */
-@Mixin(class_852.class)
+@Mixin(targets = "net.minecraft.client.render.chunk.ChunkOcclusionDataBuilder")
 public final class ChunkOcclusionDataBuilderMixin {
     @Inject(method = "markClosed", at = @At("HEAD"), cancellable = true)
     private void peo$xrayNoOcclusion(class_2338 pos, CallbackInfo ci) {
