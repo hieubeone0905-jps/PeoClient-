@@ -115,7 +115,10 @@ public final class PeoClient implements ClientModInitializer {
         for (Map.Entry<String, KeyBinding> entry : MODULE_KEYS.entrySet()) {
             while (entry.getValue().wasPressed()) toggleModuleByName(entry.getKey(), mc);
         }
-        while (nukerBypassKey.wasPressed()) NukerCompatibility.toggle();
+        while (nukerBypassKey.wasPressed()) {
+            NukerCompatibility.toggle();
+            if (mc.player != null) mc.player.sendMessage(Text.literal("Nuker Compatibility: " + (NukerCompatibility.isEnabled() ? "ON" : "OFF")), true);
+        }
 
         if (mc.player == null || mc.world == null) {
             if (++saveTick >= 100) {
@@ -507,7 +510,8 @@ public final class PeoClient implements ClientModInitializer {
                 queue.subList(1, queue.size()).clear();
             }
 
-            while (!queue.isEmpty()) {
+            int processed = 0;
+            while (!queue.isEmpty() && processed < batch) {
                 Target target = queue.get(0);
                 if (!isValidTarget(mc, target)) {
                     queue.remove(0);
@@ -521,48 +525,68 @@ public final class PeoClient implements ClientModInitializer {
                     continue;
                 }
 
-                if (CFG.nukerRotate && rotateTo(mc, target.pos)) {
-                    cooldown = 1;
-                    renderBlocks.add(target.pos);
-                    return;
+                if (CFG.nukerRotate) {
+                    rotateTo(mc, target.pos);
                 }
 
-                boolean newTarget = breakingPos == null || !breakingPos.equals(target.pos)
-                        || breakingSide != target.side;
-                if (newTarget) {
-                    if (breakingPos != null) mc.interactionManager.cancelBlockBreaking();
+                // Use the normal interaction manager for each target. We keep one
+                // active vanilla breaking state and refresh it for the current target.
+                if (breakingPos != null && !breakingPos.equals(target.pos)) {
+                    mc.interactionManager.cancelBlockBreaking();
+                    breakingPos = null;
+                    breakingSide = null;
+                }
+
+                if (breakingPos == null) {
                     if (!mc.interactionManager.attackBlock(target.pos, target.side)) {
                         queue.remove(0);
-                        breakingPos = null;
-                        breakingSide = null;
                         continue;
                     }
                     breakingPos = target.pos.toImmutable();
                     breakingSide = target.side;
-                } else {
-                    mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
                 }
 
+                mc.interactionManager.updateBlockBreakingProgress(target.pos, target.side);
                 mc.player.swingHand(Hand.MAIN_HAND);
                 renderBlocks.add(target.pos);
+                processed++;
 
                 if (mc.world.getBlockState(target.pos).isAir()) {
                     queue.remove(0);
                     breakingPos = null;
                     breakingSide = null;
-                    // Advance immediately only after the world confirms the previous block is gone.
-                    cooldown = Math.max(0, CFG.nukerCooldown);
                 } else {
-                    cooldown = Math.max(0, CFG.nukerCooldown);
+                    // Keep the current target as the active vanilla breaking state.
+                    // For SurvMulti, stop after the first partially-mined block so the
+                    // next tick can resume it instead of issuing conflicting states.
+                    if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode)) break;
+                    queue.remove(0);
+                    breakingPos = null;
+                    breakingSide = null;
                 }
-                return;
+
+                if (CFG.nukerCooldown > 0) {
+                    cooldown = CFG.nukerCooldown;
+                    break;
+                }
             }
+        }
+
+        public static List<BlockPos> getRenderBlocks() {
+            return new ArrayList<>(renderBlocks);
+        }
+
+        public static float getBreakingProgress() {
+            MinecraftClient mc = MinecraftClient.getInstance();
+            if (mc.interactionManager == null) return 0.0f;
+            return MathHelper.clamp(mc.interactionManager.currentBreakingProgress, 0.0f, 1.0f);
         }
 
         private static boolean activeTargetStillValid(MinecraftClient mc) {
             if (breakingPos == null) return false;
             BlockState state = mc.world.getBlockState(breakingPos);
             return !state.isAir() && !(state.getBlock() instanceof FluidBlock)
+                    && NukerAreaLimiter.contains(breakingPos)
                     && (!CFG.nukerFilter || passesFilter(state.getBlock()));
         }
 
@@ -642,21 +666,32 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         private static Direction bestSide(MinecraftClient mc, BlockPos pos) {
+            // BleachHack-style face selection: try every face and raycast to a point
+            // on that face instead of raycasting only to the block center. This is
+            // especially important when mining from above/below or around corners.
             Vec3d eye = mc.player.getEyePos();
-            Vec3d center = Vec3d.ofCenter(pos);
-            try {
-                BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
-                        eye, center,
-                        net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
-                        net.minecraft.world.RaycastContext.FluidHandling.NONE,
-                        mc.player));
-                if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
-                    return hit.getSide();
+            for (Direction side : Direction.values()) {
+                BlockPos neighbour = pos.offset(side);
+                if (!mc.world.getBlockState(neighbour).isFullCube(mc.world, neighbour)) {
+                    Vec3d face = Vec3d.ofCenter(pos).add(
+                            side.getOffsetX() * 0.49,
+                            side.getOffsetY() * 0.49,
+                            side.getOffsetZ() * 0.49);
+                    try {
+                        BlockHitResult hit = mc.world.raycast(new net.minecraft.world.RaycastContext(
+                                eye, face,
+                                net.minecraft.world.RaycastContext.ShapeType.OUTLINE,
+                                net.minecraft.world.RaycastContext.FluidHandling.NONE,
+                                mc.player));
+                        if (hit.getType() == HitResult.Type.BLOCK && hit.getBlockPos().equals(pos)) {
+                            return side;
+                        }
+                    } catch (Throwable ignored) {
+                    }
                 }
-            } catch (Throwable ignored) {
             }
             if (CFG.nukerRaycast) return null;
-            Vec3d toPlayer = eye.subtract(center);
+            Vec3d toPlayer = eye.subtract(Vec3d.ofCenter(pos));
             return Direction.getFacing(toPlayer.x, toPlayer.y, toPlayer.z);
         }
 

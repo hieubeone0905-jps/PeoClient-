@@ -2,6 +2,8 @@ package com.peoclient.nuker.compat;
 
 import com.peoclient.PeoClient;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.util.math.MathHelper;
 
 /**
  * Server-compatibility controller for Nuker.
@@ -38,14 +40,6 @@ public final class NukerCompatibility {
         enabled = !enabled;
         quietTicks = 0;
         lastTargetReset = System.currentTimeMillis();
-
-        MinecraftClient mc = MinecraftClient.getInstance();
-        if (mc.player != null) {
-            mc.player.sendMessage(
-                    net.minecraft.text.Text.literal("Nuker Compatibility: " + (enabled ? "ON" : "OFF")),
-                    true
-            );
-        }
     }
 
     public static boolean isEnabled() { return enabled; }

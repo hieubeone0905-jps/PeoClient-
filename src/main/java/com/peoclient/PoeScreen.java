@@ -764,14 +764,16 @@ public final class PoeScreen extends Screen {
             hackScroll = clamp(hackScroll - verticalAmount * 26, 0, max);
         } else if (mouseX >= settingsX && mouseX <= settingsX + settingsW) {
             double max = Math.max(0, settingsContentHeight() - viewport);
-            settingsScroll = clamp(settingsScroll - verticalAmount * 30, 0, max);
+            // Larger movement makes the lower Nuker settings reachable even on
+            // short screens, while retaining the same panel/layout.
+            settingsScroll = clamp(settingsScroll - verticalAmount * 36, 0, max);
         }
         return true;
     }
 
     private int settingsContentHeight() {
         return switch (selected) {
-            case "Nuker [Multi]" -> 980;
+            case "Nuker [Multi]" -> 1120;
             case "InventoryCleaner" -> 900;
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;
