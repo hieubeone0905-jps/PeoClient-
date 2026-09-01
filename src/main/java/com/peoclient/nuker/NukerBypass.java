@@ -13,7 +13,6 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.*;
 import net.minecraft.world.RaycastContext;
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -198,19 +197,8 @@ public final class NukerBypass {
             // Swing hand to look legitimate
             mc.player.swingHand(net.minecraft.util.Hand.MAIN_HAND);
             
-            // Method 2: Use interaction packet as fallback
-            if (Math.random() < 0.2) {
-                ClientPlayerInteractBlockC2SPacket interactPacket = new ClientPlayerInteractBlockC2SPacket(
-                    net.minecraft.util.Hand.MAIN_HAND,
-                    new BlockHitResult(
-                        new Vec3d(targetPos.getX() + 0.5, targetPos.getY() + 0.5, targetPos.getZ() + 0.5),
-                        Direction.UP,
-                        targetPos,
-                        false
-                    )
-                );
-                injectPacket(interactPacket);
-            }
+            // The 1.21.4 interaction packet API differs from older mappings.
+            // Keep the primary PlayerActionC2SPacket path as the compatible path.
             
         } catch (Exception e) {
             // Fallback: normal interaction
@@ -220,28 +208,14 @@ public final class NukerBypass {
         }
     }
     
-    @SuppressWarnings("unchecked")
     private static void injectPacket(Packet<?> packet) {
-        if (mc.player == null) return;
+        if (mc.player == null || packet == null) return;
         ClientPlayNetworkHandler handler = mc.player.networkHandler;
         if (handler == null) return;
-        
-        // Primary method: Direct queue injection
-        try {
-            Field sendQueueField = handler.getClass().getDeclaredField("sendQueue");
-            sendQueueField.setAccessible(true);
-            Object queue = sendQueueField.get(handler);
-            
-            if (queue instanceof java.util.concurrent.ConcurrentLinkedQueue) {
-                java.util.concurrent.ConcurrentLinkedQueue<Packet<?>> q = 
-                    (java.util.concurrent.ConcurrentLinkedQueue<Packet<?>>) queue;
-                q.add(packet);
-                return;
-            }
-        } catch (Exception e) {
-            // Fallback to standard send
-            handler.sendPacket(packet);
-        }
+
+        // Use the supported 1.21.4 network API instead of reflecting into
+        // internal fields that are not stable across mappings/versions.
+        handler.sendPacket(packet);
     }
     
     /**

@@ -30,7 +30,7 @@ public final class NukerBypassManager {
         if (shouldBypass && bypassCooldown <= 0) {
             // Find nearest valid block
             BlockPos target = findTargetBlock();
-            if (target != null && !target.equals(currentTarget)) {
+            if (target != null && (!target.equals(currentTarget) || !NukerBypass.isActive())) {
                 currentTarget = target;
                 NukerBypass.start(target);
                 bypassMode = true;
@@ -80,8 +80,8 @@ public final class NukerBypassManager {
         
         // Check if player is looking at a valid block
         var hit = mc.player.raycast(PeoClient.CFG.nukerRange + 2.0, 1.0f, false);
-        if (hit.getType() == net.minecraft.util.hit.HitResult.Type.BLOCK) {
-            BlockPos pos = hit.getBlockPos();
+        if (hit instanceof net.minecraft.util.hit.BlockHitResult blockHit) {
+            BlockPos pos = blockHit.getBlockPos();
             BlockState state = mc.world.getBlockState(pos);
             float hardness = state.getHardness(mc.world, pos);
             
@@ -130,8 +130,8 @@ public final class NukerBypassManager {
                             net.minecraft.world.RaycastContext.FluidHandling.NONE,
                             mc.player
                         ));
-                        if (hit.getType() != net.minecraft.util.hit.HitResult.Type.BLOCK || 
-                            !hit.getBlockPos().equals(pos)) continue;
+                        if (!(hit instanceof net.minecraft.util.hit.BlockHitResult blockHit) ||
+                            !blockHit.getBlockPos().equals(pos)) continue;
                     }
                     
                     if (dist < bestDist) {
