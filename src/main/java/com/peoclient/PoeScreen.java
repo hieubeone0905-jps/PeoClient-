@@ -225,10 +225,6 @@ public final class PoeScreen extends class_437 {
         y = rowToggle(d, x, y, w, "Flatten", PeoClient.CFG.nukerFlatten);
         y = rowToggle(d, x, y, w, "Rotate", PeoClient.CFG.nukerRotate);
         y = rowToggle(d, x, y, w, "NoParticles", PeoClient.CFG.nukerNoParticles);
-        y = section(d, x, y, "Compatibility");
-        y = rowToggle(d, x, y, w, "Safe pacing", PeoClient.CFG.nukerCompatibilitySafeMode);
-        y = sliderRow(d, x, y, w, "Actions / tick", PeoClient.CFG.nukerCompatibilityActionsPerTick, 1, 3, "%.0f");
-
         y = section(d, x, y, "Highlight");
         y = rowToggle(d, x, y, w, "Highlight", PeoClient.CFG.nukerHighlight);
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerHighlightMode);
@@ -622,12 +618,6 @@ public final class PoeScreen extends class_437 {
         if (hit(my, p)) { PeoClient.CFG.nukerFlatten = !PeoClient.CFG.nukerFlatten; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerRotate = !PeoClient.CFG.nukerRotate; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerNoParticles = !PeoClient.CFG.nukerNoParticles; save(); return; } p += 60;
-
-        if (hit(my, p)) { PeoClient.CFG.nukerCompatibilitySafeMode = !PeoClient.CFG.nukerCompatibilitySafeMode; save(); return; } p += 34;
-        if (hit(my, p)) {
-            PeoClient.CFG.nukerCompatibilityActionsPerTick = (int)Math.round(sliderValue(mx, x, w, 1, 3, "Actions / tick"));
-            save(); return;
-        } p += 60;
 
         if (hit(my, p)) { PeoClient.CFG.nukerHighlight = !PeoClient.CFG.nukerHighlight; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.nukerHighlightMode = cycle(PeoClient.CFG.nukerHighlightMode, "Opacity", "Expand"); save(); return; } p += 34;

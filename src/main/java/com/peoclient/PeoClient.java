@@ -255,9 +255,6 @@ public final class PeoClient implements ClientModInitializer {
         // Keep at least a small server acknowledgement window so fast disposal
         // does not outrun the server and create client/server ghost items.
         public int cleanerAckTimeout = 2;
-        /** Conservative client-side pacing; does not spoof packets or bypass server validation. */
-        public boolean nukerCompatibilitySafeMode = true;
-        public int nukerCompatibilityActionsPerTick = 1;
         public int maxBlocks = 512, maxArrows = 128, maxThrowables = 64, maxFoods = 200;
         public int maxWaterBuckets = 2, maxLavaBuckets = 2, maxMilkBuckets = 2;
         public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
@@ -337,8 +334,6 @@ public final class PeoClient implements ClientModInitializer {
                         ? new LinkedHashSet<>(c.cleanerDropFilter) : new LinkedHashSet<>();
                 cleanerActionDelay = c.cleanerActionDelay;
                 cleanerAckTimeout = c.cleanerAckTimeout;
-                nukerCompatibilitySafeMode = c.nukerCompatibilitySafeMode;
-                nukerCompatibilityActionsPerTick = c.nukerCompatibilityActionsPerTick;
                 maxBlocks = c.maxBlocks; maxArrows = c.maxArrows;
                 maxThrowables = c.maxThrowables; maxFoods = c.maxFoods;
                 maxWaterBuckets = c.maxWaterBuckets; maxLavaBuckets = c.maxLavaBuckets;
@@ -582,11 +577,7 @@ public final class PeoClient implements ClientModInitializer {
                 queue.sort(comparator(mc));
             }
 
-            int requestedBatch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
-            int safeCap = CFG.nukerCompatibilitySafeMode
-                    ? class_3532.method_15340(CFG.nukerCompatibilityActionsPerTick, 1, 3)
-                    : 10;
-            int batch = Math.min(requestedBatch, safeCap);
+            int batch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
                 // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
@@ -682,10 +673,6 @@ public final class PeoClient implements ClientModInitializer {
 
         private static boolean activeTargetStillValid(class_310 mc) {
             if (breakingPos == null) return false;
-            if (CFG.nukerCompatibilitySafeMode) {
-                class_2350 side = bestSide(mc, breakingPos);
-                if (side == null) return false;
-            }
             class_2680 state = mc.field_1687.method_8320(breakingPos);
             return !state.method_26215() && !(state.method_26204() instanceof class_2404)
                     && NukerAreaLimiter.contains(breakingPos)
