@@ -318,7 +318,7 @@ public final class PoeScreen extends class_437 {
         y = rowValue(d, x, y, w, "Edit blocks", shortSet(PeoClient.CFG.xrayBlocks));
         y += 8;
         y = section(d, x, y, "Visibility");
-        y = rowToggle(d, x, y, w, "Delete ALL terrain blocks (FPS mode)", PeoClient.CFG.xraySkyOnly);
+        y = rowToggle(d, x, y, w, "Delete ALL terrain blocks (FPS mode)", PeoClient.CFG.xray);
         y = rowToggle(d, x, y, w, "Exposed only", PeoClient.CFG.xrayExposedOnly);
         y = rowToggle(d, x, y, w, "Fluids", PeoClient.CFG.xrayFluids);
         y = rowValue(d, x, y, w, "Background opacity", PeoClient.CFG.xrayBackgroundOpacity + "/255");
@@ -678,7 +678,7 @@ public final class PoeScreen extends class_437 {
     private void clickXray(double my, int y) {
         int p = y + 26;
         if (hit(my, p)) { field_22787.method_1507(new BlockPickerScreen(this, false)); return; } p += 68;
-        if (hit(my, p)) { PeoClient.CFG.xraySkyOnly = !PeoClient.CFG.xraySkyOnly; PeoClient.reload(field_22787); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.xraySkyOnly = PeoClient.CFG.xray; PeoClient.reload(field_22787); save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayExposedOnly = !PeoClient.CFG.xrayExposedOnly; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayFluids = !PeoClient.CFG.xrayFluids; save(); return; } p += 34;
         if (hit(my, p)) { PeoClient.CFG.xrayBackgroundOpacity = PeoClient.CFG.xrayBackgroundOpacity >= 255 ? 0 : PeoClient.CFG.xrayBackgroundOpacity + 32; save(); return; } p += 34;

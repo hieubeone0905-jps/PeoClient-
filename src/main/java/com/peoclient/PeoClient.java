@@ -160,7 +160,11 @@ public final class PeoClient implements ClientModInitializer {
 
     public static void toggleXray(class_310 mc) {
         CFG.xray = !CFG.xray;
+        // X-Ray is intentionally a full client-side terrain suppression mode:
+        // when enabled, render only the sky/air background and hide every block.
+        CFG.xraySkyOnly = CFG.xray;
         if (mc.field_1687 != null) reload(mc);
+        CFG.save();
     }
 
     public static void toggleFullbright(class_310 mc) {
@@ -198,7 +202,7 @@ public final class PeoClient implements ClientModInitializer {
         // Fluids are included in the target list, matching Wurst's default X-Ray list.
         public boolean xrayFullBright = true;
         /** Performance mode: suppress all ordinary terrain block geometry so the sky remains. */
-        public boolean xraySkyOnly = false;
+        public boolean xraySkyOnly = true;
         public boolean xrayExposedOnly = false;
         public boolean xrayFluids = true;
         public int xrayBackgroundOpacity = 0;
