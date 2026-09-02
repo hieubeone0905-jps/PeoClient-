@@ -48,6 +48,13 @@ public final class PeoClient implements ClientModInitializer {
         originalUsername = class_310.method_1551().method_1548().method_1676();
         CFG.load();
 
+        // Diagnostic systems are observation-only and are initialized before the client tick.
+        com.peoclient.diagnostic.DiagnosticRecorder.get().init();
+        com.peoclient.diagnostic.KickLogManager.get().init();
+        com.peoclient.diagnostic.KickLogManager.get().cleanupOldLogs(com.peoclient.diagnostic.DiagnosticConfig.get().getLogRetentionDays());
+        com.peoclient.diagnostic.DisconnectListener.register();
+        com.peoclient.diagnostic.DiagnosticHealthMonitor.get().checkHealth();
+
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
         registerModuleKeys();
         xrayKey = MODULE_KEYS.get("X-Ray");
@@ -136,8 +143,19 @@ public final class PeoClient implements ClientModInitializer {
         FullbrightLogic.tick(mc);
 
         NukerAreaLimiter.tick(mc, CFG.nukerRangeHighlight, CFG.nukerRange);
-        if (CFG.nuker) NukerCompatibility.tick(mc);
+        if (CFG.nuker) {
+            if (!com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
+                com.peoclient.diagnostic.NukerSessionRecorder.get().startSession();
+            }
+            NukerCompatibility.tick(mc);
+        } else if (com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
+            com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
+        }
         AntiVipProMaxModule.tick();
+        if (mc.field_1724.field_6216 % 20 == 0) {
+            com.peoclient.diagnostic.PreDisconnectSnapshot.get().record(mc);
+            com.peoclient.diagnostic.LatencyMetrics.get().updatePing();
+        }
         if (CFG.cleaner) InventoryCleaner.tick(mc);
 
         if (++saveTick >= 100) {
@@ -149,7 +167,11 @@ public final class PeoClient implements ClientModInitializer {
     public static void toggleModuleByName(String module, class_310 mc) {
         switch (module) {
             case "X-Ray" -> toggleXray(mc);
-            case "Nuker [Multi]" -> CFG.nuker = !CFG.nuker;
+            case "Nuker [Multi]" -> {
+                CFG.nuker = !CFG.nuker;
+                if (CFG.nuker) com.peoclient.diagnostic.NukerSessionRecorder.get().startSession();
+                else com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
+            }
             case "Fullbright" -> toggleFullbright(mc);
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
@@ -530,6 +552,9 @@ public final class PeoClient implements ClientModInitializer {
         private static int stagnantTicks;
         private static float lastBreakingProgress;
         private static class_2338 progressPos;
+        private static long diagnosticTargetTime;
+        private static long diagnosticAttemptTime;
+        private static long diagnosticInteractionTime;
 
         private NukerLogic() {}
 
@@ -561,6 +586,12 @@ public final class PeoClient implements ClientModInitializer {
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
                     if (stagnantTicks >= 8) {
+                        com.peoclient.diagnostic.NukerSessionRecorder.get().recordRecovery();
+                        com.peoclient.diagnostic.BreakEventRecorder.get().recordRecovery(breakingPos, "Stale breaking state");
+                        com.peoclient.diagnostic.AccountSessionMetrics.get().recordRecovery();
+                        com.peoclient.diagnostic.BreakStateTracker.get().transition(
+                                com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
+                        com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
                         mc.field_1761.method_2925();
                         breakingPos = null;
                         breakingSide = null;
@@ -636,20 +667,65 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
+                    diagnosticTargetTime = System.currentTimeMillis();
+                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
+                            com.peoclient.diagnostic.BreakStateTracker.State.TARGETING, target.pos);
+                    com.peoclient.diagnostic.TargetHistory.get().recordTarget(
+                            target.pos, mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos)), queue.indexOf(target));
+                    com.peoclient.diagnostic.WorldStateMonitor.get().recordTarget(target.pos);
+                    com.peoclient.diagnostic.NukerSessionRecorder.get().recordTarget(target.pos);
+
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
+                        com.peoclient.diagnostic.BreakEventRecorder.get().recordFailure(
+                                target.pos, com.peoclient.diagnostic.BreakFailureReason.INTERACTION_FAIL.name());
+                        com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
+                        com.peoclient.diagnostic.NukerSessionRecorder.get().recordFailure();
+                        com.peoclient.diagnostic.BreakStateTracker.get().transition(
+                                com.peoclient.diagnostic.BreakStateTracker.State.FAILURE, target.pos);
+                        com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_FAILURE: " + target.pos);
                         queue.remove(0);
                         continue;
                     }
+                    diagnosticAttemptTime = System.currentTimeMillis();
+                    if (diagnosticTargetTime > 0) {
+                        com.peoclient.diagnostic.NukerTimingMetrics.get().recordTargetToAttempt(
+                                diagnosticAttemptTime - diagnosticTargetTime);
+                    }
+                    com.peoclient.diagnostic.BreakEventRecorder.get().recordStart(target.pos, CFG.nukerRange);
+                    com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakAttempt();
+                    com.peoclient.diagnostic.NukerSessionRecorder.get().recordAttempt();
+                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
+                            com.peoclient.diagnostic.BreakStateTracker.State.BREAKING, target.pos);
+                    com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_ATTEMPT: " + target.pos);
                     breakingPos = target.pos.method_10062();
                     breakingSide = target.side;
                 }
 
+                diagnosticInteractionTime = System.currentTimeMillis();
+                if (diagnosticAttemptTime > 0) {
+                    com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToInteraction(
+                            diagnosticInteractionTime - diagnosticAttemptTime);
+                }
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
                 processed++;
 
                 if (mc.field_1687.method_8320(target.pos).method_26215()) {
+                    long successNow = System.currentTimeMillis();
+                    if (diagnosticInteractionTime > 0) {
+                        com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToSuccess(
+                                successNow - diagnosticAttemptTime);
+                    }
+                    com.peoclient.diagnostic.WorldStateMonitor.get().recordCheck(target.pos);
+                    com.peoclient.diagnostic.BreakEventRecorder.get().recordSuccess(
+                            target.pos, diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
+                    com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakSuccess();
+                    com.peoclient.diagnostic.NukerSessionRecorder.get().recordSuccess(
+                            diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
+                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
+                            com.peoclient.diagnostic.BreakStateTracker.State.SUCCESS, target.pos);
+                    com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_SUCCESS: " + target.pos);
                     queue.remove(0);
                     breakingPos = null;
                     breakingSide = null;

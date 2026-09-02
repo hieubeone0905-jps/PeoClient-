@@ -1,37 +1,41 @@
 package com.peoclient.nuker.compat;
 
 import com.peoclient.PeoClient;
+import com.peoclient.diagnostic.*;
 import net.minecraft.class_310;
 
-/**
- * Server-compatibility controller for Nuker.
- *
- * This intentionally uses normal Minecraft interaction APIs. It does not spoof
- * position, inject movement packets, or attempt to defeat an anti-cheat.
- */
 public final class NukerCompatibility {
     private static boolean enabled = true;
     private static int quietTicks = 0;
     private static long lastTargetReset = 0L;
 
-    private NukerCompatibility() {}
-
     public static void tick(class_310 mc) {
         if (mc.field_1724 == null || mc.field_1687 == null || mc.field_1761 == null) return;
         if (!PeoClient.CFG.nuker) return;
 
-        // Keep the controller on the client tick; never create a background thread.
+        // Record tick start
+        TickMetrics.get().recordTickStart();
+
         if (!enabled) {
             PeoClient.NukerLogic.tick(mc);
+            TickMetrics.get().recordTickEnd();
             return;
         }
 
         quietTicks = Math.max(0, quietTicks - 1);
-        if (quietTicks > 0) return;
+        if (quietTicks > 0) {
+            TickMetrics.get().recordTickEnd();
+            return;
+        }
 
-        // Let the existing NukerLogic own the real block-breaking state.
-        // Compatibility is deliberately conservative: no synthetic movement/rotation packets.
+        // NukerLogic will call diagnostic hooks internally
         PeoClient.NukerLogic.tick(mc);
+
+        // Update latency metrics
+        LatencyMetrics.get().updatePing();
+
+        TickMetrics.get().recordTickEnd();
+        AccountSessionMetrics.get().tick();
     }
 
     public static void toggle() {
@@ -41,8 +45,5 @@ public final class NukerCompatibility {
     }
 
     public static boolean isEnabled() { return enabled; }
-
-    public static String status() {
-        return enabled ? "Compatibility ON" : "Compatibility OFF";
-    }
+    public static String status() { return enabled ? "Compatibility ON" : "Compatibility OFF"; }
 }
