@@ -168,6 +168,11 @@ public final class PeoClient implements ClientModInitializer {
         }
         if (CFG.cleaner) InventoryCleaner.tick(mc);
 
+        // Keep PeoClient diagnostic output synchronized to disk while in-game.
+        if (com.peoclient.diagnostic.DiagnosticConfig.get().isEnabled()) {
+            com.peoclient.diagnostic.DiagnosticRecorder.get().flush();
+        }
+
         if (++saveTick >= 100) {
             saveTick = 0;
             CFG.save();

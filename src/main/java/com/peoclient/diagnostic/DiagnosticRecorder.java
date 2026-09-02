@@ -13,6 +13,7 @@ public final class DiagnosticRecorder {
     private final DateTimeFormatter timestampFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS");
     private Path logFile;
     private boolean initialized = false;
+    private long lastFlushMs = 0L;
 
     private DiagnosticRecorder() {}
 
@@ -34,8 +35,12 @@ public final class DiagnosticRecorder {
         if (!initialized) init();
         String line = LocalDateTime.now().format(timestampFormat) + " [DIAG] " + message;
         logQueue.add(line);
-        if (logQueue.size() > 10000) {
+        // Keep the diagnostic file live while Minecraft is running.
+        // Do not wait for the queue to reach 10,000 entries.
+        long now = System.currentTimeMillis();
+        if (logQueue.size() >= 1 && (now - lastFlushMs >= 250L || logQueue.size() >= 250)) {
             flush();
+            lastFlushMs = now;
         }
     }
 
@@ -45,6 +50,9 @@ public final class DiagnosticRecorder {
 
     public void flush() {
         if (logFile == null || logQueue.isEmpty()) return;
+        try {
+            if (logFile.getParent() != null) Files.createDirectories(logFile.getParent());
+        } catch (IOException ignored) {}
         try (BufferedWriter w = Files.newBufferedWriter(logFile, StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
             String line;
             while ((line = logQueue.poll()) != null) {
