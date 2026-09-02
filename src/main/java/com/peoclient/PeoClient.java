@@ -160,8 +160,9 @@ public final class PeoClient implements ClientModInitializer {
 
     public static void toggleXray(class_310 mc) {
         CFG.xray = !CFG.xray;
-        // X-Ray is intentionally a full client-side terrain suppression mode:
-        // when enabled, render only the sky/air background and hide every block.
+        // Wurst-style X-Ray: when enabled, render only blocks selected in the X-Ray filter.
+        // Keep the legacy flag synchronized for old configs/UI, but do not use it
+        // as the render gate; the mixin now checks CFG.xrayBlocks directly.
         CFG.xraySkyOnly = CFG.xray;
         if (mc.field_1687 != null) reload(mc);
         CFG.save();
