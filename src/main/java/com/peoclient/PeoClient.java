@@ -567,11 +567,6 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
-        // Render refresh is throttled so it fixes stale chunk meshes without
-        // forcing a full renderer rebuild every Nuker tick. This does not
-        // change target selection, range, multi, or break speed.
-        private static long lastRenderRefreshMs;
-
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
@@ -740,12 +735,11 @@ public final class PeoClient implements ClientModInitializer {
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
 
-                // Force the same kind of incremental render invalidation used by
-                // vanilla block updates. The previous fix only scheduled a 3x3x3
-                // chunk rebuild; this additionally dirties the exact block region
-                // and, when the client state changed immediately, calls updateBlock
-                // with the real old/new states. This is render-only and does not
-                // modify Nuker targeting, range, multi, or interaction timing.
+                // Do not flood the chunk builder. The previous fixes scheduled a
+                // 3x3x3 chunk rebuild plus a terrain update for every target, which
+                // can leave the renderer permanently behind when SurvMulti is fast.
+                // Vanilla's block update path is incremental, so keep this to the
+                // exact block/neighbor region only.
                 if (mc.field_1769 != null) {
                     int x = target.pos.method_10263();
                     int y = target.pos.method_10264();
@@ -753,10 +747,9 @@ public final class PeoClient implements ClientModInitializer {
                     class_2680 renderNewState = mc.field_1687.method_8320(target.pos);
                     if (!renderOldState.equals(renderNewState)) {
                         mc.field_1769.method_8570(mc.field_1687, target.pos, renderOldState, renderNewState, 0);
+                    } else {
+                        mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
                     }
-                    mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
-                    mc.field_1769.method_18145(x, y, z);
-                    mc.field_1769.method_3292();
                 }
                 processed++;
 
@@ -794,18 +787,25 @@ public final class PeoClient implements ClientModInitializer {
 
             }
 
-            // Some servers/client states can leave chunk meshes visually stale
-            // after rapid block updates. Periodically rebuild the world renderer
-            // while Nuker is actively processing blocks. This only fixes the
-            // visual state; it never changes the Nuker target queue or timing.
-            if (processed > 0) {
-                long nowMs = System.currentTimeMillis();
-                if (nowMs - lastRenderRefreshMs >= 250L) {
-                    lastRenderRefreshMs = nowMs;
-                    if (mc.field_1769 != null) {
-                        // Keep a lightweight terrain rebuild request as a fallback for
-                        // chunk-builder frames that are still holding an older mesh.
-                        mc.field_1769.method_3292();
+            // If the vanilla breaking progress has completed but the server's
+            // block-update packet has not reached the client render state yet,
+            // predict the final visual state locally. This is client-side prediction
+            // only; the server remains authoritative and can overwrite it with its
+            // next block update. It prevents the exact ghost-block effect where a
+            // broken block stays visible until the player performs another action.
+            if (breakingPos != null && getBreakingProgress() >= 0.999f && mc.field_1687 != null) {
+                class_2680 current = mc.field_1687.method_8320(breakingPos);
+                if (!current.method_26215()) {
+                    class_2680 air = net.minecraft.class_2246.field_10124.method_9564();
+                    class_2338 pos = breakingPos.method_10062();
+                    if (mc.field_1687.method_8652(pos, air, 18)) {
+                        if (mc.field_1769 != null) {
+                            int x = pos.method_10263();
+                            int y = pos.method_10264();
+                            int z = pos.method_10260();
+                            mc.field_1769.method_8570(mc.field_1687, pos, current, air, 18);
+                            mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
+                        }
                     }
                 }
             }
