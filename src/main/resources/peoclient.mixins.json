@@ -6,6 +6,7 @@
     "ChunkOcclusionDataBuilderMixin",
     "ParticleManagerMixin",
     "BlockRenderManagerMixin",
+    "BlockXrayVisibilityMixin",
     "BlockEntityRenderDispatcherMixin",
     "SimpleOptionAccessor",
     "ScreenAccessor",

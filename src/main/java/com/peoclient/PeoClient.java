@@ -164,7 +164,13 @@ public final class PeoClient implements ClientModInitializer {
         // Keep the legacy flag synchronized for old configs/UI, but do not use it
         // as the render gate; the mixin now checks CFG.xrayBlocks directly.
         CFG.xraySkyOnly = CFG.xray;
-        if (mc.field_1687 != null) reload(mc);
+        if (mc.field_1687 != null) {
+            reload(mc);
+            // A second rebuild ensures already-built chunk meshes are discarded
+            // after the visibility rule changes. X-Ray is the only feature that
+            // needs this extra render rebuild.
+            reload(mc);
+        }
         CFG.save();
     }
 
