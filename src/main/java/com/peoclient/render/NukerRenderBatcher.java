@@ -1,4 +1,4 @@
-package com.peoclient.mixin;
+package com.peoclient.render;
 
 import net.minecraft.class_310;
 

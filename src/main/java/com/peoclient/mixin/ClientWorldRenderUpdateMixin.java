@@ -1,4 +1,5 @@
 package com.peoclient.mixin;
+import com.peoclient.render.NukerRenderBatcher;
 
 import com.peoclient.PeoClient;
 import net.minecraft.class_2338;
