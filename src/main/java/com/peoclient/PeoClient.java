@@ -733,31 +733,15 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToInteraction(
                             diagnosticInteractionTime - diagnosticAttemptTime);
                 }
-                // Capture the client state before the interaction so the renderer
-                // can be told about the exact old/new state when the local world has
-                // already received the server update.
-                class_2680 renderOldState = state;
+                // Keep the Nuker on the normal Minecraft interaction path.
+                // Render invalidation is handled centrally by ClientWorldRenderUpdateMixin
+                // and NukerRenderBatcher, so Nuker itself does not submit competing
+                // chunk rebuild requests for every target. This preserves the exact
+                // attack/progress cadence while preventing renderer work from being
+                // duplicated by the Nuker loop.
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
-
-                // Do not flood the chunk builder. The previous fixes scheduled a
-                // 3x3x3 chunk rebuild plus a terrain update for every target, which
-                // can leave the renderer permanently behind when SurvMulti is fast.
-                // Vanilla's block update path is incremental, so keep this to the
-                // exact block/neighbor region only.
-                if (mc.field_1769 != null) {
-                    int x = target.pos.method_10263();
-                    int y = target.pos.method_10264();
-                    int z = target.pos.method_10260();
-                    class_2680 renderNewState = mc.field_1687.method_8320(target.pos);
-                    if (!renderOldState.equals(renderNewState)) {
-                        mc.field_1769.method_8570(mc.field_1687, target.pos, renderOldState, renderNewState, 0);
-                        mc.field_1769.method_21596(target.pos, renderOldState, renderNewState);
-                    } else {
-                        mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
-                    }
-                }
                 processed++;
 
                 if (mc.field_1687.method_8320(target.pos).method_26215()) {
