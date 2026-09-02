@@ -7,16 +7,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Coalesces Nuker render updates.  Only one render pass is submitted per
- * client tick, regardless of how many blocks changed during that tick.
- * This is render-only and never changes world state or packets.
+ * Coalesces Nuker render updates into one bounded section refresh per client tick.
+ * Render-only: does not change world state, packets, or Nuker behaviour.
  */
 public final class NukerRenderBatcher {
     private static final Set<Long> PENDING_SECTIONS = new HashSet<>();
     private static final int MAX_PENDING_SECTIONS = 256;
-    private static int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
-    private static int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
-    private static boolean pendingBounds;
     private static long totalChanges;
     private static long totalFlushes;
 
@@ -24,61 +20,77 @@ public final class NukerRenderBatcher {
 
     public static void mark(int x, int y, int z) {
         totalChanges++;
-        if (!pendingBounds) {
-            minX = maxX = x; minY = maxY = y; minZ = maxZ = z;
-            pendingBounds = true;
-        } else {
-            minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
-            maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
-        }
         markSectionForBlock(x, y, z);
     }
 
     public static void markSectionForBlock(int x, int y, int z) {
-        int sx = Math.floorDiv(x, 16), sy = Math.floorDiv(y, 16), sz = Math.floorDiv(z, 16);
+        int sx = Math.floorDiv(x, 16);
+        int sy = Math.floorDiv(y, 16);
+        int sz = Math.floorDiv(z, 16);
+
+        // Only queue the changed section.  Neighbour sections are intentionally
+        // omitted here to prevent a large render backlog during Multi mining.
         addSection(sx, sy, sz);
-        int lx = Math.floorMod(x, 16), ly = Math.floorMod(y, 16), lz = Math.floorMod(z, 16);
-        if (lx == 0) addSection(sx - 1, sy, sz);
-        if (lx == 15) addSection(sx + 1, sy, sz);
-        if (ly == 0) addSection(sx, sy - 1, sz);
-        if (ly == 15) addSection(sx, sy + 1, sz);
-        if (lz == 0) addSection(sx, sy, sz - 1);
-        if (lz == 15) addSection(sx, sy, sz + 1);
     }
 
     private static void addSection(int x, int y, int z) {
-        if (PENDING_SECTIONS.size() < MAX_PENDING_SECTIONS) PENDING_SECTIONS.add(pack(x, y, z));
+        if (PENDING_SECTIONS.size() < MAX_PENDING_SECTIONS) {
+            PENDING_SECTIONS.add(pack(x, y, z));
+        }
     }
 
     private static long pack(int x, int y, int z) {
-        return ((long)(x & 0x3FFFFFF) << 38) | ((long)(z & 0x3FFFFFF) << 12) | (y & 0xFFFL);
+        return ((long) (x & 0x3FFFFFF) << 38)
+                | ((long) (z & 0x3FFFFFF) << 12)
+                | (y & 0xFFFL);
     }
-    private static int unpackX(long p) { int v=(int)(p>>38); return (v<<6)>>6; }
-    private static int unpackY(long p) { int v=(int)(p&0xFFFL); return (v<<20)>>20; }
-    private static int unpackZ(long p) { int v=(int)((p>>12)&0x3FFFFFFL); return (v<<6)>>6; }
+
+    private static int unpackX(long p) {
+        int v = (int) (p >> 38);
+        return (v << 6) >> 6;
+    }
+
+    private static int unpackY(long p) {
+        int v = (int) (p & 0xFFFL);
+        return (v << 20) >> 20;
+    }
+
+    private static int unpackZ(long p) {
+        int v = (int) ((p >> 12) & 0x3FFFFFFL);
+        return (v << 6) >> 6;
+    }
 
     public static void flush(class_310 mc) {
-        if (PENDING_SECTIONS.isEmpty() && !pendingBounds) return;
+        if (PENDING_SECTIONS.isEmpty()) {
+            return;
+        }
+
         int sections = PENDING_SECTIONS.size();
         try {
-            if (mc == null || mc.field_1687 == null || mc.field_1769 == null) return;
+            if (mc == null || mc.field_1687 == null || mc.field_1769 == null) {
+                return;
+            }
 
-            // One queue submission per unique section. Do not also submit a
-            // large bounding-box/terrain refresh: that was causing a render
-            // backlog during sustained Multi mining.
             for (long packed : PENDING_SECTIONS) {
-                mc.field_1769.method_8571(unpackX(packed), unpackY(packed), unpackZ(packed));
+                mc.field_1769.method_8571(
+                        unpackX(packed),
+                        unpackY(packed),
+                        unpackZ(packed)
+                );
             }
 
             totalFlushes++;
-            DiagnosticRecorder.get().record("NukerRender",
-                        "HARD_REFRESH renderer.reload() sections=" + sections + " totalChanges=" + totalChanges);
-            }
-
-            DiagnosticRecorder.get().record("NukerRender",
-                    "FLUSH sections=" + sections + " totalChanges=" + totalChanges + " flushes=" + totalFlushes);
+            DiagnosticRecorder.get().record(
+                    "NukerRender",
+                    "FLUSH sections=" + sections
+                            + " totalChanges=" + totalChanges
+                            + " flushes=" + totalFlushes
+            );
         } catch (Throwable t) {
-            DiagnosticRecorder.get().record("NukerRender", "RENDER_ERROR " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            DiagnosticRecorder.get().record(
+                    "NukerRender",
+                    "RENDER_ERROR " + t.getClass().getSimpleName() + ": " + t.getMessage()
+            );
         } finally {
             clear();
         }
@@ -86,8 +98,5 @@ public final class NukerRenderBatcher {
 
     public static void clear() {
         PENDING_SECTIONS.clear();
-        minX = minY = minZ = Integer.MAX_VALUE;
-        maxX = maxY = maxZ = Integer.MIN_VALUE;
-        pendingBounds = false;
     }
 }
