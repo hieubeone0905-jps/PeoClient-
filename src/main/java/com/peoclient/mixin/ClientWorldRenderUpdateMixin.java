@@ -6,6 +6,8 @@ import net.minecraft.class_2680;
 import net.minecraft.class_310;
 import net.minecraft.class_638;
 import org.spongepowered.asm.mixin.Mixin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,6 +26,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(class_638.class)
 public final class ClientWorldRenderUpdateMixin {
     @Unique
+    private static final Logger PEO$LOG = LoggerFactory.getLogger("PeoClient-RenderDiagnostic");
+
+    @Unique
     private static final ThreadLocal<class_2680> peo$oldState = new ThreadLocal<>();
 
     @Inject(method = "method_30092", at = @At("HEAD"))
@@ -33,7 +38,9 @@ public final class ClientWorldRenderUpdateMixin {
         try {
             class_310 mc = class_310.method_1551();
             if (mc != null && PeoClient.CFG.nuker && mc.field_1687 == (Object) this) {
-                peo$oldState.set(mc.field_1687.method_8320(pos));
+                class_2680 old = mc.field_1687.method_8320(pos);
+                peo$oldState.set(old);
+                PEO$LOG.info("[PeoRenderDebug] CLIENTWORLD_HEAD pos={} old={} requested={} flags={} depth={}", pos, old, state, flags, maxUpdateDepth);
             }
         } catch (Throwable ignored) {
             peo$oldState.remove();
@@ -55,6 +62,8 @@ public final class ClientWorldRenderUpdateMixin {
 
             class_2680 oldState = peo$oldState.get();
             class_2680 newState = mc.field_1687.method_8320(pos);
+            PEO$LOG.info("[PeoRenderDebug] CLIENTWORLD_RETURN pos={} old={} requested={} actual={} result={} flags={}",
+                    pos, oldState, state, newState, cir.getReturnValueZ(), flags);
             int x = pos.method_10263();
             int y = pos.method_10264();
             int z = pos.method_10260();
