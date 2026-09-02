@@ -735,6 +735,17 @@ public final class PeoClient implements ClientModInitializer {
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
+                // Schedule a targeted chunk/section rebuild for the changed block.
+                // A full WorldRenderer.reload() is not sufficient for this case because
+                // Minecraft may keep the existing built chunk mesh until its sections
+                // are explicitly marked dirty. This mirrors vanilla block-update
+                // rendering without changing Nuker targeting or break timing.
+                if (mc.field_1769 != null) {
+                    int x = target.pos.method_10263();
+                    int y = target.pos.method_10264();
+                    int z = target.pos.method_10260();
+                    mc.field_1769.method_18145(x, y, z);
+                }
                 processed++;
 
                 if (mc.field_1687.method_8320(target.pos).method_26215()) {
@@ -780,7 +791,9 @@ public final class PeoClient implements ClientModInitializer {
                 if (nowMs - lastRenderRefreshMs >= 250L) {
                     lastRenderRefreshMs = nowMs;
                     if (mc.field_1769 != null) {
-                        mc.field_1769.method_3279();
+                        // Mark the local terrain for an incremental rebuild instead of
+                        // reloading every world-render resource.
+                        mc.field_1769.method_3292();
                     }
                 }
             }
