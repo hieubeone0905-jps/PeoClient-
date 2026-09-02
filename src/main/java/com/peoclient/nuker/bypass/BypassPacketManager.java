@@ -1,13 +1,13 @@
 package com.peoclient.nuker.bypass;
 
 import net.minecraft.class_2338;
+import net.minecraft.class_634;
 import net.minecraft.class_2350;
 import net.minecraft.class_2596;
 import net.minecraft.class_310;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -62,7 +62,7 @@ public final class BypassPacketManager {
 
     public static void sendResetPacket() {
         if (mc.field_1724 == null) return;
-        sendRotation(mc.field_1724.method_36454(), mc.field_1724.method_36455(), mc.field_1724.field_6228);
+        sendRotation(mc.field_1724.method_36454(), mc.field_1724.method_36455(), mc.field_1724.method_24828());
     }
 
     public static void clearQueue() {
@@ -125,43 +125,33 @@ public final class BypassPacketManager {
         return null;
     }
 
-    @SuppressWarnings("unchecked")
+    private static Object getNetworkHandler() {
+        try {
+            for (Field field : mc.getClass().getDeclaredFields()) {
+                if (!class_634.class.isAssignableFrom(field.getType())) continue;
+                field.setAccessible(true);
+                Object value = field.get(mc);
+                if (value != null) return value;
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
     private static void inject(Object packet) {
         if (mc.field_1724 == null || !(packet instanceof class_2596)) return;
-        var handler = mc.field_1724.field_6214;
+        Object handler = getNetworkHandler();
         if (handler == null) return;
 
         packetQueue.add(packet);
 
         try {
-            Field sendQueueField = null;
-            for (Field field : handler.getClass().getDeclaredFields()) {
-                if (!Queue.class.isAssignableFrom(field.getType())) continue;
-                if (Modifier.isStatic(field.getModifiers())) continue;
-                field.setAccessible(true);
-                Object value = field.get(handler);
-                if (value instanceof Queue<?>) {
-                    sendQueueField = field;
-                    break;
-                }
-            }
-
-            if (sendQueueField != null) {
-                Object queue = sendQueueField.get(handler);
-                if (queue instanceof Queue) {
-                    ((Queue<Object>) queue).add(packet);
-                    packetQueue.remove(packet);
-                    return;
-                }
-            }
+            // ClientPlayNetworkHandler#sendPacket dùng intermediary method_2883
+            // trên Minecraft 1.21.4. Reflection tránh phụ thuộc vào private fields.
+            var method = handler.getClass().getMethod("method_2883", class_2596.class);
+            method.invoke(handler, packet);
         } catch (Throwable ignored) {
-            // Fall through to normal packet sending.
-        }
-
-        try {
-            handler.method_10839((class_2596) packet);
-        } catch (Throwable ignored) {
-            // Never break the main Nuker because of the optional bypass layer.
+            // Optional bypass layer must never break the main Nuker.
         } finally {
             packetQueue.remove(packet);
         }

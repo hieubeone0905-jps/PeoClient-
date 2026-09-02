@@ -6,13 +6,8 @@ import net.minecraft.class_2350;
 import net.minecraft.class_243;
 import net.minecraft.class_310;
 import net.minecraft.class_3532;
-import net.minecraft.class_3965;
-import net.minecraft.class_3959;
 import net.minecraft.class_239;
-import net.minecraft.class_2680;
-import net.minecraft.class_1297;
 import net.minecraft.class_746;
-import net.minecraft.class_2561;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.Random;
@@ -143,13 +138,8 @@ public final class NukerBypassEngine {
             field.setAccessible(true);
             return (class_2338) field.get(null);
         } catch (Exception e) {
-            // Fallback: lấy block đang nhìn
-            if (mc.field_1724 != null) {
-                class_3965 hit = mc.field_1724.method_31560(6.0, 0.0f, false);
-                if (hit.method_17783() == class_239.class_240.field_1332) {
-                    return hit.method_17777();
-                }
-            }
+            // Không dùng fallback raycast mapping phụ thuộc phiên bản;
+            // NukerLogic là nguồn target chính.
             return null;
         }
     }
@@ -176,8 +166,8 @@ public final class NukerBypassEngine {
         float noise = (float)(Math.sin(System.currentTimeMillis() / 600.0) * 0.12);
         float step = maxStep * (0.6f + (intensity / 10.0f) * 0.4f) * (1.0f + noise);
         
-        float newYaw = currentYaw + class_3532.method_15340(yawDiff, -step, step);
-        float newPitch = currentPitch + class_3532.method_15340(pitchDiff, -step * 0.7f, step * 0.7f);
+        float newYaw = currentYaw + Math.max(-step, Math.min(step, yawDiff));
+        float newPitch = currentPitch + Math.max(-step * 0.7f, Math.min(step * 0.7f, pitchDiff));
         
         newYaw += (float)((RANDOM.nextDouble() - 0.5) * 0.02);
         newPitch += (float)((RANDOM.nextDouble() - 0.5) * 0.02);
@@ -185,7 +175,7 @@ public final class NukerBypassEngine {
         newPitch = class_3532.method_15363(newPitch, -90, 90);
         
         // Gửi packet rotation
-        BypassPacketManager.sendRotation(newYaw, newPitch, player.field_6228);
+        BypassPacketManager.sendRotation(newYaw, newPitch, player.method_24828());
         
         lastSpoofedYaw = newYaw;
         lastSpoofedPitch = newPitch;
@@ -204,7 +194,7 @@ public final class NukerBypassEngine {
         double y = player.method_23318() + offsetY + (RANDOM.nextDouble() - 0.5) * 0.00003;
         double z = player.method_23321() + offsetZ + (RANDOM.nextDouble() - 0.5) * 0.00005;
         
-        BypassPacketManager.sendPosition(x, y, z, player.field_6228);
+        BypassPacketManager.sendPosition(x, y, z, player.method_24828());
         lastSpoofedX = x;
         lastSpoofedZ = z;
     }
