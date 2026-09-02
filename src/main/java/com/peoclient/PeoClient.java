@@ -156,7 +156,6 @@ public final class PeoClient implements ClientModInitializer {
                 com.peoclient.diagnostic.NukerSessionRecorder.get().startSession();
             }
             NukerCompatibility.tick(mc);
-            com.peoclient.render.NukerRenderBatcher.flush(mc);
         } else if (com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
             com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
         }
