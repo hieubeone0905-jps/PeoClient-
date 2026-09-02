@@ -24,8 +24,7 @@ public final class NukerSessionRecorder {
         if (currentSession != null) return;
         class_310 mc = class_310.method_1551();
         String account = mc.method_1548() != null ? mc.method_1548().method_1676() : "UNKNOWN";
-        String server = mc.field_1724 != null && mc.field_1724.field_6214 != null
-                ? mc.field_1724.field_6214.method_10498() : "UNKNOWN";
+        String server = DiagnosticUtil.serverAddress(mc);
         currentSession = new Session(account, server);
         DiagnosticRecorder.get().record("NukerSession", "Started");
     }

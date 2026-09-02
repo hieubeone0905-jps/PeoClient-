@@ -37,23 +37,23 @@ public final class PlayerStateSnapshot {
         if (mc.field_1724 == null) {
             return new PlayerStateSnapshot(System.currentTimeMillis(), -1, 0,0,0, 0,0,0, 0,0, false, false, false, 0, 0, 0, "UNKNOWN");
         }
-        class_243 pos = mc.field_1724.method_23317_();
-        class_243 vel = mc.field_1724.method_23309_();
-        String gm = mc.field_1761 != null && mc.field_1761.method_2917() != null
-                ? mc.field_1761.method_2917().toString() : "UNKNOWN";
+        class_243 pos = mc.field_1724.method_19538();
+        class_243 vel = mc.field_1724.method_18798();
+        String gm = mc.field_1761 != null && mc.field_1761.method_2920() != null
+                ? mc.field_1761.method_2920().toString() : "UNKNOWN";
         return new PlayerStateSnapshot(
                 System.currentTimeMillis(),
-                mc.field_1724.field_6216,
+                DiagnosticUtil.clientTick(),
                 pos.field_1352, pos.field_1351, pos.field_1350,
                 vel.field_1352, vel.field_1351, vel.field_1350,
                 mc.field_1724.method_36454(),
                 mc.field_1724.method_36455(),
-                mc.field_1724.field_6228,
-                mc.field_1724.method_24654(),
-                mc.field_1724.method_23905(),
-                mc.field_1724.method_31548().field_7461,
-                mc.field_1724.method_6078(),
-                mc.field_1724.method_6084(),
+                mc.field_1724.method_24828(),
+                false,
+                false,
+                mc.field_1724.method_31548().field_7545,
+                mc.field_1724.method_6032(),
+                mc.field_1724.method_7344().method_7586(),
                 gm
         );
     }

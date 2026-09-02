@@ -27,7 +27,7 @@ public final class WorldStateMonitor {
         class_2680 state = mc.field_1687.method_8320(pos);
         String blockId = state.method_26204() != null ? class_7923.field_41175.method_10221(state.method_26204()).toString() : "UNKNOWN";
         double dist = mc.field_1724 != null ? mc.field_1724.method_33571().method_1022(class_243.method_24953(pos)) : -1;
-        history.add(new TargetState(System.currentTimeMillis(), mc.field_1724 != null ? mc.field_1724.field_6216 : -1, pos, blockId, state.method_26215(), state.method_26220(), dist));
+        history.add(new TargetState(System.currentTimeMillis(), mc.field_1724 != null ? DiagnosticUtil.clientTick() : -1, pos, blockId, state.method_26215(), state.method_26220(mc.field_1687, pos), dist));
         trim();
     }
 
@@ -38,7 +38,7 @@ public final class WorldStateMonitor {
         class_2680 state = mc.field_1687.method_8320(pos);
         String blockId = state.method_26204() != null ? class_7923.field_41175.method_10221(state.method_26204()).toString() : "UNKNOWN";
         double dist = mc.field_1724 != null ? mc.field_1724.method_33571().method_1022(class_243.method_24953(pos)) : -1;
-        history.add(new TargetState(System.currentTimeMillis(), mc.field_1724 != null ? mc.field_1724.field_6216 : -1, pos, blockId, state.method_26215(), state.method_26220(), dist, "POST_BREAK"));
+        history.add(new TargetState(System.currentTimeMillis(), mc.field_1724 != null ? DiagnosticUtil.clientTick() : -1, pos, blockId, state.method_26215(), state.method_26220(mc.field_1687, pos), dist, "POST_BREAK"));
         trim();
     }
 

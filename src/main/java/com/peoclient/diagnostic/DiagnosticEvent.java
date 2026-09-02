@@ -62,7 +62,7 @@ public final class DiagnosticEvent {
         public DiagnosticEvent build() {
             if (category == null) category = Category.ERROR;
             if (clientTick == -1 && class_310.method_1551().field_1724 != null)
-                clientTick = class_310.method_1551().field_1724.field_6216;
+                clientTick = DiagnosticUtil.clientTick();
             return new DiagnosticEvent(this);
         }
     }

@@ -64,27 +64,26 @@ public final class DisconnectContext {
     public static DisconnectContext capture(class_310 mc) {
         Builder b = new Builder();
         b.timestamp = System.currentTimeMillis();
-        b.clientTick = mc.field_1724 != null ? mc.field_1724.field_6216 : -1;
+        b.clientTick = mc.field_1724 != null ? DiagnosticUtil.clientTick() : -1;
         b.accountName = mc.method_1548() != null ? mc.method_1548().method_1676() : "UNKNOWN";
-        b.serverAddress = mc.field_1724 != null && mc.field_1724.field_6214 != null
-                ? mc.field_1724.field_6214.method_10498() : "UNKNOWN";
-        b.dimension = mc.field_1687 != null && mc.field_1687.method_27986() != null
-                ? mc.field_1687.method_27986().toString() : "UNKNOWN";
+        b.serverAddress = DiagnosticUtil.serverAddress(mc);
+        b.dimension = mc.field_1687 != null && mc.field_1687.method_27983() != null
+                ? mc.field_1687.method_27983().toString() : "UNKNOWN";
 
         if (mc.field_1724 != null) {
-            class_243 pos = mc.field_1724.method_23317_();
+            class_243 pos = mc.field_1724.method_19538();
             b.x = pos.field_1352; b.y = pos.field_1351; b.z = pos.field_1350;
-            class_243 vel = mc.field_1724.method_23309_();
+            class_243 vel = mc.field_1724.method_18798();
             b.velocityX = vel.field_1352; b.velocityY = vel.field_1351; b.velocityZ = vel.field_1350;
             b.yaw = mc.field_1724.method_36454();
             b.pitch = mc.field_1724.method_36455();
-            b.onGround = mc.field_1724.field_6228;
-            b.selectedSlot = mc.field_1724.method_31548().field_7461;
-            b.health = mc.field_1724.method_6078();
-            b.food = mc.field_1724.method_6084();
-            b.gamemode = mc.field_1761 != null && mc.field_1761.method_2917() != null
-                    ? mc.field_1761.method_2917().toString() : "UNKNOWN";
-            b.ping = mc.field_1724.field_6214 != null ? mc.field_1724.field_6214.method_11028() : -1;
+            b.onGround = mc.field_1724.method_24828();
+            b.selectedSlot = mc.field_1724.method_31548().field_7545;
+            b.health = mc.field_1724.method_6032();
+            b.food = mc.field_1724.method_7344().method_7586();
+            b.gamemode = mc.field_1761 != null && mc.field_1761.method_2920() != null
+                    ? mc.field_1761.method_2920().toString() : "UNKNOWN";
+            b.ping = DiagnosticUtil.ping(mc);
         } else {
             b.x = b.y = b.z = 0;
             b.velocityX = b.velocityY = b.velocityZ = 0;

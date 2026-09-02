@@ -17,8 +17,8 @@ public final class LatencyMetrics {
 
     public void updatePing() {
         class_310 mc = class_310.method_1551();
-        if (mc.field_1724 == null || mc.field_1724.field_6214 == null) return;
-        int ping = mc.field_1724.field_6214.method_11028();
+        if (mc.field_1724 == null) return;
+        int ping = DiagnosticUtil.ping(mc);
         if (ping > 0) {
             lastPing = ping;
             AccountSessionMetrics.get().updatePing(ping);

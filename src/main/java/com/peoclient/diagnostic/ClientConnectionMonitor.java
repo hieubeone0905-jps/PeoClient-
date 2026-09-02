@@ -30,8 +30,8 @@ public final class ClientConnectionMonitor {
 
     public void onConnected() {
         class_310 mc = class_310.method_1551();
-        if ((serverAddress == null || serverAddress.isBlank()) && mc.field_1724 != null && mc.field_1724.field_6214 != null) {
-            serverAddress = mc.field_1724.field_6214.method_10498();
+        if (serverAddress == null || serverAddress.isBlank()) {
+            serverAddress = DiagnosticUtil.serverAddress(mc);
         }
         if (account == null || account.isBlank()) {
             account = mc.method_1548() != null ? mc.method_1548().method_1676() : "UNKNOWN";

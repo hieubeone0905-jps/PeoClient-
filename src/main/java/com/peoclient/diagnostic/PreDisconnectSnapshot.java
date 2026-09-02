@@ -81,7 +81,7 @@ public final class PreDisconnectSnapshot {
 
         public static StateSnapshot capture(class_310 mc) {
             long ts = System.currentTimeMillis();
-            int tick = mc.field_1724 != null ? mc.field_1724.field_6216 : -1;
+            int tick = mc.field_1724 != null ? DiagnosticUtil.clientTick() : -1;
             double x = 0, y = 0, z = 0;
             float yaw = 0, pitch = 0;
             boolean onGround = false;
@@ -93,14 +93,14 @@ public final class PreDisconnectSnapshot {
             int attempts = 0, successes = 0, failures = 0, rec = 0;
 
             if (mc.field_1724 != null) {
-                class_243 pos = mc.field_1724.method_23317_();
+                class_243 pos = mc.field_1724.method_19538();
                 x = pos.field_1352; y = pos.field_1351; z = pos.field_1350;
                 yaw = mc.field_1724.method_36454();
                 pitch = mc.field_1724.method_36455();
-                onGround = mc.field_1724.field_6228;
-                ping = mc.field_1724.field_6214 != null ? mc.field_1724.field_6214.method_11028() : -1;
-                health = mc.field_1724.method_6078();
-                food = mc.field_1724.method_6084();
+                onGround = mc.field_1724.method_24828();
+                ping = DiagnosticUtil.ping(mc);
+                health = mc.field_1724.method_6032();
+                food = mc.field_1724.method_7344().method_7586();
             }
             nukerState = BreakStateTracker.get().getState().name();
             target = BreakStateTracker.get().getCurrentTarget();

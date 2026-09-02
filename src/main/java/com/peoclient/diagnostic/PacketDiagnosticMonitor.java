@@ -21,7 +21,7 @@ public final class PacketDiagnosticMonitor {
         String name = packet.getClass().getSimpleName();
         if (!name.startsWith("class_")) {
             // only record if it's a network packet (intermediary names start with class_)
-            records.add(new PacketRecord(System.currentTimeMillis(), class_310.method_1551().field_1724 != null ? class_310.method_1551().field_1724.field_6216 : -1, name));
+            records.add(new PacketRecord(System.currentTimeMillis(), class_310.method_1551().field_1724 != null ? DiagnosticUtil.clientTick() : -1, name));
             if (records.size() > MAX_RECORDS) {
                 records.poll();
             }

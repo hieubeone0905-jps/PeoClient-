@@ -132,6 +132,8 @@ public final class PeoClient implements ClientModInitializer {
             if (mc.field_1724 != null) mc.field_1724.method_7353(class_2561.method_43470("Nuker Compatibility: " + (NukerCompatibility.isEnabled() ? "ON" : "OFF")), true);
         }
 
+        com.peoclient.diagnostic.DiagnosticUtil.nextTick();
+
         if (mc.field_1724 == null || mc.field_1687 == null) {
             if (++saveTick >= 100) {
                 saveTick = 0;
@@ -152,7 +154,7 @@ public final class PeoClient implements ClientModInitializer {
             com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
         }
         AntiVipProMaxModule.tick();
-        if (mc.field_1724.field_6216 % 20 == 0) {
+        if (com.peoclient.diagnostic.DiagnosticUtil.clientTick() % 20 == 0) {
             com.peoclient.diagnostic.PreDisconnectSnapshot.get().record(mc);
             com.peoclient.diagnostic.LatencyMetrics.get().updatePing();
         }
