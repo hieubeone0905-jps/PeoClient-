@@ -156,6 +156,7 @@ public final class PeoClient implements ClientModInitializer {
                 com.peoclient.diagnostic.NukerSessionRecorder.get().startSession();
             }
             NukerCompatibility.tick(mc);
+            com.peoclient.mixin.NukerRenderBatcher.flush(mc);
         } else if (com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
             com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
         }
@@ -731,7 +732,6 @@ public final class PeoClient implements ClientModInitializer {
                 // can be told about the exact old/new state when the local world has
                 // already received the server update.
                 class_2680 renderOldState = state;
-                com.peoclient.diagnostic.RenderDiagnostic.logNukerBefore(target.pos, renderOldState);
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
@@ -746,7 +746,6 @@ public final class PeoClient implements ClientModInitializer {
                     int y = target.pos.method_10264();
                     int z = target.pos.method_10260();
                     class_2680 renderNewState = mc.field_1687.method_8320(target.pos);
-                    com.peoclient.diagnostic.RenderDiagnostic.logNukerAfter(target.pos, renderOldState, renderNewState);
                     if (!renderOldState.equals(renderNewState)) {
                         mc.field_1769.method_8570(mc.field_1687, target.pos, renderOldState, renderNewState, 0);
                     } else {
