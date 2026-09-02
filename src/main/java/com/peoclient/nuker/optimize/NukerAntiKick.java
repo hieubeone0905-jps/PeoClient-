@@ -2,7 +2,7 @@ package com.peoclient.nuker.optimize;
 
 import com.peoclient.PeoClient;
 import com.peoclient.diagnostic.BreakFailureReason;
-import com.peoclient.diagnostic.FailureClassifier;
+import com.peoclient.nuker.compat.FailureClassifier;
 import com.peoclient.nuker.bypass.NukerBypassEngine;
 import net.minecraft.class_2338;
 import net.minecraft.class_2350;

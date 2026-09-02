@@ -28,7 +28,7 @@ public final class FailureClassifier {
         class_2680 state = mc.field_1687.method_8320(target);
         if (state.method_26215()) return BreakFailureReason.BLOCK_NOT_CHANGED;
         if (state.method_26204() instanceof class_2404) return BreakFailureReason.UNKNOWN;
-        if (progress <= 0.0f) return BreakFailureReason.BREAK_STAGNANT;
+        if (progress <= 0.0f) return BreakFailureReason.BLOCK_NOT_CHANGED;
         return BreakFailureReason.UNKNOWN;
     }
 }
