@@ -84,7 +84,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
-                case "PeoJoin" -> GLFW.GLFW_KEY_UNKNOWN;
+                case "PeoJoin" -> GLFW.GLFW_KEY_P;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
             Integer stored = CFG.keybinds.get(module);
@@ -115,7 +115,7 @@ public final class PeoClient implements ClientModInitializer {
             case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
-                case "PeoJoin" -> GLFW.GLFW_KEY_UNKNOWN;
+                case "PeoJoin" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
     }

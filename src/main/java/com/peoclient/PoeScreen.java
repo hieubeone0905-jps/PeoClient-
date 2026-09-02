@@ -1,6 +1,7 @@
 package com.peoclient;
 
 import com.peoclient.modules.AntiVipProMaxModule;
+import com.peoclient.modules.PeoJoinModule;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -67,7 +68,8 @@ public final class PoeScreen extends class_437 {
 
     private boolean implemented(String name) {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
-                || name.equals("Nuker [Multi]") || name.equals("X-Ray") || name.equals("AntiVipProMax");
+                || name.equals("Nuker [Multi]") || name.equals("X-Ray")
+                || name.equals("AntiVipProMax") || name.equals("PeoJoin");
     }
 
     private boolean enabled(String name) {
@@ -77,6 +79,7 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.CFG.xray;
             case "AntiVipProMax" -> AntiVipProMaxModule.isEnabled();
+            case "PeoJoin" -> PeoJoinModule.isEnabled();
             default -> false;
         };
     }
@@ -88,6 +91,7 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
+            case "PeoJoin" -> PeoJoinModule.toggle();
         }
         PeoClient.CFG.save();
     }
@@ -199,6 +203,7 @@ public final class PoeScreen extends class_437 {
                 case "X-Ray" -> drawXray(d, x, yy, w);
                 case "Fullbright" -> drawFullbright(d, x, yy, w);
                 case "AntiVipProMax" -> drawAntiVipProMax(d, x, yy, w);
+                case "PeoJoin" -> drawPeoJoin(d, x, yy, w);
             }
         } else {
             rowValue(d, x, yy, w, "Keybind", keyName(selected));
@@ -405,6 +410,7 @@ public final class PoeScreen extends class_437 {
             case "Fullbright" -> "Makes dark areas bright.";
             case "X-Ray" -> "Shows selected blocks through the world.";
             case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
+            case "PeoJoin" -> "Automatic local recovery after disconnect; reconnects and sends /home.";
             default -> "";
         };
     }
@@ -417,6 +423,15 @@ public final class PoeScreen extends class_437 {
         y = rowToggle(d, x, y, w, "Auto Adjust", AntiVipProMaxModule.isAutoAdjust());
         y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
         y = rowValue(d, x, y, w, "Mode", "Compatibility/status only; no anti-cheat bypass");
+        return y;
+    }
+
+    private int drawPeoJoin(class_332 d, int x, int y, int w) {
+        y = section(d, x, y, "Recovery");
+        y = rowValue(d, x, y, w, "Server", "Skyblock");
+        y = rowValue(d, x, y, w, "Join delay", "5 seconds");
+        y = rowValue(d, x, y, w, "After /home", "5 seconds");
+        y = rowValue(d, x, y, w, "Mode", "Reconnect + /home");
         return y;
     }
 
