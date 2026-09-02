@@ -1,10 +1,13 @@
 # AntiVipProMax integration
 
-This build adds an `AntiVipProMax` module to the existing PeoClient hub.
+This build wires the supplied AntiVipProMax implementation into PeoClient.
 
-- Default key: C
-- Settings: Grim Mode, Vulcan Mode, Intensity 1-10, Auto Adjust
-- Existing Nuker settings and NukerLogic are left unchanged.
-- The module is a compatibility/settings/status layer. It is shown in the active-module HUD when enabled, but it does not inject synthetic movement/rotation packets or attempt to defeat server anti-cheat.
+- Module UI/keybind remains `AntiVipProMax` (default key: C).
+- Settings: Grim Mode, Vulcan Mode, Intensity 1-10, Auto Adjust.
+- `AntiVipProMaxModule` controls `NukerBypassEngine`.
+- `BypassPacketManager` and `NukerBypassEngine` are included under `com.peoclient.nuker.bypass`.
+- Existing `PeoClient.NukerLogic` and its configuration fields remain unchanged.
+- Saved AntiVipProMax settings are loaded from `config/peoclient.json`.
 
-The supplied packet-spoof/bypass sources were not wired into the client because doing so would replace the existing Nuker control path and could destabilize the 1.21.4 client. They are therefore not part of the active build.
+Build note: this environment could not run the Gradle build because the Gradle wrapper
+needed to download `gradle-8.12.1-bin.zip` and outbound network access was unavailable.

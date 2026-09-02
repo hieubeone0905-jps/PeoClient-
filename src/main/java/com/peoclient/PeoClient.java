@@ -296,6 +296,11 @@ public final class PeoClient implements ClientModInitializer {
                 slotItems = c.slotItems != null ? c.slotItems : slotItems;
 
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
+                antiVipProMax = c.antiVipProMax;
+                antiVipProMaxGrim = c.antiVipProMaxGrim;
+                antiVipProMaxVulcan = c.antiVipProMaxVulcan;
+                antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));
+                antiVipProMaxAutoAdjust = c.antiVipProMaxAutoAdjust;
                 keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
