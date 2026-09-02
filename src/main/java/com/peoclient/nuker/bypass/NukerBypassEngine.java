@@ -1,7 +1,6 @@
 package com.peoclient.nuker.bypass;
 
 import com.peoclient.diagnostic.BreakFailureReason;
-import com.peoclient.diagnostic.DiagnosticEvent;
 import com.peoclient.diagnostic.DiagnosticTimeline;
 import com.peoclient.diagnostic.DiagnosticUtil;
 import com.peoclient.diagnostic.LatencyMetrics;

@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
+import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -151,6 +152,7 @@ public final class PeoClient implements ClientModInitializer {
         } else if (com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
             com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
         }
+        SafeCompatibilityDiagnostics.tick();
         AntiVipProMaxModule.tick();
         if (com.peoclient.diagnostic.DiagnosticUtil.clientTick() % 20 == 0) {
             com.peoclient.diagnostic.PreDisconnectSnapshot.get().record(mc);
