@@ -61,8 +61,11 @@ public final class ClientWorldRenderUpdateMixin {
             int z = pos.method_10260();
 
             if (oldState != null && !oldState.equals(newState)) {
-                // Preserve the exact old/new incremental update.
-                mc.field_1769.method_8570(mc.field_1687, pos, oldState, newState, flags);
+                // Vanilla ClientWorld#setBlockState already performs the normal
+                // incremental renderer update. Do NOT invoke updateBlock() a
+                // second time here: duplicate renderer invalidation can leave
+                // rebuild work queued out of order during fast Multi mining.
+                // We only record the changed section for the bounded safety pass.
                 NukerRenderBatcher.mark(x, y, z);
             }
         } catch (Throwable ignored) {

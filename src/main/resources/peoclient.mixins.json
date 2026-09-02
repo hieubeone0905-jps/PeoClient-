@@ -19,7 +19,8 @@
     "ClientConnectionMixin",
     "ClientDisconnectMixin",
     "ClientWorldRenderUpdateMixin",
-        "ClientPlayNetworkRenderRefreshMixin"
+    "ClientPlayNetworkRenderRefreshMixin",
+    "MixinChunkRebuildTask"
   ],
   "injectors": {
     "defaultRequire": 1
