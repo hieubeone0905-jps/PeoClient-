@@ -37,7 +37,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "PeoJoin",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",

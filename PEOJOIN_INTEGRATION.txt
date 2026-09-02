@@ -1,0 +1,15 @@
+PeoJoin integration
+===================
+Added:
+- com/peoclient/modules/PeoJoinModule.java
+- PeoJoin added to PoeScreen module list
+- PeoJoin toggle wired in PeoClient.toggleModuleByName()
+- PeoJoin enableNukerOnJoin default enabled during initialization
+
+Source files supplied:
+- deepseek_java_20260902_54b3f4.java
+- deepseek_java_20260902_b84c8c.java
+- deepseek_java_20260902_b398c2.java
+
+Note: the supplied PeoJoinModule contains placeholder methods for selecting the Skyblock
+server and Join button, so those parts are not guaranteed to work against a specific server list UI.

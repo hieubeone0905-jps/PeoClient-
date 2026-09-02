@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
+import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
@@ -58,6 +59,7 @@ public final class PeoClient implements ClientModInitializer {
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
         registerModuleKeys();
+        PeoJoinModule.setEnableNukerOnJoin(true);
         xrayKey = MODULE_KEYS.get("X-Ray");
         nukerKey = MODULE_KEYS.get("Nuker [Multi]");
         fullbrightKey = MODULE_KEYS.get("Fullbright");
@@ -82,6 +84,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
+                case "PeoJoin" -> GLFW.GLFW_KEY_UNKNOWN;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
             Integer stored = CFG.keybinds.get(module);
@@ -112,6 +115,7 @@ public final class PeoClient implements ClientModInitializer {
             case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
+                case "PeoJoin" -> GLFW.GLFW_KEY_UNKNOWN;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
     }
@@ -177,6 +181,7 @@ public final class PeoClient implements ClientModInitializer {
             case "Fullbright" -> toggleFullbright(mc);
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
+            case "PeoJoin" -> PeoJoinModule.toggle();
             default -> { /* reserved for modules that are not implemented yet */ }
         }
         CFG.save();
