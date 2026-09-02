@@ -221,11 +221,7 @@ public final class NukerBypassEngine {
             );
             if (!mc.field_1687.method_8320(spoofPos).method_26215()) {
                 class_2350 side = class_2350.values()[RANDOM.nextInt(class_2350.values().length)];
-                BypassPacketManager.sendBlockAction(
-                    net.minecraft.class_279.class_280.field_1369, // ABORT_DESTROY_BLOCK
-                    spoofPos,
-                    side
-                );
+                BypassPacketManager.sendBlockAction(spoofPos, side);
                 break;
             }
         }
