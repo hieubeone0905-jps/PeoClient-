@@ -787,28 +787,6 @@ public final class PeoClient implements ClientModInitializer {
 
             }
 
-            // If the vanilla breaking progress has completed but the server's
-            // block-update packet has not reached the client render state yet,
-            // predict the final visual state locally. This is client-side prediction
-            // only; the server remains authoritative and can overwrite it with its
-            // next block update. It prevents the exact ghost-block effect where a
-            // broken block stays visible until the player performs another action.
-            if (breakingPos != null && getBreakingProgress() >= 0.999f && mc.field_1687 != null) {
-                class_2680 current = mc.field_1687.method_8320(breakingPos);
-                if (!current.method_26215()) {
-                    class_2680 air = net.minecraft.class_2246.field_10124.method_9564();
-                    class_2338 pos = breakingPos.method_10062();
-                    if (mc.field_1687.method_8652(pos, air, 18)) {
-                        if (mc.field_1769 != null) {
-                            int x = pos.method_10263();
-                            int y = pos.method_10264();
-                            int z = pos.method_10260();
-                            mc.field_1769.method_8570(mc.field_1687, pos, current, air, 18);
-                            mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
-                        }
-                    }
-                }
-            }
 
         }
 

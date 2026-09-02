@@ -17,7 +17,8 @@
     "MultiplayerScreenMixin",
     "SelectWorldScreenMixin",
     "ClientConnectionMixin",
-    "ClientDisconnectMixin"
+    "ClientDisconnectMixin",
+    "ClientWorldRenderUpdateMixin"
   ],
   "injectors": {
     "defaultRequire": 1
