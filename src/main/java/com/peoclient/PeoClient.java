@@ -358,7 +358,7 @@ public final class PeoClient implements ClientModInitializer {
                 xrayBackgroundOpacity = c.xrayBackgroundOpacity;
 
                 nukerMode = c.nukerMode; nukerMulti = c.nukerMulti;
-                nukerCooldown = c.nukerCooldown; nukerShape = c.nukerShape;
+                nukerCooldown = 0; nukerShape = c.nukerShape;
                 nukerRange = c.nukerRange; nukerSort = c.nukerSort;
                 nukerFilter = c.nukerFilter; nukerWhitelist = c.nukerWhitelist;
                 nukerFilterIds = c.nukerFilterIds; nukerRaycast = c.nukerRaycast;
@@ -567,6 +567,10 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
+        // Render refresh is throttled so it fixes stale chunk meshes without
+        // forcing a full renderer rebuild every Nuker tick. This does not
+        // change target selection, range, multi, or break speed.
+        private static long lastRenderRefreshMs;
 
         private NukerLogic() {}
 
@@ -626,12 +630,6 @@ public final class PeoClient implements ClientModInitializer {
             if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                 com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(
                         breakingPos != null, stagnantTicks > 0);
-            }
-
-            if (cooldown > 0) {
-                cooldown--;
-                if (breakingPos != null) renderBlocks.add(breakingPos);
-                return;
             }
 
             // Build a fresh queue when the old one is exhausted or its active target became invalid.
@@ -773,12 +771,20 @@ public final class PeoClient implements ClientModInitializer {
 
             }
 
-            // Cooldown is a delay BETWEEN batches, not a per-target limiter.
-            // This keeps Range/Multi/Shape/Mode unchanged: a batch can still
-            // process the full configured Multi count before the cooldown starts.
-            if (CFG.nukerCooldown > 0 && processed > 0) {
-                cooldown = CFG.nukerCooldown;
+            // Some servers/client states can leave chunk meshes visually stale
+            // after rapid block updates. Periodically rebuild the world renderer
+            // while Nuker is actively processing blocks. This only fixes the
+            // visual state; it never changes the Nuker target queue or timing.
+            if (processed > 0) {
+                long nowMs = System.currentTimeMillis();
+                if (nowMs - lastRenderRefreshMs >= 250L) {
+                    lastRenderRefreshMs = nowMs;
+                    if (mc.field_1769 != null) {
+                        mc.field_1769.method_3279();
+                    }
+                }
             }
+
         }
 
         public static void resetState() {
@@ -793,6 +799,7 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
+            lastRenderRefreshMs = 0L;
         }
 
         public static List<class_2338> getRenderBlocks() {
