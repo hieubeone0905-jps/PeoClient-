@@ -771,10 +771,13 @@ public final class PeoClient implements ClientModInitializer {
                     breakingSide = null;
                 }
 
-                if (CFG.nukerCooldown > 0) {
-                    cooldown = CFG.nukerCooldown;
-                    break;
-                }
+            }
+
+            // Cooldown is a delay BETWEEN batches, not a per-target limiter.
+            // This keeps Range/Multi/Shape/Mode unchanged: a batch can still
+            // process the full configured Multi count before the cooldown starts.
+            if (CFG.nukerCooldown > 0 && processed > 0) {
+                cooldown = CFG.nukerCooldown;
             }
         }
 
