@@ -65,8 +65,25 @@ public final class InventoryCleaner {
         // Aggressive mode: perform several locally-predicted inventory actions in
         // the same client tick. We deliberately cap the batch so the client does
         // not flood the connection with an unbounded number of click packets.
-        final int maxActionsPerTick = 8;
+        final int maxActionsPerTick = 16;
         int actions = 0;
+
+        // Fast path for explicit filter mode: collect matching slots once and
+        // throw complete stacks back-to-back. Dropping a stack never shifts the
+        // remaining inventory slots, so the collected slot ids remain valid.
+        if (PeoClient.CFG.cleanerFilterOnly && !PeoClient.CFG.cleanerDropFilter.isEmpty()
+                && PeoClient.CFG.cleanerActionDelay == 0 && cooldown == 0) {
+            List<Entry> filtered = snapshot(mc).stream()
+                    .filter(e -> isDropFiltered(e.stack))
+                    .filter(e -> !e.stack.method_7960())
+                    .sorted(Comparator.comparingInt(Entry::slot))
+                    .limit(maxActionsPerTick)
+                    .toList();
+            for (Entry e : filtered) {
+                drop(mc, e.slot);
+            }
+            return;
+        }
 
         while (actions < maxActionsPerTick) {
             if (cooldown > 0) {
