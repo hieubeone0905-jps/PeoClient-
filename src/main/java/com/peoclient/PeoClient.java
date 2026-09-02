@@ -732,19 +732,31 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToInteraction(
                             diagnosticInteractionTime - diagnosticAttemptTime);
                 }
+                // Capture the client state before the interaction so the renderer
+                // can be told about the exact old/new state when the local world has
+                // already received the server update.
+                class_2680 renderOldState = state;
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
-                // Schedule a targeted chunk/section rebuild for the changed block.
-                // A full WorldRenderer.reload() is not sufficient for this case because
-                // Minecraft may keep the existing built chunk mesh until its sections
-                // are explicitly marked dirty. This mirrors vanilla block-update
-                // rendering without changing Nuker targeting or break timing.
+
+                // Force the same kind of incremental render invalidation used by
+                // vanilla block updates. The previous fix only scheduled a 3x3x3
+                // chunk rebuild; this additionally dirties the exact block region
+                // and, when the client state changed immediately, calls updateBlock
+                // with the real old/new states. This is render-only and does not
+                // modify Nuker targeting, range, multi, or interaction timing.
                 if (mc.field_1769 != null) {
                     int x = target.pos.method_10263();
                     int y = target.pos.method_10264();
                     int z = target.pos.method_10260();
+                    class_2680 renderNewState = mc.field_1687.method_8320(target.pos);
+                    if (!renderOldState.equals(renderNewState)) {
+                        mc.field_1769.method_8570(mc.field_1687, target.pos, renderOldState, renderNewState, 0);
+                    }
+                    mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
                     mc.field_1769.method_18145(x, y, z);
+                    mc.field_1769.method_3292();
                 }
                 processed++;
 
@@ -791,8 +803,8 @@ public final class PeoClient implements ClientModInitializer {
                 if (nowMs - lastRenderRefreshMs >= 250L) {
                     lastRenderRefreshMs = nowMs;
                     if (mc.field_1769 != null) {
-                        // Mark the local terrain for an incremental rebuild instead of
-                        // reloading every world-render resource.
+                        // Keep a lightweight terrain rebuild request as a fallback for
+                        // chunk-builder frames that are still holding an older mesh.
                         mc.field_1769.method_3292();
                     }
                 }
