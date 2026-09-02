@@ -2,6 +2,7 @@ package com.peoclient.mixin;
 
 import com.peoclient.PeoClient;
 import com.peoclient.render.NukerRenderBatcher;
+import com.peoclient.diagnostic.NukerRenderDiagnostics;
 import net.minecraft.class_1922;
 import net.minecraft.class_2338;
 import net.minecraft.class_2680;
@@ -39,6 +40,7 @@ public final class WorldRendererNukerUpdateMixin {
             int y = pos.method_10264();
             int z = pos.method_10260();
             NukerRenderBatcher.markSectionForBlock(x, y, z);
+            NukerRenderDiagnostics.worldChanged(pos, oldState, newState);
         } catch (Throwable ignored) {
             // Render repair must never affect vanilla rendering/gameplay.
         }
