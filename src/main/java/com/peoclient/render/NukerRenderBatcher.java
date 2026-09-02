@@ -13,19 +13,17 @@ import java.util.Set;
  */
 public final class NukerRenderBatcher {
     private static final Set<Long> PENDING_SECTIONS = new HashSet<>();
+    private static final int MAX_PENDING_SECTIONS = 256;
     private static int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
     private static int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
     private static boolean pendingBounds;
     private static long totalChanges;
     private static long totalFlushes;
-    private static long lastHardRefreshMs;
-    private static int changesSinceHardRefresh;
 
     private NukerRenderBatcher() {}
 
     public static void mark(int x, int y, int z) {
         totalChanges++;
-        changesSinceHardRefresh++;
         if (!pendingBounds) {
             minX = maxX = x; minY = maxY = y; minZ = maxZ = z;
             pendingBounds = true;
@@ -49,7 +47,7 @@ public final class NukerRenderBatcher {
     }
 
     private static void addSection(int x, int y, int z) {
-        PENDING_SECTIONS.add(pack(x, y, z));
+        if (PENDING_SECTIONS.size() < MAX_PENDING_SECTIONS) PENDING_SECTIONS.add(pack(x, y, z));
     }
 
     private static long pack(int x, int y, int z) {
@@ -73,14 +71,7 @@ public final class NukerRenderBatcher {
             }
 
             totalFlushes++;
-            long now = System.currentTimeMillis();
-            if (changesSinceHardRefresh > 0 && now - lastHardRefreshMs >= 2500L) {
-                // Safety valve only after sustained activity. 2.5s cadence
-                // avoids repeatedly rebuilding the entire renderer.
-                mc.field_1769.method_3279();
-                lastHardRefreshMs = now;
-                changesSinceHardRefresh = 0;
-                DiagnosticRecorder.get().record("NukerRender",
+            DiagnosticRecorder.get().record("NukerRender",
                         "HARD_REFRESH renderer.reload() sections=" + sections + " totalChanges=" + totalChanges);
             }
 
