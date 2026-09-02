@@ -824,7 +824,6 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
-            lastRenderRefreshMs = 0L;
         }
 
         public static List<class_2338> getRenderBlocks() {
