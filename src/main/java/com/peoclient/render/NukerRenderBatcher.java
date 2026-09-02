@@ -1,27 +1,31 @@
 package com.peoclient.render;
 
-import com.peoclient.diagnostic.NukerRenderDiagnostics;
+import com.peoclient.diagnostic.DiagnosticRecorder;
 import net.minecraft.class_310;
 
 import java.util.HashSet;
 import java.util.Set;
 
 /**
- * Coalesces render invalidation for rapid Nuker block changes.
- * Render-only: never changes world state and never sends packets.
+ * Coalesces Nuker render updates.  Only one render pass is submitted per
+ * client tick, regardless of how many blocks changed during that tick.
+ * This is render-only and never changes world state or packets.
  */
 public final class NukerRenderBatcher {
     private static final Set<Long> PENDING_SECTIONS = new HashSet<>();
     private static int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
     private static int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;
     private static boolean pendingBounds;
-    private static boolean hadChanges;
-    private static long lastChangeMs;
-    private static long firstChangeMs;
+    private static long totalChanges;
+    private static long totalFlushes;
+    private static long lastHardRefreshMs;
+    private static int changesSinceHardRefresh;
 
     private NukerRenderBatcher() {}
 
     public static void mark(int x, int y, int z) {
+        totalChanges++;
+        changesSinceHardRefresh++;
         if (!pendingBounds) {
             minX = maxX = x; minY = maxY = y; minZ = maxZ = z;
             pendingBounds = true;
@@ -29,15 +33,11 @@ public final class NukerRenderBatcher {
             minX = Math.min(minX, x); minY = Math.min(minY, y); minZ = Math.min(minZ, z);
             maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); maxZ = Math.max(maxZ, z);
         }
-        hadChanges = true;
-        if (firstChangeMs == 0L) firstChangeMs = System.currentTimeMillis();
-        lastChangeMs = System.currentTimeMillis();
         markSectionForBlock(x, y, z);
     }
 
     public static void markSectionForBlock(int x, int y, int z) {
         int sx = Math.floorDiv(x, 16), sy = Math.floorDiv(y, 16), sz = Math.floorDiv(z, 16);
-        int before = PENDING_SECTIONS.size();
         addSection(sx, sy, sz);
         int lx = Math.floorMod(x, 16), ly = Math.floorMod(y, 16), lz = Math.floorMod(z, 16);
         if (lx == 0) addSection(sx - 1, sy, sz);
@@ -46,8 +46,6 @@ public final class NukerRenderBatcher {
         if (ly == 15) addSection(sx, sy + 1, sz);
         if (lz == 0) addSection(sx, sy, sz - 1);
         if (lz == 15) addSection(sx, sy, sz + 1);
-        int added = PENDING_SECTIONS.size() - before;
-        if (added > 0) NukerRenderDiagnostics.sectionQueued(added);
     }
 
     private static void addSection(int x, int y, int z) {
@@ -57,50 +55,39 @@ public final class NukerRenderBatcher {
     private static long pack(int x, int y, int z) {
         return ((long)(x & 0x3FFFFFF) << 38) | ((long)(z & 0x3FFFFFF) << 12) | (y & 0xFFFL);
     }
-    private static int unpackX(long p) { int x=(int)(p>>38); return (x<<6)>>6; }
-    private static int unpackY(long p) { int y=(int)(p&0xFFFL); return (y<<20)>>20; }
-    private static int unpackZ(long p) { int z=(int)((p>>12)&0x3FFFFFFL); return (z<<6)>>6; }
+    private static int unpackX(long p) { int v=(int)(p>>38); return (v<<6)>>6; }
+    private static int unpackY(long p) { int v=(int)(p&0xFFFL); return (v<<20)>>20; }
+    private static int unpackZ(long p) { int v=(int)((p>>12)&0x3FFFFFFL); return (v<<6)>>6; }
 
     public static void flush(class_310 mc) {
-        if (PENDING_SECTIONS.isEmpty() && !pendingBounds && !hadChanges) return;
+        if (PENDING_SECTIONS.isEmpty() && !pendingBounds) return;
+        int sections = PENDING_SECTIONS.size();
         try {
-            if (mc == null || mc.field_1687 == null || mc.field_1769 == null) {
-                clear();
-                return;
+            if (mc == null || mc.field_1687 == null || mc.field_1769 == null) return;
+
+            // One queue submission per unique section. Do not also submit a
+            // large bounding-box/terrain refresh: that was causing a render
+            // backlog during sustained Multi mining.
+            for (long packed : PENDING_SECTIONS) {
+                mc.field_1769.method_8571(unpackX(packed), unpackY(packed), unpackZ(packed));
             }
 
-            int sections = PENDING_SECTIONS.size();
-            for (long p : PENDING_SECTIONS) {
-                mc.field_1769.method_8571(unpackX(p), unpackY(p), unpackZ(p));
-            }
-
-            if (pendingBounds) {
-                mc.field_1769.method_18146(
-                        minX - 1, minY - 1, minZ - 1,
-                        maxX + 1, maxY + 1, maxZ + 1);
-            }
-
-            if (hadChanges) {
-                mc.field_1769.method_3292();
-            }
-
-            NukerRenderDiagnostics.flushed(sections);
-
-            // If Nuker has been running continuously, a bounded full renderer
-            // rebuild periodically clears any stale queued mesh that survived
-            // incremental invalidation. It is throttled and only render-side.
+            totalFlushes++;
             long now = System.currentTimeMillis();
-            if (hadChanges && firstChangeMs > 0L && now - firstChangeMs >= 3000L && NukerRenderDiagnostics.shouldHardRefresh()) {
+            if (changesSinceHardRefresh > 0 && now - lastHardRefreshMs >= 2500L) {
+                // Safety valve only after sustained activity. 2.5s cadence
+                // avoids repeatedly rebuilding the entire renderer.
                 mc.field_1769.method_3279();
-                NukerRenderDiagnostics.hardRefresh(mc);
+                lastHardRefreshMs = now;
+                changesSinceHardRefresh = 0;
+                DiagnosticRecorder.get().record("NukerRender",
+                        "HARD_REFRESH renderer.reload() sections=" + sections + " totalChanges=" + totalChanges);
             }
-            NukerRenderDiagnostics.summary();
+
+            DiagnosticRecorder.get().record("NukerRender",
+                    "FLUSH sections=" + sections + " totalChanges=" + totalChanges + " flushes=" + totalFlushes);
         } catch (Throwable t) {
-            if (com.peoclient.diagnostic.DiagnosticConfig.get().isEnabled()) {
-                com.peoclient.diagnostic.DiagnosticRecorder.get().record(
-                        "NukerRender", "RENDER_REFRESH_ERROR " + t.getClass().getSimpleName() + ": " + t.getMessage());
-                com.peoclient.diagnostic.DiagnosticRecorder.get().flush();
-            }
+            DiagnosticRecorder.get().record("NukerRender", "RENDER_ERROR " + t.getClass().getSimpleName() + ": " + t.getMessage());
         } finally {
             clear();
         }
@@ -108,9 +95,8 @@ public final class NukerRenderBatcher {
 
     public static void clear() {
         PENDING_SECTIONS.clear();
-        minX=minY=minZ=Integer.MAX_VALUE;
-        maxX=maxY=maxZ=Integer.MIN_VALUE;
-        pendingBounds=false;
-        hadChanges=false;
+        minX = minY = minZ = Integer.MAX_VALUE;
+        maxX = maxY = maxZ = Integer.MIN_VALUE;
+        pendingBounds = false;
     }
 }

@@ -749,11 +749,6 @@ public final class PeoClient implements ClientModInitializer {
                     if (!renderOldState.equals(renderNewState)) {
                         mc.field_1769.method_8570(mc.field_1687, target.pos, renderOldState, renderNewState, 0);
                         mc.field_1769.method_21596(target.pos, renderOldState, renderNewState);
-                        com.peoclient.render.NukerRenderBatcher.mark(x, y, z);
-                        com.peoclient.diagnostic.NukerRenderDiagnostics.worldChanged(
-                                target.pos, renderOldState, renderNewState);
-                        com.peoclient.diagnostic.NukerRenderDiagnostics.recordMismatch(
-                                target.pos, renderNewState);
                     } else {
                         mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
                     }

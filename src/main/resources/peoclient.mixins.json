@@ -19,8 +19,7 @@
     "ClientConnectionMixin",
     "ClientDisconnectMixin",
     "ClientWorldRenderUpdateMixin",
-    "WorldRendererNukerUpdateMixin",
-    "ClientPlayNetworkRenderRefreshMixin"
+        "ClientPlayNetworkRenderRefreshMixin"
   ],
   "injectors": {
     "defaultRequire": 1

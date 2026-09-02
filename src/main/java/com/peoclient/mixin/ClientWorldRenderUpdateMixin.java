@@ -63,7 +63,6 @@ public final class ClientWorldRenderUpdateMixin {
             if (oldState != null && !oldState.equals(newState)) {
                 // Preserve the exact old/new incremental update.
                 mc.field_1769.method_8570(mc.field_1687, pos, oldState, newState, flags);
-                mc.field_1769.method_21596(pos, oldState, newState);
                 NukerRenderBatcher.mark(x, y, z);
             }
         } catch (Throwable ignored) {
