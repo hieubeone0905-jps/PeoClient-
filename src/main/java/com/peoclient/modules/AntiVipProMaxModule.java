@@ -100,14 +100,13 @@ public final class AntiVipProMaxModule {
     public static void tick() {
         if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
         if (isEnabled()) NukerBypassEngine.tick();
-        // Auto Adjust is observation-only. It never changes the configured
-        // intensity and never touches Nuker settings/timing/targets.
-        // The intensity value is retained only as a user-selected diagnostic label.
+        // Auto Adjust is intentionally diagnostic-only. It never changes Nuker strength.
         if (isEnabled() && isAutoAdjust()) {
             int susp = getSuspicionLevel();
-            if (susp >= 7) {
-                DiagnosticRecorder.get().record("AntiVipProMax",
-                        "High diagnostic suspicion=" + susp + " (observation only)");
+            int diagnosticIntensity = susp > 6 ? 8 : susp > 3 ? 6 : 5;
+            if (diagnosticIntensity != getIntensity()) {
+                PeoClient.CFG.antiVipProMaxIntensity = diagnosticIntensity;
+                NukerBypassEngine.setIntensity(diagnosticIntensity);
             }
         }
     }

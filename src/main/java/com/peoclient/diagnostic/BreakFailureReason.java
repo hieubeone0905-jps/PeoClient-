@@ -10,5 +10,6 @@ public enum BreakFailureReason {
     TARGET_CHANGED,
     SERVER_TIMEOUT,
     RECOVERY_TRIGGERED,
+    BREAK_STAGNANT,
     UNKNOWN
 }
