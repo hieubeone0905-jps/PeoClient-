@@ -75,16 +75,9 @@ public final class AntiVipProMaxModule {
     }
 
     public static void tick() {
-        // Khởi động engine nếu chưa chạy và được bật
-        if (isEnabled() && !NukerBypassEngine.isEnabled()) {
-            updateEngine();
-        }
-        // Tự động điều chỉnh intensity nếu bật auto adjust
-        if (isEnabled() && isAutoAdjust()) {
-            int susp = getSuspicionLevel();
-            if (susp > 6) setIntensity(8);
-            else if (susp > 3) setIntensity(6);
-            else setIntensity(5);
-        }
+        if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
+        if (isEnabled()) NukerBypassEngine.tick();
+        // Auto Adjust no longer changes Nuker's strength. It only keeps the
+        // diagnostic intensity setting within its configured range.
     }
 }

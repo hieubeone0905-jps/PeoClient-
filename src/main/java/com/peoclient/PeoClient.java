@@ -572,6 +572,13 @@ public final class PeoClient implements ClientModInitializer {
                 }
             }
 
+            // AntiVipProMax observes the existing vanilla break state; it does
+            // not create a second packet producer and does not alter Nuker speed.
+            if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(
+                        breakingPos != null, stagnantTicks > 0);
+            }
+
             if (cooldown > 0) {
                 cooldown--;
                 if (breakingPos != null) renderBlocks.add(breakingPos);
