@@ -137,6 +137,9 @@ public final class PeoClient implements ClientModInitializer {
             if (mc.field_1724 != null) mc.field_1724.method_7353(class_2561.method_43470("Nuker Compatibility: " + (NukerCompatibility.isEnabled() ? "ON" : "OFF")), true);
         }
 
+        // PeoJoin runs before the in-world early return so it can observe disconnects.
+        PeoJoinModule.tick();
+
         if (mc.field_1724 == null || mc.field_1687 == null) {
             if (++saveTick >= 100) {
                 saveTick = 0;
