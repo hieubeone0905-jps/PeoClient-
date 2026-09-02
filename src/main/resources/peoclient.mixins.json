@@ -18,7 +18,8 @@
     "SelectWorldScreenMixin",
     "ClientConnectionMixin",
     "ClientDisconnectMixin",
-    "ClientWorldRenderUpdateMixin"
+    "ClientWorldRenderUpdateMixin",
+    "ClientPlayNetworkRenderRefreshMixin"
   ],
   "injectors": {
     "defaultRequire": 1
