@@ -197,7 +197,7 @@ public final class PeoClient implements ClientModInitializer {
         // Wurst-style X-Ray settings: block list, exposed-only and opacity.
         // Fluids are included in the target list, matching Wurst's default X-Ray list.
         public boolean xrayFullBright = true;
-        /** Performance mode: suppress all terrain block geometry so only the sky remains. */
+        /** Performance mode: suppress all ordinary terrain block geometry so the sky remains. */
         public boolean xraySkyOnly = false;
         public boolean xrayExposedOnly = false;
         public boolean xrayFluids = true;

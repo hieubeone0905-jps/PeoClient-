@@ -6,6 +6,7 @@
     "ChunkOcclusionDataBuilderMixin",
     "ParticleManagerMixin",
     "BlockRenderManagerMixin",
+    "BlockEntityRenderDispatcherMixin",
     "SimpleOptionAccessor",
     "ScreenAccessor",
     "ClientPlayNetworkHandlerMixin",

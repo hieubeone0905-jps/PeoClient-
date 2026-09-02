@@ -65,7 +65,7 @@ public final class InventoryCleaner {
         // Aggressive mode: perform several locally-predicted inventory actions in
         // the same client tick. We deliberately cap the batch so the client does
         // not flood the connection with an unbounded number of click packets.
-        final int maxActionsPerTick = 16;
+        final int maxActionsPerTick = 27;
         int actions = 0;
 
         // Fast path for explicit filter mode: collect matching slots once and
