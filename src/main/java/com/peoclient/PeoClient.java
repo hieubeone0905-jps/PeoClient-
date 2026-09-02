@@ -217,6 +217,7 @@ public final class PeoClient implements ClientModInitializer {
         public boolean antiVipProMaxVulcan = true;
         public int antiVipProMaxIntensity = 5;
         public boolean antiVipProMaxAutoAdjust = true;
+        public boolean antiVipProMaxAutoRecovery = true;
         public Map<String, Integer> keybinds = new LinkedHashMap<>();
 
         // Account/network settings.  A username override only changes the client-side
@@ -334,6 +335,7 @@ public final class PeoClient implements ClientModInitializer {
                 antiVipProMaxVulcan = c.antiVipProMaxVulcan;
                 antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));
                 antiVipProMaxAutoAdjust = c.antiVipProMaxAutoAdjust;
+                antiVipProMaxAutoRecovery = c.antiVipProMaxAutoRecovery;
                 keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
@@ -569,6 +571,9 @@ public final class PeoClient implements ClientModInitializer {
             if (breakingPos != null) {
                 class_2680 activeState = mc.field_1687.method_8320(breakingPos);
                 float progress = getBreakingProgress();
+                if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                    com.peoclient.nuker.bypass.NukerBypassEngine.onBreakProgress(progress, breakingPos);
+                }
                 if (activeState.method_26215()) {
                     mc.field_1761.method_2925();
                     breakingPos = null;
@@ -586,6 +591,9 @@ public final class PeoClient implements ClientModInitializer {
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
                     if (stagnantTicks >= 8) {
+                        if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                            com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
+                        }
                         com.peoclient.diagnostic.NukerSessionRecorder.get().recordRecovery();
                         com.peoclient.diagnostic.BreakEventRecorder.get().recordRecovery(breakingPos, "Stale breaking state");
                         com.peoclient.diagnostic.AccountSessionMetrics.get().recordRecovery();
@@ -668,14 +676,24 @@ public final class PeoClient implements ClientModInitializer {
 
                 if (breakingPos == null) {
                     diagnosticTargetTime = System.currentTimeMillis();
+                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                        com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
+                    }
                     com.peoclient.diagnostic.BreakStateTracker.get().transition(
                             com.peoclient.diagnostic.BreakStateTracker.State.TARGETING, target.pos);
                     com.peoclient.diagnostic.TargetHistory.get().recordTarget(
                             target.pos, mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos)), queue.indexOf(target));
                     com.peoclient.diagnostic.WorldStateMonitor.get().recordTarget(target.pos);
                     com.peoclient.diagnostic.NukerSessionRecorder.get().recordTarget(target.pos);
+                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                        com.peoclient.nuker.bypass.NukerBypassEngine.onBreakAttempt(target.pos, target.side);
+                    }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
+                        if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                            com.peoclient.nuker.bypass.NukerBypassEngine.onBreakFailure(
+                                    target.pos, com.peoclient.diagnostic.BreakFailureReason.INTERACTION_FAIL);
+                        }
                         com.peoclient.diagnostic.BreakEventRecorder.get().recordFailure(
                                 target.pos, com.peoclient.diagnostic.BreakFailureReason.INTERACTION_FAIL.name());
                         com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
@@ -718,6 +736,10 @@ public final class PeoClient implements ClientModInitializer {
                                 successNow - diagnosticAttemptTime);
                     }
                     com.peoclient.diagnostic.WorldStateMonitor.get().recordCheck(target.pos);
+                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                        com.peoclient.nuker.bypass.NukerBypassEngine.onBreakSuccess(
+                                target.pos, diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
+                    }
                     com.peoclient.diagnostic.BreakEventRecorder.get().recordSuccess(
                             target.pos, diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
                     com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakSuccess();

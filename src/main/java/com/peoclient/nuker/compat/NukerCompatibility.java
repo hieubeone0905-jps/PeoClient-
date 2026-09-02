@@ -1,49 +1,33 @@
 package com.peoclient.nuker.compat;
 
 import com.peoclient.PeoClient;
-import com.peoclient.diagnostic.*;
+import com.peoclient.diagnostic.AccountSessionMetrics;
+import com.peoclient.diagnostic.LatencyMetrics;
+import com.peoclient.diagnostic.TickMetrics;
 import net.minecraft.class_310;
 
+/**
+ * Compatibility wrapper that never suppresses a Nuker tick. The actual Nuker
+ * remains fully responsible for its configured range/multi/cooldown behaviour.
+ */
 public final class NukerCompatibility {
     private static boolean enabled = true;
-    private static int quietTicks = 0;
-    private static long lastTargetReset = 0L;
+
+    private NukerCompatibility() {}
 
     public static void tick(class_310 mc) {
         if (mc.field_1724 == null || mc.field_1687 == null || mc.field_1761 == null) return;
         if (!PeoClient.CFG.nuker) return;
 
-        // Record tick start
         TickMetrics.get().recordTickStart();
-
-        if (!enabled) {
-            PeoClient.NukerLogic.tick(mc);
-            TickMetrics.get().recordTickEnd();
-            return;
-        }
-
-        quietTicks = Math.max(0, quietTicks - 1);
-        if (quietTicks > 0) {
-            TickMetrics.get().recordTickEnd();
-            return;
-        }
-
-        // NukerLogic will call diagnostic hooks internally
+        // Never gate, sleep, delay or skip NukerLogic here.
         PeoClient.NukerLogic.tick(mc);
-
-        // Update latency metrics
         LatencyMetrics.get().updatePing();
-
-        TickMetrics.get().recordTickEnd();
         AccountSessionMetrics.get().tick();
+        TickMetrics.get().recordTickEnd();
     }
 
-    public static void toggle() {
-        enabled = !enabled;
-        quietTicks = 0;
-        lastTargetReset = System.currentTimeMillis();
-    }
-
+    public static void toggle() { enabled = !enabled; }
     public static boolean isEnabled() { return enabled; }
     public static String status() { return enabled ? "Compatibility ON" : "Compatibility OFF"; }
 }
