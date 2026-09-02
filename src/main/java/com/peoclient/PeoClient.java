@@ -733,11 +733,9 @@ public final class PeoClient implements ClientModInitializer {
                             diagnosticInteractionTime - diagnosticAttemptTime);
                 }
                 // Keep the Nuker on the normal Minecraft interaction path.
-                // Render invalidation is handled centrally by ClientWorldRenderUpdateMixin
-                // and NukerRenderBatcher, so Nuker itself does not submit competing
-                // chunk rebuild requests for every target. This preserves the exact
-                // attack/progress cadence while preventing renderer work from being
-                // duplicated by the Nuker loop.
+                // With the vanilla-render build, Nuker does not submit custom
+                // chunk rebuild requests. Minecraft handles the render update
+                // through its normal ClientWorld/WorldRenderer path.
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
