@@ -6,22 +6,42 @@ import net.minecraft.class_2680;
 import net.minecraft.class_310;
 import net.minecraft.class_638;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Refreshes the client renderer after a server-driven ClientWorld block-state
- * update while Nuker is active. This is render-only: it never changes the
- * world state and never sends packets.
+ * Render-only repair for ClientWorld block-state updates.
  *
- * Minecraft 1.21.4 ClientWorld overrides the four-argument setBlockState
- * (method_30092). Hooking World#method_8652 alone misses this path.
+ * The important part is that the renderer receives the ACTUAL old and new
+ * states. Merely asking the renderer to reload/schedule terrain can leave a
+ * stale chunk mesh behind when a server block update has already changed the
+ * client world state.
+ *
+ * This mixin never changes the world state and never sends or modifies packets.
  */
 @Mixin(class_638.class)
 public final class ClientWorldRenderUpdateMixin {
+    @Unique
+    private static final ThreadLocal<class_2680> peo$oldState = new ThreadLocal<>();
+
+    @Inject(method = "method_30092", at = @At("HEAD"))
+    private void peo$captureOldState(
+            class_2338 pos, class_2680 state, int flags, int maxUpdateDepth,
+            CallbackInfoReturnable<Boolean> cir) {
+        try {
+            class_310 mc = class_310.method_1551();
+            if (mc != null && PeoClient.CFG.nuker && mc.field_1687 == (Object) this) {
+                peo$oldState.set(mc.field_1687.method_8320(pos));
+            }
+        } catch (Throwable ignored) {
+            peo$oldState.remove();
+        }
+    }
+
     @Inject(method = "method_30092", at = @At("RETURN"))
-    private void peo$nukerClientWorldBlockUpdate(
+    private void peo$refreshAfterBlockUpdate(
             class_2338 pos, class_2680 state, int flags, int maxUpdateDepth,
             CallbackInfoReturnable<Boolean> cir) {
         try {
@@ -29,22 +49,30 @@ public final class ClientWorldRenderUpdateMixin {
             if (mc == null || !PeoClient.CFG.nuker || mc.field_1687 == null || mc.field_1769 == null) {
                 return;
             }
-            if (mc.field_1687 != (Object) this) {
-                return;
-            }
-            if (!cir.getReturnValueZ()) {
+            if (mc.field_1687 != (Object) this || !cir.getReturnValueZ()) {
                 return;
             }
 
+            class_2680 oldState = peo$oldState.get();
+            class_2680 newState = mc.field_1687.method_8320(pos);
             int x = pos.method_10263();
             int y = pos.method_10264();
             int z = pos.method_10260();
 
-            // Force the small section containing the changed block to rebuild.
-            // Do not reload the whole renderer or the surrounding 3x3x3 chunks.
+            if (oldState != null && !oldState.equals(newState)) {
+                // Tell WorldRenderer exactly which block changed and what the
+                // old/new states were. This is the same kind of incremental
+                // update vanilla relies on for normal block interactions.
+                mc.field_1769.method_8570(mc.field_1687, pos, oldState, newState, flags);
+            }
+
+            // Also mark the immediate block region dirty so neighboring faces,
+            // fence connections, transparencies, etc. are rebuilt as needed.
             mc.field_1769.method_18146(x - 1, y - 1, z - 1, x + 1, y + 1, z + 1);
         } catch (Throwable ignored) {
-            // Renderer refresh must never break vanilla block updates.
+            // Renderer repair must never break vanilla world updates.
+        } finally {
+            peo$oldState.remove();
         }
     }
 }
