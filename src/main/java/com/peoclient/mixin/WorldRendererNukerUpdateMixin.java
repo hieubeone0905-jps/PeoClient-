@@ -2,7 +2,7 @@ package com.peoclient.mixin;
 
 import com.peoclient.PeoClient;
 import com.peoclient.render.NukerRenderBatcher;
-import net.minecraft.class_1920;
+import net.minecraft.class_1922;
 import net.minecraft.class_2338;
 import net.minecraft.class_2680;
 import net.minecraft.class_761;
@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public final class WorldRendererNukerUpdateMixin {
     @Inject(method = "method_8570", at = @At("RETURN"))
     private void peo$queueNukerSection(
-            class_1920 world,
+            class_1922 world,
             class_2338 pos,
             class_2680 oldState,
             class_2680 newState,
