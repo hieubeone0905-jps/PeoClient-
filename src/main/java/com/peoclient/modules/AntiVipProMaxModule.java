@@ -138,14 +138,19 @@ public final class AntiVipProMaxModule {
             NukerBypassEngine.setVulcanMode(isVulcanMode());
             NukerBypassEngine.setIntensity(getIntensity());
             NukerBypassEngine.setAutoRecovery(isAutoRecovery());
-            // Anti-kick engine cũng được bật theo module
+            // Compatibility engines are monitors/facades only. NukerLogic remains
+            // the single owner of the real block-breaking interaction state.
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(true);
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setGrimMode(isGrimMode());
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setVulcanMode(isVulcanMode());
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setPacketSpoofLevel(getIntensity());
             NukerBypassUltimateV2.setIntensity(PeoClient.CFG.bypassV2Intensity);
             NukerBypassUltimateV2.setDesyncLevel(PeoClient.CFG.bypassV2Desync);
-            setBypassV2(PeoClient.CFG.bypassV2Enabled);
+            if (PeoClient.CFG.bypassV2Enabled) {
+                NukerBypassUltimateV2.start(PeoClient.NukerLogic.getCurrentTarget());
+            } else {
+                NukerBypassUltimateV2.stop();
+            }
         } else {
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(false);
         }
@@ -153,7 +158,10 @@ public final class AntiVipProMaxModule {
 
     public static void tick() {
         if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
-        if (isEnabled()) NukerBypassEngine.tick();
+        if (isEnabled()) {
+            NukerBypassEngine.tick();
+            NukerBypassUltimateV2.tick();
+        }
         if (isEnabled()) {
             if (PeoClient.CFG.bypassV2Enabled) {
                 if (!NukerBypassUltimateV2.isActive()) setBypassV2(true);
@@ -163,12 +171,9 @@ public final class AntiVipProMaxModule {
         }
         // Auto Adjust is intentionally diagnostic-only. It never changes Nuker strength.
         if (isEnabled() && isAutoAdjust()) {
-            int susp = getSuspicionLevel();
-            int diagnosticIntensity = susp > 6 ? 8 : susp > 3 ? 6 : 5;
-            if (diagnosticIntensity != getIntensity()) {
-                PeoClient.CFG.antiVipProMaxIntensity = diagnosticIntensity;
-                NukerBypassEngine.setIntensity(diagnosticIntensity);
-            }
+            // Diagnostic-only: never rewrite Nuker's configured strength or timing.
+            DiagnosticRecorder.get().record("AntiVipProMax",
+                    "AutoAdjust observation suspicion=" + getSuspicionLevel());
         }
     }
 }

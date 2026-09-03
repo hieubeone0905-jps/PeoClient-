@@ -22,6 +22,8 @@ public final class NukerCompatibility {
         TickMetrics.get().recordTickStart();
         // Never gate, sleep, delay or skip NukerLogic here.
         PeoClient.NukerLogic.tick(mc);
+        // WorldSync is intentionally observational/recovery-only and never gates throughput.
+        NukerWorldSync.tick(mc);
         LatencyMetrics.get().updatePing();
         AccountSessionMetrics.get().tick();
         TickMetrics.get().recordTickEnd();

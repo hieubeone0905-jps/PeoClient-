@@ -9,7 +9,6 @@ import net.minecraft.class_2680;
 import net.minecraft.class_310;
 import net.minecraft.class_3965;
 import net.minecraft.class_239;
-import net.minecraft.class_1268;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -106,31 +105,17 @@ public final class AutoBlockReload {
     }
 
     private static void performBlockReload(class_2338 pos) {
-        if (mc.field_1724 == null || mc.field_1687 == null || mc.field_1761 == null) return;
+        if (mc.field_1724 == null || mc.field_1687 == null || mc.field_1761 == null || pos == null) return;
 
         class_2680 state = mc.field_1687.method_8320(pos);
-        if (state.method_26215()) {
-            // Block đã là air, không cần reload
-            return;
-        }
+        if (state.method_26215()) return;
 
-        class_2350 side = getBestSide(pos);
-        if (side == null) side = class_2350.field_11036;
-
-        try {
-            // Re-enter the normal vanilla interaction path.  Do not inject a
-            // synthetic right-click packet: that packet can trigger block
-            // interactions and does not reliably refresh a stale block state.
-            mc.field_1761.method_2902(pos, side);
-            mc.field_1724.method_6104(class_1268.field_5808);
-
-            DiagnosticRecorder.get().record("AutoBlockReload", 
-                "Reloaded block at " + pos + " (side=" + side + ")");
-            
-        } catch (Exception e) {
-            DiagnosticRecorder.get().record("AutoBlockReload", 
-                "Reload failed at " + pos + ": " + e.getMessage());
-        }
+        // Never use a synthetic right-click as a fake "server reload" request.
+        // Delegate stale-state recovery to the single world-sync owner.
+        float progress = PeoClient.NukerLogic.getBreakingProgress();
+        com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, pos, progress);
+        DiagnosticRecorder.get().record("AutoBlockReload",
+                "Stale break state handed to NukerWorldSync at " + pos);
     }
 
     private static class_2338 getCurrentTarget() {
