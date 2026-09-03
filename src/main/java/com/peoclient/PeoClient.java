@@ -304,7 +304,7 @@ public final class PeoClient implements ClientModInitializer {
         public String nukerFilterIds = "";
         public boolean nukerRaycast = true;
         public boolean nukerFlatten = false;
-        public boolean nukerRotate = true;
+        public boolean nukerRotate = false;
         public boolean nukerNoParticles = false;
         public boolean nukerHighlight = false;
         public String nukerHighlightMode = "Opacity";
