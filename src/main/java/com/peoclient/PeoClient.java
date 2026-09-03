@@ -608,7 +608,7 @@ public final class PeoClient implements ClientModInitializer {
 
         public static void tick(class_310 mc) {
             if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null
-                    || mc.field_1755 != null) return;
+                    ) return;
 
             renderBlocks.clear();
 

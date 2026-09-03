@@ -8,35 +8,37 @@ import net.minecraft.class_310;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * Packet helper used by the AntiVipProMax/Nuker bypass layer.
+ * Quản lý packet cho AntiVipProMax.
  *
- * The packet types themselves are resolved through intermediary names at
- * runtime.  This keeps this optional helper isolated from mapping changes,
- * while the actual send path is made robust against inherited/private fields
- * and methods in the 1.21.4 client classes.
+ * Không tham chiếu trực tiếp tới các packet class có mapping thay đổi giữa
+ * các bản Minecraft/Fabric Yarn. Packet được tạo bằng reflection để tránh
+ * lỗi compile khi mapping 1.21.4 thay đổi tên intermediary.
  */
 public final class BypassPacketManager {
     private static final class_310 mc = class_310.method_1551();
-    private static final Queue<class_2596<?>> packetQueue = new ConcurrentLinkedQueue<>();
+    private static final Queue<Object> packetQueue = new ConcurrentLinkedQueue<>();
 
     private BypassPacketManager() {}
 
     public static void sendRotation(float yaw, float pitch, boolean onGround) {
-        inject(createMovePacket(yaw, pitch, onGround));
+        Object packet = createMovePacket(yaw, pitch, onGround);
+        inject(packet);
     }
 
     public static void sendPosition(double x, double y, double z, boolean onGround) {
-        inject(createPositionPacket(x, y, z, onGround));
+        Object packet = createPositionPacket(x, y, z, onGround);
+        inject(packet);
     }
 
-    /** Sends ABORT_DESTROY_BLOCK for the supplied block position. */
+    /**
+     * Gửi action block nếu packet/action có thể được tìm thấy trên mapping
+     * runtime. Nếu mapping không khớp thì bỏ qua thay vì làm crash client.
+     */
     public static void sendBlockAction(class_2338 pos, class_2350 side) {
-        if (pos == null || side == null) return;
         try {
             Class<?> packetClass = Class.forName("net.minecraft.class_2846");
             Object action = findAbortAction(packetClass);
@@ -44,28 +46,23 @@ public final class BypassPacketManager {
 
             for (Constructor<?> ctor : packetClass.getDeclaredConstructors()) {
                 Class<?>[] p = ctor.getParameterTypes();
-                if (p.length != 3) continue;
-                if (!p[0].isAssignableFrom(action.getClass())) continue;
-                if (!p[1].isAssignableFrom(pos.getClass())) continue;
-                if (!p[2].isAssignableFrom(side.getClass())) continue;
-
-                ctor.setAccessible(true);
-                Object packet = ctor.newInstance(action, pos, side);
-                inject(packet);
-                return;
+                if (p.length == 3
+                        && p[0].isAssignableFrom(action.getClass())
+                        && p[1].isAssignableFrom(pos.getClass())
+                        && p[2].isAssignableFrom(side.getClass())) {
+                    ctor.setAccessible(true);
+                    inject(ctor.newInstance(action, pos, side));
+                    return;
+                }
             }
         } catch (Throwable ignored) {
-            // This is an optional layer; never break the main Nuker loop.
+            // Optional bypass packet; never let it break the main Nuker.
         }
     }
 
     public static void sendResetPacket() {
         if (mc.field_1724 == null) return;
-        sendRotation(
-                mc.field_1724.method_36454(),
-                mc.field_1724.method_36455(),
-                mc.field_1724.method_24828()
-        );
+        sendRotation(mc.field_1724.method_36454(), mc.field_1724.method_36455(), mc.field_1724.method_24828());
     }
 
     public static void clearQueue() {
@@ -75,6 +72,7 @@ public final class BypassPacketManager {
     private static Object createMovePacket(float yaw, float pitch, boolean onGround) {
         try {
             Class<?> base = Class.forName("net.minecraft.class_2828");
+            // Prefer LookAndOnGround: (float yaw, float pitch, boolean onGround, boolean horizontalCollision)
             for (Class<?> nested : base.getDeclaredClasses()) {
                 for (Constructor<?> ctor : nested.getDeclaredConstructors()) {
                     Class<?>[] p = ctor.getParameterTypes();
@@ -96,6 +94,7 @@ public final class BypassPacketManager {
     private static Object createPositionPacket(double x, double y, double z, boolean onGround) {
         try {
             Class<?> base = Class.forName("net.minecraft.class_2828");
+            // Prefer PositionAndOnGround: (double x, double y, double z, boolean onGround, boolean horizontalCollision)
             for (Class<?> nested : base.getDeclaredClasses()) {
                 for (Constructor<?> ctor : nested.getDeclaredConstructors()) {
                     Class<?>[] p = ctor.getParameterTypes();
@@ -119,80 +118,42 @@ public final class BypassPacketManager {
         for (Class<?> nested : packetClass.getDeclaredClasses()) {
             if (!nested.isEnum()) continue;
             Object[] constants = nested.getEnumConstants();
-            if (constants == null) continue;
-
-            // Prefer the actual enum constant name when available.
-            for (Object constant : constants) {
-                if (constant instanceof Enum<?> e
-                        && "ABORT_DESTROY_BLOCK".equals(e.name())) {
-                    return constant;
-                }
-            }
-
-            // Intermediary runtime names can hide the readable enum name.
-            // In 1.21.4 ABORT_DESTROY_BLOCK is ordinal 1.
-            if (constants.length > 1) return constants[1];
+            if (constants == null || constants.length < 2) continue;
+            // PlayerActionC2SPacket.Action keeps ABORT_DESTROY_BLOCK at ordinal 1.
+            return constants[1];
         }
         return null;
     }
 
-    /**
-     * Finds ClientPlayNetworkHandler without assuming the exact Minecraft
-     * field name.  Fields inherited from a superclass are also inspected.
-     */
-    private static class_634 getNetworkHandler() {
+    private static Object getNetworkHandler() {
         try {
-            Class<?> type = mc.getClass();
-            while (type != null) {
-                for (Field field : type.getDeclaredFields()) {
-                    if (!class_634.class.isAssignableFrom(field.getType())) continue;
-                    field.setAccessible(true);
-                    Object value = field.get(mc);
-                    if (value instanceof class_634 handler) return handler;
-                }
-                type = type.getSuperclass();
+            for (Field field : mc.getClass().getDeclaredFields()) {
+                if (!class_634.class.isAssignableFrom(field.getType())) continue;
+                field.setAccessible(true);
+                Object value = field.get(mc);
+                if (value != null) return value;
             }
         } catch (Throwable ignored) {
         }
         return null;
     }
 
-    /** Sends a clientbound-safe packet through ClientPlayNetworkHandler. */
     private static void inject(Object packet) {
-        if (mc.field_1724 == null || !(packet instanceof class_2596<?> typedPacket)) return;
-
-        class_634 handler = getNetworkHandler();
+        if (mc.field_1724 == null || !(packet instanceof class_2596)) return;
+        Object handler = getNetworkHandler();
         if (handler == null) return;
 
-        packetQueue.add(typedPacket);
+        packetQueue.add(packet);
+
         try {
-            Method send = findSendPacketMethod(handler.getClass());
-            if (send == null) return;
-            send.setAccessible(true);
-            send.invoke(handler, typedPacket);
+            // ClientPlayNetworkHandler#sendPacket dùng intermediary method_2883
+            // trên Minecraft 1.21.4. Reflection tránh phụ thuộc vào private fields.
+            var method = handler.getClass().getMethod("method_2883", class_2596.class);
+            method.invoke(handler, packet);
         } catch (Throwable ignored) {
             // Optional bypass layer must never break the main Nuker.
         } finally {
-            packetQueue.remove(typedPacket);
+            packetQueue.remove(packet);
         }
-    }
-
-    /**
-     * Finds the intermediary sendPacket method while tolerating inheritance.
-     * The normal 1.21.4 intermediary name is method_2883.
-     */
-    private static Method findSendPacketMethod(Class<?> type) {
-        Class<?> current = type;
-        while (current != null) {
-            for (Method method : current.getDeclaredMethods()) {
-                if ("method_2883".equals(method.getName())
-                        && method.getParameterCount() == 1
-                        && class_2596.class.isAssignableFrom(method.getParameterTypes()[0])) {
-                    return method;
-                }
-            }
-            current = current.getSuperclass();
-        }
-        return null;
     }
 }
