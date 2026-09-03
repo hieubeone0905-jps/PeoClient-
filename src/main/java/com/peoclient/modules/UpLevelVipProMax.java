@@ -139,7 +139,7 @@ public final class UpLevelVipProMax {
         var inv = client.field_1724.method_31548();
         for (int slot = 0; slot < 36; slot++) {
             class_1799 stack = inv.method_5438(slot);
-            if (stack.isEmpty()) continue;
+            if (stack.method_7960()) continue;
             String id = itemId(stack);
             if (!DROP_BLOCKS.contains(id)) continue;
 
@@ -164,7 +164,7 @@ public final class UpLevelVipProMax {
         int foundHotbar = -1;
         for (int slot = 0; slot < 9; slot++) {
             class_1799 stack = inv.method_5438(slot);
-            if (!stack.isEmpty() && LEVEL_BLOCKS.contains(itemId(stack))) {
+            if (!stack.method_7960() && LEVEL_BLOCKS.contains(itemId(stack))) {
                 foundHotbar = slot;
                 break;
             }
@@ -200,11 +200,11 @@ public final class UpLevelVipProMax {
 
     private static boolean isLevelScreen(class_310 client) {
         if (client.field_1755 == null || client.field_1724 == null) return false;
-        if (!(client.field_1755 instanceof class_437)) return false;
+        if (!(client.field_1755 instanceof net.minecraft.class_465)) return false;
 
         String title;
         try {
-            title = client.field_1755.method_25316().getString();
+            title = client.field_1755.method_25440().getString();
         } catch (Throwable ignored) {
             return false;
         }
@@ -272,10 +272,15 @@ public final class UpLevelVipProMax {
 
     private static int findHopperSlot(class_310 client) {
         var handler = client.field_1724.field_7512;
-        int limit = Math.min(54, handler.slots.size());
+        int limit = 54;
         for (int i = 0; i < limit; i++) {
-            class_1799 stack = handler.getSlot(i).getStack();
-            if (stack.isEmpty()) continue;
+            class_1799 stack;
+            try {
+                stack = handler.method_7611(i).method_7677();
+            } catch (IndexOutOfBoundsException ignored) {
+                break;
+            }
+            if (stack.method_7960()) continue;
             if ("minecraft:hopper".equals(itemId(stack))) return i;
         }
         return -1;
@@ -302,11 +307,11 @@ public final class UpLevelVipProMax {
 
     /** Exposed for the GUI/diagnostics without exposing mutable collections. */
     public static boolean isLevelBlock(class_1799 stack) {
-        return !stack.isEmpty() && LEVEL_BLOCKS.contains(itemId(stack));
+        return !stack.method_7960() && LEVEL_BLOCKS.contains(itemId(stack));
     }
 
     public static boolean isDropBlock(class_1799 stack) {
-        return !stack.isEmpty() && DROP_BLOCKS.contains(itemId(stack));
+        return !stack.method_7960() && DROP_BLOCKS.contains(itemId(stack));
     }
 
     public static String getStatus() {

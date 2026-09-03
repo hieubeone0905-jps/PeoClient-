@@ -2,7 +2,6 @@ package com.peoclient;
 
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.PeoJoinModule;
-import com.peoclient.modules.UpLevelVipProMax;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -39,7 +38,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "UpLevelVipProMax", "PeoJoin",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "PeoJoin",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
@@ -70,7 +69,7 @@ public final class PoeScreen extends class_437 {
     private boolean implemented(String name) {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
                 || name.equals("Nuker [Multi]") || name.equals("X-Ray")
-                || name.equals("AntiVipProMax") || name.equals("UpLevelVipProMax") || name.equals("PeoJoin");
+                || name.equals("AntiVipProMax") || name.equals("PeoJoin");
     }
 
     private boolean enabled(String name) {
@@ -80,7 +79,6 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.CFG.xray;
             case "AntiVipProMax" -> AntiVipProMaxModule.isEnabled();
-            case "UpLevelVipProMax" -> UpLevelVipProMax.isEnabled();
             case "PeoJoin" -> PeoJoinModule.isEnabled();
             default -> false;
         };
@@ -93,7 +91,6 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
-            case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
         }
         PeoClient.CFG.save();
