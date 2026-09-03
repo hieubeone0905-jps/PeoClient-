@@ -9,10 +9,8 @@ import net.minecraft.class_2680;
 import net.minecraft.class_310;
 import net.minecraft.class_3532;
 import net.minecraft.class_3965;
-import net.minecraft.class_279;
-import net.minecraft.class_2724;
-import net.minecraft.class_2727;
-import net.minecraft.class_2729;
+import net.minecraft.class_2828;
+import net.minecraft.class_2846;
 
 import java.lang.reflect.Field;
 import java.util.Queue;
@@ -205,7 +203,7 @@ public final class NukerBypassUltimateV2 {
         }
         
         // Send rotation packet
-        class_2729 rotationPacket = new class_2729(smoothedYaw, smoothedPitch, mc.field_1724.field_6228);
+        class_2828.class_2831 rotationPacket = new class_2828.class_2831(smoothedYaw, smoothedPitch, mc.field_1724.field_6228, false);
         packetQueue.add(rotationPacket);
         
         // Update local player
@@ -244,7 +242,7 @@ public final class NukerBypassUltimateV2 {
             z = zBuffer.stream().mapToDouble(d -> d).average().orElse(z);
         }
         
-        class_2727 posPacket = new class_2727(x, y, z, mc.field_1724.field_6228);
+        class_2828.class_2829 posPacket = new class_2828.class_2829(x, y, z, mc.field_1724.field_6228, false);
         packetQueue.add(posPacket);
         
         lastSentX = x;
@@ -263,8 +261,8 @@ public final class NukerBypassUltimateV2 {
         if (side == null) side = class_2350.field_11036;
         
         // Send start destroy
-        class_2724 startPacket = new class_2724(
-            class_279.class_280.field_1370, // START_DESTROY_BLOCK
+        class_2846 startPacket = new class_2846(
+            class_2846.class_2847.field_12968, // START_DESTROY_BLOCK
             currentTarget,
             side
         );
@@ -274,8 +272,8 @@ public final class NukerBypassUltimateV2 {
         if (!"Instant".equalsIgnoreCase(PeoClient.CFG.nukerMode)) {
             int steps = 2 + RANDOM.nextInt(3);
             for (int i = 0; i < steps; i++) {
-                class_2724 progressPacket = new class_2724(
-                    class_279.class_280.field_1369, // ABORT_DESTROY_BLOCK
+                class_2846 progressPacket = new class_2846(
+                    class_2846.class_2847.field_12971, // ABORT_DESTROY_BLOCK
                     currentTarget,
                     side
                 );
@@ -284,8 +282,8 @@ public final class NukerBypassUltimateV2 {
         }
         
         // Send stop destroy
-        class_2724 stopPacket = new class_2724(
-            class_279.class_280.field_1371, // STOP_DESTROY_BLOCK
+        class_2846 stopPacket = new class_2846(
+            class_2846.class_2847.field_12973, // STOP_DESTROY_BLOCK
             currentTarget,
             side
         );
@@ -297,20 +295,22 @@ public final class NukerBypassUltimateV2 {
     
     private static void sendResetPacket() {
         if (mc.field_1724 == null) return;
-        class_2729 resetPacket = new class_2729(
+        class_2828.class_2831 resetPacket = new class_2828.class_2831(
             mc.field_1724.method_36454(),
             mc.field_1724.method_36455(),
-            mc.field_1724.field_6228
+            mc.field_1724.field_6228,
+            false
         );
         packetQueue.add(resetPacket);
     }
     
     private static void sendSyncPacket() {
         if (mc.field_1724 == null) return;
-        class_2729 syncPacket = new class_2729(
+        class_2828.class_2831 syncPacket = new class_2828.class_2831(
             mc.field_1724.method_36454(),
             mc.field_1724.method_36455(),
-            mc.field_1724.field_6228
+            mc.field_1724.field_6228,
+            false
         );
         packetQueue.add(syncPacket);
     }
@@ -367,18 +367,11 @@ public final class NukerBypassUltimateV2 {
         var handler = mc.field_1724.field_6214;
         if (handler == null) return;
         
-        // Try queue injection
-        try {
-            Field sendQueueField = handler.getClass().getDeclaredField("field_11121");
-            sendQueueField.setAccessible(true);
-            Object queue = sendQueueField.get(handler);
-            if (queue instanceof ConcurrentLinkedQueue) {
-                ((ConcurrentLinkedQueue<Object>) queue).add(packet);
-                return;
-            }
-        } catch (Exception e) {
-            // Fallback: normal send
-            handler.method_10839((net.minecraft.class_2596) packet);
+        // Use Minecraft's supported client packet sender. The previous
+        // reflection path targeted a removed internal queue and could call
+        // the disconnect callback by mistake on 1.21.4.
+        if (packet instanceof net.minecraft.class_2596) {
+            handler.method_52787((net.minecraft.class_2596) packet);
         }
     }
     
