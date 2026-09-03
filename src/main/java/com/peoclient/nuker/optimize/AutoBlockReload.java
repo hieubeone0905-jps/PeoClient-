@@ -91,8 +91,8 @@ public final class AutoBlockReload {
         // Nếu client thấy air nhưng đây là target đang đào, có thể là ghost
         if (clientSeesAir) {
             // Kiểm tra xem có thực sự ghost không (dùng raycast để xác nhận)
-            class_3965 hit = mc.field_1724.method_5745(PeoClient.CFG.nukerRange + 1.0, 0.0f, false);
-            if (hit.method_17783() == class_239.class_240.field_1332) {
+            net.minecraft.class_239 rayHit = mc.field_1724.method_5745(PeoClient.CFG.nukerRange + 1.0, 0.0f, false);
+            if (rayHit instanceof class_3965 hit && hit.method_17783() == class_239.class_240.field_1332) {
                 class_2338 hitPos = hit.method_17777();
                 // Nếu raycast trúng block, có thể client đang bị ghost
                 if (!hitPos.equals(target)) {
@@ -168,8 +168,8 @@ public final class AutoBlockReload {
         } catch (Exception e) {
             // Fallback: lấy block đang nhìn
             if (mc.field_1724 != null) {
-                class_3965 hit = mc.field_1724.method_5745(6.0, 0.0f, false);
-                if (hit.method_17783() == class_239.class_240.field_1332) {
+                net.minecraft.class_239 rayHit = mc.field_1724.method_5745(6.0, 0.0f, false);
+                if (rayHit instanceof class_3965 hit && hit.method_17783() == class_239.class_240.field_1332) {
                     return hit.method_17777();
                 }
             }
@@ -189,7 +189,7 @@ public final class AutoBlockReload {
         double bestDot = -Double.MAX_VALUE;
         for (class_2350 side : class_2350.values()) {
             class_243 normal = new class_243(side.method_10148(), side.method_10164(), side.method_10165());
-            double dot = diff.method_1029().method_1020(normal);
+            double dot = diff.method_1029().method_1026(normal);
             if (dot > bestDot) {
                 bestDot = dot;
                 best = side;

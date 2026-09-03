@@ -334,7 +334,7 @@ public final class NukerBypassUltimateV2 {
         double bestDot = -Double.MAX_VALUE;
         for (class_2350 side : class_2350.values()) {
             class_243 normal = new class_243(side.method_10148(), side.method_10164(), side.method_10165());
-            double dot = diff.method_1029().method_1020(normal);
+            double dot = diff.method_1029().method_1026(normal);
             if (dot > bestDot) {
                 bestDot = dot;
                 best = side;
