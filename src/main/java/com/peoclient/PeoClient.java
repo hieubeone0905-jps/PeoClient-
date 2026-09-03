@@ -572,6 +572,11 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
+        // Per-tick duplicate guard and conservative client-side processing cap.
+        // This prevents repeatedly issuing the same local break interaction in one tick.
+        private static final java.util.Set<class_2338> processedInTick = new java.util.HashSet<>();
+        private static int processedCountInTick;
+        private static final int MAX_BLOCKS_PER_TICK = 10;
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
@@ -579,6 +584,8 @@ public final class PeoClient implements ClientModInitializer {
                     || mc.field_1755 != null) return;
 
             renderBlocks.clear();
+            processedInTick.clear();
+            processedCountInTick = 0;
 
             // Lightweight local recovery: keep the fast Nuker engine intact, but
             // recover automatically if the vanilla breaking state stops changing.
@@ -656,9 +663,14 @@ public final class PeoClient implements ClientModInitializer {
             }
 
             int processed = 0;
-            while (!queue.isEmpty() && processed < batch) {
+            while (!queue.isEmpty() && processed < batch && processedCountInTick < MAX_BLOCKS_PER_TICK) {
                 Target target = queue.get(0);
                 if (!isValidTarget(mc, target)) {
+                    queue.remove(0);
+                    continue;
+                }
+
+                if (processedInTick.contains(target.pos)) {
                     queue.remove(0);
                     continue;
                 }
@@ -740,6 +752,8 @@ public final class PeoClient implements ClientModInitializer {
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
                 processed++;
+                processedCountInTick++;
+                processedInTick.add(target.pos);
 
                 if (mc.field_1687.method_8320(target.pos).method_26215()) {
                     long successNow = System.currentTimeMillis();

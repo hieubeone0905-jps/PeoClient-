@@ -62,5 +62,7 @@ public final class DiagnosticRecorder {
         } catch (IOException ignored) {}
     }
 
+    public int getPendingSize() { return logQueue.size(); }
+
     public Path getLogFile() { return logFile; }
 }
