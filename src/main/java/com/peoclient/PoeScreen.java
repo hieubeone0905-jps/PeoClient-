@@ -426,6 +426,18 @@ public final class PoeScreen extends class_437 {
         // === THÊM: Anti-Kick Engine ===
         y = rowToggle(d, x, y, w, "Anti-Kick Engine", com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled());
         // === END ===
+        y = section(d, x, y, "Bypass V2");
+        y = rowToggle(d, x, y, w, "Bypass V2", com.peoclient.nuker.optimize.NukerBypassUltimateV2.isActive());
+        y = sliderRow(d, x, y, w, "Intensity", com.peoclient.nuker.optimize.NukerBypassUltimateV2.getIntensity(), 1, 10, "%.0f");
+        y = sliderRow(d, x, y, w, "Desync", com.peoclient.nuker.optimize.NukerBypassUltimateV2.getDesyncLevel(), 1, 5, "%.0f");
+        y = rowToggle(d, x, y, w, "Grim Mode", com.peoclient.nuker.optimize.NukerBypassUltimateV2.isGrimMode());
+        y = rowToggle(d, x, y, w, "Vulcan Mode", com.peoclient.nuker.optimize.NukerBypassUltimateV2.isVulcanMode());
+        y = rowValue(d, x, y, w, "Status", com.peoclient.nuker.optimize.NukerBypassUltimateV2.getStatus());
+
+        y = section(d, x, y, "AntiKick");
+        y = rowToggle(d, x, y, w, "Auto Reload", com.peoclient.nuker.optimize.AutoBlockReload.isActive());
+        y = rowValue(d, x, y, w, "Reload Queue", com.peoclient.nuker.optimize.AutoBlockReload.getQueueSize() + " blocks");
+        y = rowValue(d, x, y, w, "AntiKick", com.peoclient.nuker.optimize.AntiKickEngine.getStatus());
         y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
         y = rowValue(d, x, y, w, "Mode", "Compatibility/status only; no anti-cheat bypass");
         return y;
@@ -588,13 +600,59 @@ public final class PoeScreen extends class_437 {
 
     private void clickAntiVipProMax(double mx, double my, int x, int w, int y) {
         int p = y + 26;
+        if (hit(my, p)) { AntiVipProMaxModule.toggle(); save(); return; } p += 34;
         if (hit(my, p)) { AntiVipProMaxModule.setGrimMode(!AntiVipProMaxModule.isGrimMode()); save(); return; } p += 34;
         if (hit(my, p)) { AntiVipProMaxModule.setVulcanMode(!AntiVipProMaxModule.isVulcanMode()); save(); return; } p += 34;
         if (hit(my, p)) {
             AntiVipProMaxModule.setIntensity((int)Math.round(sliderValue(mx, x, w, 1, 10, "Intensity")));
             save(); return;
         } p += 34;
-        if (hit(my, p)) { AntiVipProMaxModule.setAutoAdjust(!AntiVipProMaxModule.isAutoAdjust()); save(); }
+        if (hit(my, p)) { AntiVipProMaxModule.setAutoAdjust(!AntiVipProMaxModule.isAutoAdjust()); save(); return; } p += 34;
+        if (hit(my, p)) { AntiVipProMaxModule.setAutoRecovery(!AntiVipProMaxModule.isAutoRecovery()); save(); return; } p += 34;
+        if (hit(my, p)) {
+            boolean next = !com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled();
+            AntiVipProMaxModule.setAntiKickEnabled(next);
+            save(); return;
+        } p += 34;
+
+        // Bypass V2 section
+        p += 26; // section header
+        if (hit(my, p)) {
+            PeoClient.CFG.bypassV2Enabled = !PeoClient.CFG.bypassV2Enabled;
+            AntiVipProMaxModule.setBypassV2(PeoClient.CFG.bypassV2Enabled);
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            AntiVipProMaxModule.setBypassV2Intensity((int)Math.round(sliderValue(mx, x, w, 1, 10, "Intensity")));
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            AntiVipProMaxModule.setBypassV2Desync((int)Math.round(sliderValue(mx, x, w, 1, 5, "Desync")));
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            com.peoclient.nuker.optimize.NukerBypassUltimateV2.setGrimMode(
+                    !com.peoclient.nuker.optimize.NukerBypassUltimateV2.isGrimMode());
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            com.peoclient.nuker.optimize.NukerBypassUltimateV2.setVulcanMode(
+                    !com.peoclient.nuker.optimize.NukerBypassUltimateV2.isVulcanMode());
+            save(); return;
+        } p += 34;
+        p += 34; // V2 status row
+
+        // AntiKick section
+        p += 26;
+        if (hit(my, p)) {
+            PeoClient.CFG.autoBlockReload = !PeoClient.CFG.autoBlockReload;
+            if (PeoClient.CFG.autoBlockReload) {
+                com.peoclient.nuker.optimize.AutoBlockReload.start();
+            } else {
+                com.peoclient.nuker.optimize.AutoBlockReload.stop();
+            }
+            save(); return;
+        }
     }
 
     private void clickNuker(double mx, double my, int x, int w, int y) {

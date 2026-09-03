@@ -8,6 +8,9 @@ import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
+import com.peoclient.nuker.optimize.AutoBlockReload;
+import com.peoclient.nuker.optimize.AntiKickEngine;
+import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -56,6 +59,9 @@ public final class PeoClient implements ClientModInitializer {
         com.peoclient.diagnostic.KickLogManager.get().cleanupOldLogs(com.peoclient.diagnostic.DiagnosticConfig.get().getLogRetentionDays());
         com.peoclient.diagnostic.DisconnectListener.register();
         com.peoclient.diagnostic.DiagnosticHealthMonitor.get().checkHealth();
+        // Initialize optional Nuker optimization/monitoring engines.
+        if (CFG.autoBlockReload) AutoBlockReload.start();
+        if (CFG.antiKickEnabled) AntiKickEngine.start();
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
         registerModuleKeys();
@@ -148,6 +154,19 @@ public final class PeoClient implements ClientModInitializer {
             return;
         }
 
+        // Keep the new optimization engines synchronized with Config.
+        if (CFG.nuker && CFG.autoBlockReload) {
+            if (!AutoBlockReload.isActive()) AutoBlockReload.start();
+        } else if (AutoBlockReload.isActive()) {
+            AutoBlockReload.stop();
+        }
+        if (CFG.nuker && CFG.antiKickEnabled) {
+            if (!AntiKickEngine.isActive()) AntiKickEngine.start();
+        } else if (AntiKickEngine.isActive()) {
+            AntiKickEngine.stop();
+        }
+        if (!CFG.bypassV2Enabled) NukerBypassUltimateV2.stop();
+
         FullbrightLogic.tick(mc);
 
         // Targeted client-side render resync for server block updates.
@@ -235,6 +254,11 @@ public final class PeoClient implements ClientModInitializer {
         public int antiVipProMaxIntensity = 5;
         public boolean antiVipProMaxAutoAdjust = true;
         public boolean antiVipProMaxAutoRecovery = true;
+        public boolean autoBlockReload = true;
+        public boolean antiKickEnabled = true;
+        public boolean bypassV2Enabled = true;
+        public int bypassV2Intensity = 7;
+        public int bypassV2Desync = 3;
         public Map<String, Integer> keybinds = new LinkedHashMap<>();
 
         // Account/network settings.  A username override only changes the client-side
@@ -353,6 +377,11 @@ public final class PeoClient implements ClientModInitializer {
                 antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));
                 antiVipProMaxAutoAdjust = c.antiVipProMaxAutoAdjust;
                 antiVipProMaxAutoRecovery = c.antiVipProMaxAutoRecovery;
+                autoBlockReload = c.autoBlockReload;
+                antiKickEnabled = c.antiKickEnabled;
+                bypassV2Enabled = c.bypassV2Enabled;
+                bypassV2Intensity = Math.max(1, Math.min(10, c.bypassV2Intensity));
+                bypassV2Desync = Math.max(1, Math.min(5, c.bypassV2Desync));
                 keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
@@ -583,6 +612,17 @@ public final class PeoClient implements ClientModInitializer {
 
             renderBlocks.clear();
 
+            // New optimization/monitoring engines run alongside the existing
+            // vanilla Nuker state machine; they do not replace it.
+            if (CFG.autoBlockReload) AutoBlockReload.tick();
+            if (CFG.antiKickEnabled) {
+                AntiKickEngine.tick(mc);
+                if (AntiKickEngine.shouldPause()) return;
+            }
+            if (CFG.bypassV2Enabled && com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                if (NukerBypassUltimateV2.isActive()) NukerBypassUltimateV2.tick();
+            }
+
             // Lightweight local recovery: keep the fast Nuker engine intact, but
             // recover automatically if the vanilla breaking state stops changing.
             if (breakingPos != null) {
@@ -721,6 +761,14 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onBreakAttempt(target.pos, target.side);
                     }
 
+                    // The V2 engine, when active, is responsible for its own
+                    // packet sequence; otherwise use the normal interaction path.
+                    if (NukerBypassUltimateV2.isActive()) {
+                        // Bypass V2 has already prepared its packet path.
+                    } else {
+                        // Normal vanilla attack path remains below.
+                    }
+
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onBreakFailure(
@@ -818,6 +866,10 @@ public final class PeoClient implements ClientModInitializer {
 
         public static List<class_2338> getRenderBlocks() {
             return new ArrayList<>(renderBlocks);
+        }
+
+        public static class_2338 getCurrentTarget() {
+            return breakingPos;
         }
 
         public static float getBreakingProgress() {

@@ -5,6 +5,7 @@ import com.peoclient.diagnostic.AccountSessionMetrics;
 import com.peoclient.diagnostic.DiagnosticRecorder;
 import com.peoclient.diagnostic.LatencyMetrics;
 import com.peoclient.nuker.bypass.NukerBypassEngine;
+import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import net.minecraft.class_2338;
 
 /** AntiVipProMax compatibility, diagnostics and recovery controller. */
@@ -29,6 +30,39 @@ public final class AntiVipProMaxModule {
         return com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled();
     }
 
+
+    public static void setBypassV2(boolean enable) {
+        if (enable) {
+            class_2338 target = PeoClient.NukerLogic.getCurrentTarget();
+            if (target != null) {
+                NukerBypassUltimateV2.start(target);
+            }
+        } else {
+            NukerBypassUltimateV2.stop();
+        }
+    }
+
+    public static boolean isBypassV2Active() {
+        return NukerBypassUltimateV2.isActive();
+    }
+
+    public static String getBypassV2Status() {
+        return NukerBypassUltimateV2.getStatus();
+    }
+
+    public static void setBypassV2Intensity(int value) {
+        int clamped = Math.max(1, Math.min(10, value));
+        PeoClient.CFG.bypassV2Intensity = clamped;
+        NukerBypassUltimateV2.setIntensity(clamped);
+        PeoClient.CFG.save();
+    }
+
+    public static void setBypassV2Desync(int value) {
+        int clamped = Math.max(1, Math.min(5, value));
+        PeoClient.CFG.bypassV2Desync = clamped;
+        NukerBypassUltimateV2.setDesyncLevel(clamped);
+        PeoClient.CFG.save();
+    }
 
     public static void setGrimMode(boolean value) {
         PeoClient.CFG.antiVipProMaxGrim = value;
@@ -109,6 +143,9 @@ public final class AntiVipProMaxModule {
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setGrimMode(isGrimMode());
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setVulcanMode(isVulcanMode());
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setPacketSpoofLevel(getIntensity());
+            NukerBypassUltimateV2.setIntensity(PeoClient.CFG.bypassV2Intensity);
+            NukerBypassUltimateV2.setDesyncLevel(PeoClient.CFG.bypassV2Desync);
+            setBypassV2(PeoClient.CFG.bypassV2Enabled);
         } else {
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(false);
         }
@@ -117,6 +154,13 @@ public final class AntiVipProMaxModule {
     public static void tick() {
         if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
         if (isEnabled()) NukerBypassEngine.tick();
+        if (isEnabled()) {
+            if (PeoClient.CFG.bypassV2Enabled) {
+                if (!NukerBypassUltimateV2.isActive()) setBypassV2(true);
+            } else if (NukerBypassUltimateV2.isActive()) {
+                setBypassV2(false);
+            }
+        }
         // Auto Adjust is intentionally diagnostic-only. It never changes Nuker strength.
         if (isEnabled() && isAutoAdjust()) {
             int susp = getSuspicionLevel();
