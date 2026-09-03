@@ -9,7 +9,6 @@ import net.minecraft.class_2680;
 import net.minecraft.class_310;
 import net.minecraft.class_3965;
 import net.minecraft.class_239;
-import net.minecraft.class_2885;
 import net.minecraft.class_1268;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -119,21 +118,9 @@ public final class AutoBlockReload {
         if (side == null) side = class_2350.field_11036;
 
         try {
-            // Gửi interact packet (click phải) để server gửi lại block state
-            class_3965 hit = new class_3965(
-                class_243.method_24953(pos),
-                side,
-                pos,
-                false
-            );
-            class_2885 interactPacket = new class_2885(
-                class_1268.field_5808,
-                hit,
-                0
-            );
-            mc.field_1687.method_8522(interactPacket);
-
-            // Cũng gửi attack block để chắc chắn
+            // Re-enter the normal vanilla interaction path.  Do not inject a
+            // synthetic right-click packet: that packet can trigger block
+            // interactions and does not reliably refresh a stale block state.
             mc.field_1761.method_2902(pos, side);
             mc.field_1724.method_6104(class_1268.field_5808);
 

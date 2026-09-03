@@ -661,19 +661,29 @@ public final class PeoClient implements ClientModInitializer {
             // Lightweight local recovery: keep the fast Nuker engine intact, but
             // recover automatically if the vanilla breaking state stops changing.
             if (breakingPos != null) {
+                // Keep exactly one active vanilla breaking target alive until the
+                // interaction manager reports completion.  The previous version
+                // cleared breakingPos after a single tick, which caused repeated
+                // START/STOP sequences and was a common source of ghost blocks.
                 class_2680 activeState = mc.field_1687.method_8320(breakingPos);
                 float progress = getBreakingProgress();
                 if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                     com.peoclient.nuker.bypass.NukerBypassEngine.onBreakProgress(progress, breakingPos);
                 }
+
                 if (activeState.method_26215()) {
-                    mc.field_1761.method_2925();
+                    long successNow = System.currentTimeMillis();
+                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
+                        com.peoclient.nuker.bypass.NukerBypassEngine.onBreakSuccess(
+                                breakingPos, diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
+                    }
                     breakingPos = null;
                     breakingSide = null;
-                    queue.clear();
                     stagnantTicks = 0;
                     lastBreakingProgress = 0.0f;
                     progressPos = null;
+                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
+                            com.peoclient.diagnostic.BreakStateTracker.State.SUCCESS, null);
                 } else {
                     if (!breakingPos.equals(progressPos) || progress > lastBreakingProgress + 0.001f) {
                         stagnantTicks = 0;
@@ -682,34 +692,20 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 8) {
-                        // === GHOST BLOCK FIX: Tự động gửi interact packet để load lại block ===
-                        if (breakingPos != null && mc.field_1687 != null) {
-                            // Gửi packet tương tự click chuột phải để client yêu cầu server gửi lại block state
-                            try {
-                                // Gửi Interact Block packet (click chuột phải vào block)
-                                net.minecraft.class_2885 interactPacket = new net.minecraft.class_2885(
-                                    net.minecraft.class_1268.field_5808,
-                                    new net.minecraft.class_3965(
-                                        class_243.method_24953(breakingPos),
-                                        class_2350.field_11036,
-                                        breakingPos,
-                                        false
-                                    ),
-                                    0
-                                );
-                                if (mc.field_1687 != null) {
-                                    mc.field_1687.method_8522(interactPacket);
-                                }
-                            } catch (Throwable ignored) {}
-                        }
-                        // === KẾT THÚC GHOST BLOCK FIX ===
 
+                    // Continue the normal vanilla interaction path every tick.
+                    // No synthetic movement/interact packets are injected here.
+                    if (breakingSide != null) {
+                        mc.field_1761.method_2902(breakingPos, breakingSide);
+                    }
+
+                    if (stagnantTicks >= 8) {
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
                         }
                         com.peoclient.diagnostic.NukerSessionRecorder.get().recordRecovery();
-                        com.peoclient.diagnostic.BreakEventRecorder.get().recordRecovery(breakingPos, "Stale breaking state");
+                        com.peoclient.diagnostic.BreakEventRecorder.get().recordRecovery(
+                                breakingPos, "Stale vanilla breaking state");
                         com.peoclient.diagnostic.AccountSessionMetrics.get().recordRecovery();
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
@@ -717,10 +713,14 @@ public final class PeoClient implements ClientModInitializer {
                         mc.field_1761.method_2925();
                         breakingPos = null;
                         breakingSide = null;
-                        queue.clear();
+                        queue.removeIf(t -> t.pos.equals(progressPos));
                         stagnantTicks = 0;
                         lastBreakingProgress = 0.0f;
                         progressPos = null;
+                    } else {
+                        // Do not select another block while the current vanilla
+                        // break state is still active.
+                        return;
                     }
                 }
             }
@@ -875,13 +875,11 @@ public final class PeoClient implements ClientModInitializer {
                     breakingPos = null;
                     breakingSide = null;
                 } else {
-                    // Keep the current target as the active vanilla breaking state.
-                    // For SurvMulti, stop after the first partially-mined block so the
-                    // next tick can resume it instead of issuing conflicting states.
-                    if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode)) break;
-                    queue.remove(0);
-                    breakingPos = null;
-                    breakingSide = null;
+                    // Keep the target active.  The next tick will continue the
+                    // same vanilla break until the block actually becomes air.
+                    if (!"SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
+                        queue.remove(0);
+                    }
                 }
 
             }
