@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.PeoJoinModule;
+import com.peoclient.modules.UpLevelVipProMax;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
@@ -97,6 +98,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
                 case "PeoJoin" -> GLFW.GLFW_KEY_P;
+                case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
             Integer stored = CFG.keybinds.get(module);
@@ -128,6 +130,7 @@ public final class PeoClient implements ClientModInitializer {
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
                 case "PeoJoin" -> GLFW.GLFW_KEY_P;
+                case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
     }
@@ -199,6 +202,7 @@ public final class PeoClient implements ClientModInitializer {
             com.peoclient.diagnostic.LatencyMetrics.get().updatePing();
         }
         if (CFG.cleaner) InventoryCleaner.tick(mc);
+        UpLevelVipProMax.tick(mc);
 
         // Keep PeoClient diagnostic output synchronized to disk while in-game.
         if (com.peoclient.diagnostic.DiagnosticConfig.get().isEnabled()) {
@@ -223,6 +227,7 @@ public final class PeoClient implements ClientModInitializer {
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
+            case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             default -> { /* reserved for modules that are not implemented yet */ }
         }
         CFG.save();
@@ -261,6 +266,7 @@ public final class PeoClient implements ClientModInitializer {
     public static final class Config {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
         public boolean antiVipProMax = false;
+        public boolean upLevelVipProMax = false;
         public boolean antiVipProMaxGrim = true;
         public boolean antiVipProMaxVulcan = true;
         public int antiVipProMaxIntensity = 5;
@@ -391,6 +397,7 @@ public final class PeoClient implements ClientModInitializer {
 
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
                 antiVipProMax = c.antiVipProMax;
+                upLevelVipProMax = c.upLevelVipProMax;
                 antiVipProMaxGrim = c.antiVipProMaxGrim;
                 antiVipProMaxVulcan = c.antiVipProMaxVulcan;
                 antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));
