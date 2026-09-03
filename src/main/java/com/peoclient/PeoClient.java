@@ -577,6 +577,15 @@ public final class PeoClient implements ClientModInitializer {
         private static final java.util.Set<class_2338> processedInTick = new java.util.HashSet<>();
         private static int processedCountInTick;
         private static final int MAX_BLOCKS_PER_TICK = 10;
+
+        // Added from the supplied Nuker refinement: prevent duplicate local
+        // interactions and temporarily pause the local queue if it grows too large.
+        private static final java.util.Set<class_2338> pendingBlocks = new java.util.HashSet<>();
+        private static boolean isPaused;
+        private static int pauseTicks;
+        private static final int PAUSE_THRESHOLD = 200;
+        private static final int PAUSE_DURATION_TICKS = 10;
+
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
@@ -586,6 +595,25 @@ public final class PeoClient implements ClientModInitializer {
             renderBlocks.clear();
             processedInTick.clear();
             processedCountInTick = 0;
+
+            // Queue-pressure guard from the supplied refinement. This is purely
+            // client-side throttling; it does not spoof or bypass server checks.
+            int estimatedPending = queue.size();
+            if (estimatedPending > PAUSE_THRESHOLD && !isPaused) {
+                isPaused = true;
+                pauseTicks = 0;
+                com.peoclient.diagnostic.DiagnosticRecorder.get().record(
+                        "NukerThrottle", "Paused due to high pending queue: " + estimatedPending);
+            }
+            if (isPaused) {
+                pauseTicks++;
+                if (pauseTicks >= PAUSE_DURATION_TICKS) {
+                    isPaused = false;
+                    pauseTicks = 0;
+                } else {
+                    return;
+                }
+            }
 
             // Lightweight local recovery: keep the fast Nuker engine intact, but
             // recover automatically if the vanilla breaking state stops changing.
@@ -600,6 +628,7 @@ public final class PeoClient implements ClientModInitializer {
                     breakingPos = null;
                     breakingSide = null;
                     queue.clear();
+                    pendingBlocks.clear();
                     stagnantTicks = 0;
                     lastBreakingProgress = 0.0f;
                     progressPos = null;
@@ -650,6 +679,7 @@ public final class PeoClient implements ClientModInitializer {
                     progressPos = null;
                 }
                 queue.clear();
+                pendingBlocks.clear();
                 queue.addAll(collect(mc));
                 queue.sort(comparator(mc));
             }
@@ -672,6 +702,15 @@ public final class PeoClient implements ClientModInitializer {
 
                 if (processedInTick.contains(target.pos)) {
                     queue.remove(0);
+                    pendingBlocks.remove(target.pos);
+                    continue;
+                }
+
+                // Do not start another local interaction for a block that is
+                // already in the pending set. Re-queue it for a later tick.
+                if (pendingBlocks.contains(target.pos)) {
+                    queue.remove(0);
+                    queue.add(target);
                     continue;
                 }
 
@@ -722,6 +761,7 @@ public final class PeoClient implements ClientModInitializer {
                                 com.peoclient.diagnostic.BreakStateTracker.State.FAILURE, target.pos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_FAILURE: " + target.pos);
                         queue.remove(0);
+                        pendingBlocks.remove(target.pos);
                         continue;
                     }
                     diagnosticAttemptTime = System.currentTimeMillis();
@@ -737,6 +777,7 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_ATTEMPT: " + target.pos);
                     breakingPos = target.pos.method_10062();
                     breakingSide = target.side;
+                    pendingBlocks.add(target.pos);
                 }
 
                 diagnosticInteractionTime = System.currentTimeMillis();
@@ -775,6 +816,7 @@ public final class PeoClient implements ClientModInitializer {
                             com.peoclient.diagnostic.BreakStateTracker.State.SUCCESS, target.pos);
                     com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_SUCCESS: " + target.pos);
                     queue.remove(0);
+                    pendingBlocks.remove(target.pos);
                     breakingPos = null;
                     breakingSide = null;
                 } else {
@@ -783,6 +825,7 @@ public final class PeoClient implements ClientModInitializer {
                     // next tick can resume it instead of issuing conflicting states.
                     if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode)) break;
                     queue.remove(0);
+                    pendingBlocks.remove(target.pos);
                     breakingPos = null;
                     breakingSide = null;
                 }
@@ -798,6 +841,9 @@ public final class PeoClient implements ClientModInitializer {
                 mc.field_1761.method_2925();
             }
             queue.clear();
+            pendingBlocks.clear();
+            isPaused = false;
+            pauseTicks = 0;
             renderBlocks.clear();
             breakingPos = null;
             breakingSide = null;
