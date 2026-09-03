@@ -881,6 +881,38 @@ public final class PeoClient implements ClientModInitializer {
             return out;
         }
 
+        private static boolean isValidTarget(class_310 mc, Target target) {
+            if (target == null || target.pos == null || mc.field_1724 == null || mc.field_1687 == null) {
+                return false;
+            }
+
+            class_2338 pos = target.pos;
+            double range = class_3532.method_15350(CFG.nukerRange, 0.0, 15.0);
+            class_243 eye = mc.field_1724.method_33571();
+            class_2338 center = class_2338.method_49638(mc.field_1724.method_33571());
+            double distance = "Cube".equalsIgnoreCase(CFG.nukerShape)
+                    ? Math.max(
+                        Math.max(Math.abs(pos.method_10263() - center.method_10263()),
+                                 Math.abs(pos.method_10264() - center.method_10264())),
+                        Math.abs(pos.method_10260() - center.method_10260()))
+                    : eye.method_1022(class_243.method_24953(pos));
+
+            if (distance > range + 0.25) return false;
+            if (!NukerAreaLimiter.contains(pos)) return false;
+            if (CFG.nukerFlatten && pos.method_10264() < mc.field_1724.method_31478() - 1) return false;
+
+            class_2680 state = mc.field_1687.method_8320(pos);
+            if (state.method_26215() || state.method_26204() instanceof class_2404) return false;
+            if (CFG.nukerFilter && !passesFilter(state.method_26204())) return false;
+
+            if (CFG.nukerRaycast) {
+                class_2350 side = bestSide(mc, pos);
+                if (side == null) return false;
+            }
+
+            return state.method_26165(mc.field_1724, mc.field_1687, pos) > 0.0f;
+        }
+
         private static boolean passesFilter(class_2248 block) {
             Set<String> filter = new LinkedHashSet<>();
             String raw = CFG.nukerFilterIds == null ? "" : CFG.nukerFilterIds;
