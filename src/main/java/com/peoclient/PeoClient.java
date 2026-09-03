@@ -365,7 +365,7 @@ public final class PeoClient implements ClientModInitializer {
                 xrayBackgroundOpacity = c.xrayBackgroundOpacity;
 
                 nukerMode = c.nukerMode; nukerMulti = c.nukerMulti;
-                nukerCooldown = 0; nukerShape = c.nukerShape;
+                nukerCooldown = c.nukerCooldown; nukerShape = c.nukerShape;
                 nukerRange = c.nukerRange; nukerSort = c.nukerSort;
                 nukerFilter = c.nukerFilter; nukerWhitelist = c.nukerWhitelist;
                 nukerFilterIds = c.nukerFilterIds; nukerRaycast = c.nukerRaycast;
@@ -574,12 +574,6 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
-        // Per-tick duplicate guard and conservative client-side processing cap.
-        // This prevents repeatedly issuing the same local break interaction in one tick.
-        private static final java.util.Set<class_2338> processedInTick = new java.util.HashSet<>();
-        private static int processedCountInTick;
-        private static final int MAX_BLOCKS_PER_TICK = 10;
-
         // Added from the supplied Nuker refinement: prevent duplicate local
         // interactions and temporarily pause the local queue if it grows too large.
         private static final java.util.Set<class_2338> pendingBlocks = new java.util.HashSet<>();
@@ -595,14 +589,11 @@ public final class PeoClient implements ClientModInitializer {
                     || mc.field_1755 != null) return;
 
             renderBlocks.clear();
-            processedInTick.clear();
-            processedCountInTick = 0;
-
-            // Keep the queue bounded by the configured multi value, but never
-            // create more than one active vanilla breaking state. This mirrors
-            // the important part of holding the left mouse button: one target
-            // is selected, then updateBlockBreakingProgress is called every tick
-            // until that target is finished or cancelled.
+            // Restore the old Nuker "Multi" strength/queue setting while keeping
+            // the ghost-block fix: Multi controls how many valid targets are kept
+            // ready, but only ONE vanilla breaking state is active at a time.
+            // The active target is then updated every tick like holding left-click.
+            int batch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
             int estimatedPending = queue.size();
             if (estimatedPending > PAUSE_THRESHOLD && !isPaused) {
                 isPaused = true;
@@ -618,6 +609,15 @@ public final class PeoClient implements ClientModInitializer {
                 } else {
                     return;
                 }
+            }
+
+            // Restore configurable cooldown from the previous Nuker behaviour.
+            // It applies between completed targets and never interrupts an active
+            // vanilla breaking state.
+            if (cooldown > 0) {
+                cooldown--;
+                if (breakingPos != null) renderBlocks.add(breakingPos);
+                return;
             }
 
             // -----------------------------------------------------------------
@@ -647,6 +647,7 @@ public final class PeoClient implements ClientModInitializer {
 
                     queue.removeIf(t -> t.pos.equals(breakingPos));
                     pendingBlocks.remove(breakingPos);
+                    if (CFG.nukerCooldown > 0) cooldown = CFG.nukerCooldown;
                     breakingPos = null;
                     breakingSide = null;
                     stagnantTicks = 0;
@@ -654,6 +655,7 @@ public final class PeoClient implements ClientModInitializer {
                     progressPos = null;
                     diagnosticAttemptTime = 0L;
                     diagnosticInteractionTime = 0L;
+                    if (cooldown > 0) return;
                 } else {
                     // This is the key change: while the target remains active,
                     // continuously feed the normal Minecraft interaction manager
@@ -667,8 +669,6 @@ public final class PeoClient implements ClientModInitializer {
 
                     boolean continueBreaking = mc.field_1761.method_2902(breakingPos,
                             breakingSide == null ? class_2350.field_11036 : breakingSide);
-                    processedCountInTick++;
-                    processedInTick.add(breakingPos);
                     renderBlocks.add(breakingPos);
 
                     float progress = getBreakingProgress();
@@ -729,6 +729,16 @@ public final class PeoClient implements ClientModInitializer {
             if (queue.isEmpty()) {
                 queue.addAll(collect(mc));
                 queue.sort(comparator(mc));
+            }
+
+            // Restore the old Multi/SurvMulti queue depth. This preserves the
+            // setting's "strength" as target throughput without creating multiple
+            // simultaneous breaking states (which was the source of ghost blocks).
+            if ("Multi".equalsIgnoreCase(CFG.nukerMode)
+                    || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
+                if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
+            } else if (queue.size() > 1) {
+                queue.subList(1, queue.size()).clear();
             }
 
             // Remove invalid targets without starting them.
@@ -804,8 +814,6 @@ public final class PeoClient implements ClientModInitializer {
             breakingPos = target.pos.method_10062();
             breakingSide = target.side;
             pendingBlocks.add(target.pos);
-            processedInTick.add(target.pos);
-            processedCountInTick++;
             renderBlocks.add(target.pos);
 
             // Do one progress update on the start tick, then the branch above will
@@ -839,24 +847,6 @@ public final class PeoClient implements ClientModInitializer {
             class_310 mc = class_310.method_1551();
             if (mc.field_1761 == null) return 0.0f;
             return class_3532.method_15363(mc.field_1761.method_51888() / 10.0f, 0.0f, 1.0f);
-        }
-
-        private static boolean activeTargetStillValid(class_310 mc) {
-            if (breakingPos == null) return false;
-            class_2680 state = mc.field_1687.method_8320(breakingPos);
-            return !state.method_26215() && !(state.method_26204() instanceof class_2404)
-                    && NukerAreaLimiter.contains(breakingPos)
-                    && (!CFG.nukerFilter || passesFilter(state.method_26204()));
-        }
-
-        private static boolean isValidTarget(class_310 mc, Target target) {
-            class_2680 state = mc.field_1687.method_8320(target.pos);
-            if (state.method_26215() || state.method_26204() instanceof class_2404) return false;
-            if (CFG.nukerFlatten && target.pos.method_10264() < mc.field_1724.method_31478() - 1) return false;
-            if (CFG.nukerFilter && !passesFilter(state.method_26204())) return false;
-            if (CFG.nukerRaycast && target.side == null) return false;
-            return mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos))
-                    <= class_3532.method_15350(CFG.nukerRange, 0.0, 15.0) + 0.25;
         }
 
         private static List<Target> collect(class_310 mc) {
