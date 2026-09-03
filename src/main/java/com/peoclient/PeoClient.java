@@ -653,17 +653,18 @@ public final class PeoClient implements ClientModInitializer {
                             // Gửi packet tương tự click chuột phải để client yêu cầu server gửi lại block state
                             try {
                                 // Gửi Interact Block packet (click chuột phải vào block)
-                                net.minecraft.class_2850 interactPacket = new net.minecraft.class_2850(
+                                net.minecraft.class_2885 interactPacket = new net.minecraft.class_2885(
                                     net.minecraft.class_1268.field_5808,
                                     new net.minecraft.class_3965(
                                         class_243.method_24953(breakingPos),
                                         class_2350.field_11036,
                                         breakingPos,
                                         false
-                                    )
+                                    ),
+                                    0
                                 );
-                                if (mc.field_1724.field_6214 != null) {
-                                    mc.field_1724.field_6214.method_10839(interactPacket);
+                                if (mc.field_1687 != null) {
+                                    mc.field_1687.method_8522(interactPacket);
                                 }
                             } catch (Throwable ignored) {}
                         }

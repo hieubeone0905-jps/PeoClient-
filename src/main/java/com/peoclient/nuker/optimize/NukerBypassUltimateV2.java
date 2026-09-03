@@ -69,7 +69,7 @@ public final class NukerBypassUltimateV2 {
     
     public static void start(class_2338 target) {
         if (mc.field_1724 == null || mc.field_1687 == null) return;
-        currentTarget = target.toImmutable();
+        currentTarget = target;
         calculateRotation(currentTarget);
         active.set(true);
         tickCounter = 0;
@@ -179,8 +179,8 @@ public final class NukerBypassUltimateV2 {
         float noise = (float)(Math.sin(System.currentTimeMillis() / 500.0) * 0.1);
         step *= (1.0f + noise);
         
-        float newYaw = currentYaw + class_3532.method_15340(yawDiff, -step, step);
-        float newPitch = currentPitch + class_3532.method_15340(pitchDiff, -step * 0.7f, step * 0.7f);
+        float newYaw = currentYaw + class_3532.method_15348(0.0f, yawDiff, step);
+        float newPitch = currentPitch + class_3532.method_15348(0.0f, pitchDiff, step * 0.7f);
         
         // Add micro-noise
         newYaw += (float)((RANDOM.nextDouble() - 0.5) * 0.02);
@@ -203,7 +203,7 @@ public final class NukerBypassUltimateV2 {
         }
         
         // Send rotation packet
-        class_2828.class_2831 rotationPacket = new class_2828.class_2831(smoothedYaw, smoothedPitch, mc.field_1724.field_6228, false);
+        class_2828.class_2831 rotationPacket = new class_2828.class_2831(smoothedYaw, smoothedPitch, mc.field_1724.method_24828(), false);
         packetQueue.add(rotationPacket);
         
         // Update local player
@@ -242,7 +242,7 @@ public final class NukerBypassUltimateV2 {
             z = zBuffer.stream().mapToDouble(d -> d).average().orElse(z);
         }
         
-        class_2828.class_2829 posPacket = new class_2828.class_2829(x, y, z, mc.field_1724.field_6228, false);
+        class_2828.class_2829 posPacket = new class_2828.class_2829(x, y, z, mc.field_1724.method_24828(), false);
         packetQueue.add(posPacket);
         
         lastSentX = x;
@@ -298,7 +298,7 @@ public final class NukerBypassUltimateV2 {
         class_2828.class_2831 resetPacket = new class_2828.class_2831(
             mc.field_1724.method_36454(),
             mc.field_1724.method_36455(),
-            mc.field_1724.field_6228,
+            mc.field_1724.method_24828(),
             false
         );
         packetQueue.add(resetPacket);
@@ -309,7 +309,7 @@ public final class NukerBypassUltimateV2 {
         class_2828.class_2831 syncPacket = new class_2828.class_2831(
             mc.field_1724.method_36454(),
             mc.field_1724.method_36455(),
-            mc.field_1724.field_6228,
+            mc.field_1724.method_24828(),
             false
         );
         packetQueue.add(syncPacket);
@@ -334,7 +334,7 @@ public final class NukerBypassUltimateV2 {
         double bestDot = -Double.MAX_VALUE;
         for (class_2350 side : class_2350.values()) {
             class_243 normal = new class_243(side.method_10148(), side.method_10164(), side.method_10165());
-            double dot = diff.normalize().method_1020(normal);
+            double dot = diff.method_1029().method_1020(normal);
             if (dot > bestDot) {
                 bestDot = dot;
                 best = side;
@@ -363,15 +363,11 @@ public final class NukerBypassUltimateV2 {
     }
     
     private static void injectPacket(Object packet) {
-        if (mc.field_1724 == null || packet == null) return;
-        var handler = mc.field_1724.field_6214;
-        if (handler == null) return;
-        
-        // Use Minecraft's supported client packet sender. The previous
-        // reflection path targeted a removed internal queue and could call
-        // the disconnect callback by mistake on 1.21.4.
+        if (mc.field_1687 == null || packet == null) return;
         if (packet instanceof net.minecraft.class_2596) {
-            handler.method_52787((net.minecraft.class_2596) packet);
+            // ClientWorld forwards outgoing packets through the active client
+            // network connection on 1.21.4; avoid private LivingEntity fields.
+            mc.field_1687.method_8522((net.minecraft.class_2596) packet);
         }
     }
     
