@@ -563,6 +563,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class NukerLogic {
+        private static final int MAX_BLOCKS_PER_TICK = 15; // tăng từ 10 lên 15
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -607,6 +608,27 @@ public final class PeoClient implements ClientModInitializer {
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
                     if (stagnantTicks >= 8) {
+                        // === GHOST BLOCK FIX: Tự động gửi interact packet để load lại block ===
+                        if (breakingPos != null && mc.field_1687 != null) {
+                            // Gửi packet tương tự click chuột phải để client yêu cầu server gửi lại block state
+                            try {
+                                // Gửi Interact Block packet (click chuột phải vào block)
+                                net.minecraft.class_2850 interactPacket = new net.minecraft.class_2850(
+                                    net.minecraft.class_1268.field_5808,
+                                    new net.minecraft.class_3965(
+                                        class_243.method_24953(breakingPos),
+                                        class_2350.field_11036,
+                                        breakingPos,
+                                        false
+                                    )
+                                );
+                                if (mc.field_1724.field_6214 != null) {
+                                    mc.field_1724.field_6214.method_10839(interactPacket);
+                                }
+                            } catch (Throwable ignored) {}
+                        }
+                        // === KẾT THÚC GHOST BLOCK FIX ===
+
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
                         }
@@ -649,7 +671,7 @@ public final class PeoClient implements ClientModInitializer {
                 queue.sort(comparator(mc));
             }
 
-            int batch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
+            int batch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
                 // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();

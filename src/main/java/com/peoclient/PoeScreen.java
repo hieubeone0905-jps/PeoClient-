@@ -417,10 +417,15 @@ public final class PoeScreen extends class_437 {
 
     private int drawAntiVipProMax(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "AntiVipProMax");
+        y = rowToggle(d, x, y, w, "Enable", AntiVipProMaxModule.isEnabled());
         y = rowToggle(d, x, y, w, "Grim Mode", AntiVipProMaxModule.isGrimMode());
         y = rowToggle(d, x, y, w, "Vulcan Mode", AntiVipProMaxModule.isVulcanMode());
         y = sliderRow(d, x, y, w, "Intensity", AntiVipProMaxModule.getIntensity(), 1, 10, "%.0f");
         y = rowToggle(d, x, y, w, "Auto Adjust", AntiVipProMaxModule.isAutoAdjust());
+        y = rowToggle(d, x, y, w, "Auto Recovery", AntiVipProMaxModule.isAutoRecovery());
+        // === THÊM: Anti-Kick Engine ===
+        y = rowToggle(d, x, y, w, "Anti-Kick Engine", com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled());
+        // === END ===
         y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
         y = rowValue(d, x, y, w, "Mode", "Compatibility/status only; no anti-cheat bypass");
         return y;

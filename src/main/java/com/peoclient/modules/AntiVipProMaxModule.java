@@ -20,6 +20,16 @@ public final class AntiVipProMaxModule {
 
     public static boolean isEnabled() { return PeoClient.CFG.antiVipProMax; }
 
+    public static void setAntiKickEnabled(boolean value) {
+        com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(value);
+        PeoClient.CFG.save();
+    }
+
+    public static boolean isAntiKickEnabled() {
+        return com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled();
+    }
+
+
     public static void setGrimMode(boolean value) {
         PeoClient.CFG.antiVipProMaxGrim = value;
         NukerBypassEngine.setGrimMode(value);
@@ -94,6 +104,13 @@ public final class AntiVipProMaxModule {
             NukerBypassEngine.setVulcanMode(isVulcanMode());
             NukerBypassEngine.setIntensity(getIntensity());
             NukerBypassEngine.setAutoRecovery(isAutoRecovery());
+            // Anti-kick engine cũng được bật theo module
+            com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(true);
+            com.peoclient.nuker.bypass.NukerAntiKickEngine.setGrimMode(isGrimMode());
+            com.peoclient.nuker.bypass.NukerAntiKickEngine.setVulcanMode(isVulcanMode());
+            com.peoclient.nuker.bypass.NukerAntiKickEngine.setPacketSpoofLevel(getIntensity());
+        } else {
+            com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(false);
         }
     }
 

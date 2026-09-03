@@ -1,4 +1,5 @@
 package com.peoclient.nuker.bypass;
+import com.peoclient.nuker.bypass.NukerAntiKickEngine;
 
 import com.peoclient.diagnostic.BreakFailureReason;
 import com.peoclient.diagnostic.DiagnosticEvent;
@@ -46,18 +47,29 @@ public final class NukerBypassEngine {
     private NukerBypassEngine() {}
 
     public static void setEnabled(boolean enable) {
-        if (enabled == enable) return;
-        enabled = enable;
-        if (!enable) resetMetrics();
-    }
+    if (enabled == enable) return;
+    enabled = enable;
+    NukerAntiKickEngine.setEnabled(enable);
+    if (!enable) resetMetrics();
+}
 
-    public static void setIntensity(int level) { intensity = Math.max(1, Math.min(10, level)); }
-    public static void setGrimMode(boolean on) { grimMode = on; }
-    public static void setVulcanMode(boolean on) { vulcanMode = on; }
+    public static void setIntensity(int level) {
+    intensity = Math.max(1, Math.min(10, level));
+    NukerAntiKickEngine.setPacketSpoofLevel(intensity);
+}
+    public static void setGrimMode(boolean on) {
+    grimMode = on;
+    NukerAntiKickEngine.setGrimMode(on);
+}
+    public static void setVulcanMode(boolean on) {
+    vulcanMode = on;
+    NukerAntiKickEngine.setVulcanMode(on);
+}
     public static void setAutoRecovery(boolean on) { autoRecovery = on; }
 
     public static void tick() {
         if (!enabled) return;
+        NukerAntiKickEngine.tick();
         long now = System.nanoTime();
         if (lastTickNanos != 0L) {
             double dt = (now - lastTickNanos) / 1_000_000.0;
