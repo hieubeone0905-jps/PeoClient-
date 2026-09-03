@@ -8,6 +8,7 @@ import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
+import com.peoclient.nuker.render.NukerRender;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -598,12 +599,12 @@ public final class PeoClient implements ClientModInitializer {
 
             // Queue-pressure guard from the supplied refinement. This is purely
             // client-side throttling; it does not spoof or bypass server checks.
-            int estimatedPending = queue.size();
+            int estimatedPending = Math.max(queue.size(), NukerRender.getPendingWorldChanges());
             if (estimatedPending > PAUSE_THRESHOLD && !isPaused) {
                 isPaused = true;
                 pauseTicks = 0;
                 com.peoclient.diagnostic.DiagnosticRecorder.get().record(
-                        "NukerThrottle", "Paused due to high pending queue: " + estimatedPending);
+                        "NukerThrottle", "Paused due to high pending changes: " + estimatedPending);
             }
             if (isPaused) {
                 pauseTicks++;
@@ -842,6 +843,7 @@ public final class PeoClient implements ClientModInitializer {
             }
             queue.clear();
             pendingBlocks.clear();
+            NukerRender.resetPending();
             isPaused = false;
             pauseTicks = 0;
             renderBlocks.clear();

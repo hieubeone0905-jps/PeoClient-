@@ -1,0 +1,6 @@
+Merged latest supplied NukerRender and NukerLogic refinements into the current PeoClient baseline.
+- Added NukerRender pending world-change counter.
+- NukerLogic now uses both queue size and NukerRender pending world changes for local pause threshold.
+- NukerLogic resetState clears NukerRender pending count.
+- Preserved the complete existing NukerLogic methods and diagnostics; omitted no implementation with placeholder ellipses.
+- No anti-cheat bypass/spoofing behavior was added by this merge.
