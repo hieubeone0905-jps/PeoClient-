@@ -436,8 +436,14 @@ public final class PoeScreen extends class_437 {
 
         y = section(d, x, y, "AntiKick");
         y = rowToggle(d, x, y, w, "Auto Reload", com.peoclient.nuker.optimize.AutoBlockReload.isActive());
-        y = rowValue(d, x, y, w, "Reload Queue", com.peoclient.nuker.optimize.AutoBlockReload.getQueueSize() + " blocks");
+        y = rowValue(d, x, y, w, "Reload Queue", com.peoclient.nuker.optimize.AutoReloadEnhancer.getQueueSize() + " blocks");
         y = rowValue(d, x, y, w, "AntiKick", com.peoclient.nuker.optimize.AntiKickEngine.getStatus());
+        y = section(d, x, y, "Client Optimization");
+        y = rowToggle(d, x, y, w, "Stabilizer", com.peoclient.nuker.optimize.ClientStabilizer.isEnabled());
+        y = sliderRow(d, x, y, w, "Rotation Step", PeoClient.CFG.stabilizerRotationStep, 10, 30, "%.0f deg/tick");
+        y = sliderRow(d, x, y, w, "Position Jitter", PeoClient.CFG.stabilizerPositionJitter * 100000, 1, 50, "%.0f µ");
+        y = rowToggle(d, x, y, w, "Latency Compensator", com.peoclient.nuker.optimize.LatencyCompensator.isEnabled());
+        y = sliderRow(d, x, y, w, "Ping Threshold", PeoClient.CFG.compensatorPingThreshold, 50, 300, "%.0f ms");
         y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
         y = rowValue(d, x, y, w, "Mode", "Compatibility/status only; no anti-cheat bypass");
         return y;
@@ -648,9 +654,41 @@ public final class PoeScreen extends class_437 {
             PeoClient.CFG.autoBlockReload = !PeoClient.CFG.autoBlockReload;
             if (PeoClient.CFG.autoBlockReload) {
                 com.peoclient.nuker.optimize.AutoBlockReload.start();
+                com.peoclient.nuker.optimize.AutoReloadEnhancer.start();
             } else {
                 com.peoclient.nuker.optimize.AutoBlockReload.stop();
+                com.peoclient.nuker.optimize.AutoReloadEnhancer.stop();
             }
+            save(); return;
+        }
+        p += 34; // Reload Queue
+        p += 34; // AntiKick status
+        p += 26; // Client Optimization header
+        if (hit(my, p)) {
+            boolean next = !com.peoclient.nuker.optimize.ClientStabilizer.isEnabled();
+            if (next) com.peoclient.nuker.optimize.ClientStabilizer.start();
+            else com.peoclient.nuker.optimize.ClientStabilizer.stop();
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            PeoClient.CFG.stabilizerRotationStep = (int)Math.round(sliderValue(mx, x, w, 10, 30, "Rotation Step"));
+            com.peoclient.nuker.optimize.ClientStabilizer.setRotationStep(PeoClient.CFG.stabilizerRotationStep);
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            PeoClient.CFG.stabilizerPositionJitter = Math.round(sliderValue(mx, x, w, 1, 50, "Position Jitter")) / 100000.0;
+            com.peoclient.nuker.optimize.ClientStabilizer.setPositionJitter(PeoClient.CFG.stabilizerPositionJitter);
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            boolean next = !com.peoclient.nuker.optimize.LatencyCompensator.isEnabled();
+            if (next) com.peoclient.nuker.optimize.LatencyCompensator.start();
+            else com.peoclient.nuker.optimize.LatencyCompensator.stop();
+            save(); return;
+        } p += 34;
+        if (hit(my, p)) {
+            PeoClient.CFG.compensatorPingThreshold = (int)Math.round(sliderValue(mx, x, w, 50, 300, "Ping Threshold"));
+            com.peoclient.nuker.optimize.LatencyCompensator.setPingThreshold(PeoClient.CFG.compensatorPingThreshold);
             save(); return;
         }
     }

@@ -11,6 +11,9 @@ import com.peoclient.nuker.compat.NukerAreaLimiter;
 import com.peoclient.nuker.optimize.AutoBlockReload;
 import com.peoclient.nuker.optimize.AntiKickEngine;
 import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
+import com.peoclient.nuker.optimize.ClientStabilizer;
+import com.peoclient.nuker.optimize.LatencyCompensator;
+import com.peoclient.nuker.optimize.AutoReloadEnhancer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -61,7 +64,10 @@ public final class PeoClient implements ClientModInitializer {
         com.peoclient.diagnostic.DiagnosticHealthMonitor.get().checkHealth();
         // Initialize optional Nuker optimization/monitoring engines.
         if (CFG.autoBlockReload) AutoBlockReload.start();
+        if (CFG.autoBlockReload) AutoReloadEnhancer.start();
         if (CFG.antiKickEnabled) AntiKickEngine.start();
+        if (CFG.antiKickEnabled) ClientStabilizer.start();
+        if (CFG.antiKickEnabled) LatencyCompensator.start();
 
         menuKey = key("PeoClient Hub", GLFW.GLFW_KEY_RIGHT_SHIFT);
         registerModuleKeys();
@@ -157,13 +163,19 @@ public final class PeoClient implements ClientModInitializer {
         // Keep the new optimization engines synchronized with Config.
         if (CFG.nuker && CFG.autoBlockReload) {
             if (!AutoBlockReload.isActive()) AutoBlockReload.start();
+            if (!AutoReloadEnhancer.isEnabled()) AutoReloadEnhancer.start();
         } else if (AutoBlockReload.isActive()) {
             AutoBlockReload.stop();
+            AutoReloadEnhancer.stop();
         }
         if (CFG.nuker && CFG.antiKickEnabled) {
             if (!AntiKickEngine.isActive()) AntiKickEngine.start();
+            if (!ClientStabilizer.isEnabled()) ClientStabilizer.start();
+            if (!LatencyCompensator.isEnabled()) LatencyCompensator.start();
         } else if (AntiKickEngine.isActive()) {
             AntiKickEngine.stop();
+            ClientStabilizer.stop();
+            LatencyCompensator.stop();
         }
         if (!CFG.bypassV2Enabled) NukerBypassUltimateV2.stop();
 
@@ -259,6 +271,13 @@ public final class PeoClient implements ClientModInitializer {
         public boolean bypassV2Enabled = true;
         public int bypassV2Intensity = 7;
         public int bypassV2Desync = 3;
+
+        // Client optimization settings. These are local stability/pacing controls.
+        public int stabilizerRotationStep = 22;
+        public double stabilizerPositionJitter = 0.00008;
+        public int stabilizerPacketDelay = 2;
+        public int compensatorPingThreshold = 150;
+        public int compensatorMicroPause = 50;
         public Map<String, Integer> keybinds = new LinkedHashMap<>();
 
         // Account/network settings.  A username override only changes the client-side
@@ -382,6 +401,11 @@ public final class PeoClient implements ClientModInitializer {
                 bypassV2Enabled = c.bypassV2Enabled;
                 bypassV2Intensity = Math.max(1, Math.min(10, c.bypassV2Intensity));
                 bypassV2Desync = Math.max(1, Math.min(5, c.bypassV2Desync));
+                stabilizerRotationStep = Math.max(1, Math.min(30, c.stabilizerRotationStep));
+                stabilizerPositionJitter = Math.max(0.00001, Math.min(0.001, c.stabilizerPositionJitter));
+                stabilizerPacketDelay = Math.max(1, Math.min(5, c.stabilizerPacketDelay));
+                compensatorPingThreshold = Math.max(50, Math.min(500, c.compensatorPingThreshold));
+                compensatorMicroPause = Math.max(20, Math.min(100, c.compensatorMicroPause));
                 keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
                 randomProxy = c.randomProxy;
@@ -616,9 +640,20 @@ public final class PeoClient implements ClientModInitializer {
             // vanilla Nuker state machine; they do not replace it.
             if (CFG.autoBlockReload) AutoBlockReload.tick();
             if (CFG.antiKickEnabled) {
+                ClientStabilizer.tick();
+                LatencyCompensator.tick();
                 AntiKickEngine.tick(mc);
                 if (AntiKickEngine.shouldPause()) return;
             }
+
+            // Apply only a local pacing adjustment when latency is genuinely high.
+            // This never fabricates movement/block packets.
+            if (cooldown > 0) {
+                cooldown--;
+                return;
+            }
+            int dynamicCooldown = LatencyCompensator.isEnabled()
+                    ? LatencyCompensator.getDynamicCooldown() : 0;
             if (CFG.bypassV2Enabled && com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                 if (NukerBypassUltimateV2.isActive()) NukerBypassUltimateV2.tick();
             }
@@ -813,6 +848,9 @@ public final class PeoClient implements ClientModInitializer {
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
                 processed++;
+                if (processed > 0) {
+                    cooldown = Math.max(0, CFG.nukerCooldown + dynamicCooldown);
+                }
 
                 if (mc.field_1687.method_8320(target.pos).method_26215()) {
                     long successNow = System.currentTimeMillis();
