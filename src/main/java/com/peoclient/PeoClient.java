@@ -261,6 +261,7 @@ public final class PeoClient implements ClientModInitializer {
     public static final class Config {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
         public boolean antiVipProMax = false;
+        public boolean upLevelVipProMax = false;
         public boolean antiVipProMaxGrim = true;
         public boolean antiVipProMaxVulcan = true;
         public int antiVipProMaxIntensity = 5;
@@ -391,6 +392,7 @@ public final class PeoClient implements ClientModInitializer {
 
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
                 antiVipProMax = c.antiVipProMax;
+                upLevelVipProMax = c.upLevelVipProMax;
                 antiVipProMaxGrim = c.antiVipProMaxGrim;
                 antiVipProMaxVulcan = c.antiVipProMaxVulcan;
                 antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));

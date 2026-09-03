@@ -56,6 +56,7 @@ public final class UpLevelVipProMax {
     private static int cooldown;
     private static int lastContainerSyncId = -1;
     private static int selectedHotbar = -1;
+    private static boolean configInitialized;
 
     private enum State {
         IDLE,
@@ -91,6 +92,11 @@ public final class UpLevelVipProMax {
     }
 
     public static void tick(class_310 client) {
+        if (!configInitialized) {
+            enabled = PeoClient.CFG.upLevelVipProMax;
+            configInitialized = true;
+        }
+
         if (!enabled || client.field_1724 == null || client.field_1761 == null
                 || client.field_1687 == null) return;
 
