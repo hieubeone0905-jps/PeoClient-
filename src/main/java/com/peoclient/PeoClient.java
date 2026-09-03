@@ -270,7 +270,7 @@ public final class PeoClient implements ClientModInitializer {
 
         // BleachHack-inspired Nuker settings.
         public String nukerMode = "Normal";
-        public int nukerMulti = 2;
+        public int nukerMulti = 10;
         public int nukerCooldown = 0;
         public String nukerShape = "Sphere";
         public double nukerRange = 4.2;
@@ -579,8 +579,8 @@ public final class PeoClient implements ClientModInitializer {
         private static final java.util.Set<class_2338> pendingBlocks = new java.util.HashSet<>();
         private static boolean isPaused;
         private static int pauseTicks;
-        private static final int PAUSE_THRESHOLD = 200;
-        private static final int PAUSE_DURATION_TICKS = 10;
+        private static final int PAUSE_THRESHOLD = Integer.MAX_VALUE;
+        private static final int PAUSE_DURATION_TICKS = 0;
 
         private NukerLogic() {}
 
@@ -594,22 +594,9 @@ public final class PeoClient implements ClientModInitializer {
             // ready, but only ONE vanilla breaking state is active at a time.
             // The active target is then updated every tick like holding left-click.
             int batch = class_3532.method_15340(CFG.nukerMulti, 1, 10);
-            int estimatedPending = queue.size();
-            if (estimatedPending > PAUSE_THRESHOLD && !isPaused) {
-                isPaused = true;
-                pauseTicks = 0;
-                com.peoclient.diagnostic.DiagnosticRecorder.get().record(
-                        "NukerThrottle", "Paused due to high target queue: " + estimatedPending);
-            }
-            if (isPaused) {
-                pauseTicks++;
-                if (pauseTicks >= PAUSE_DURATION_TICKS) {
-                    isPaused = false;
-                    pauseTicks = 0;
-                } else {
-                    return;
-                }
-            }
+            // Aggressive mode: do not throttle the target queue.
+            // The ghost-block protection is preserved by keeping exactly one
+            // vanilla breaking state active, while the queue is kept full.
 
             // Restore configurable cooldown from the previous Nuker behaviour.
             // It applies between completed targets and never interrupts an active
@@ -690,7 +677,7 @@ public final class PeoClient implements ClientModInitializer {
                     // Recovery only cancels a genuinely stale vanilla state. It
                     // does not perform a renderer reload or create a replacement
                     // block state.
-                    if (stagnantTicks >= 8) {
+                    if (stagnantTicks >= 20) {
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
                         }

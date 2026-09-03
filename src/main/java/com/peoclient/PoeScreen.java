@@ -213,7 +213,7 @@ public final class PoeScreen extends class_437 {
     private int drawNuker(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Mining");
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerMode);
-        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 0, 10, "%.0f blocks");
+        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 1, 10, "%.0f blocks");
         y = sliderRow(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown, 0, 20, "%.0f ticks");
         y = rowValue(d, x, y, w, "Shape", PeoClient.CFG.nukerShape);
         y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 0.0, 15.0, "%.1f");
@@ -761,7 +761,7 @@ public final class PoeScreen extends class_437 {
             int contentY = firstRowsTop + (implemented(selected) ? 68 : 34);
             int p = contentY + 26;
             if ("NukerMulti".equals(draggingSlider)) {
-                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 10, "Multi"));
+                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 1, 10, "Multi"));
             } else if ("NukerCooldown".equals(draggingSlider)) {
                 PeoClient.CFG.nukerCooldown = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 20, "Cooldown"));
             } else if ("NukerRange".equals(draggingSlider)) {
