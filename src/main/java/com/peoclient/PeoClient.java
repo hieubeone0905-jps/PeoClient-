@@ -151,6 +151,9 @@ public final class PeoClient implements ClientModInitializer {
 
         FullbrightLogic.tick(mc);
 
+        // Targeted client-side render resync for server block updates.
+        NukerRender.tick(mc);
+
         NukerAreaLimiter.tick(mc, CFG.nukerRangeHighlight, CFG.nukerRange);
         if (CFG.nuker) {
             if (!com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
