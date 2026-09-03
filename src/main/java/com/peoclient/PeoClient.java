@@ -821,7 +821,6 @@ public final class PeoClient implements ClientModInitializer {
             }
             queue.clear();
             pendingBlocks.clear();
-            NukerRender.resetPending();
             isPaused = false;
             pauseTicks = 0;
             renderBlocks.clear();
