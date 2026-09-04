@@ -19,6 +19,7 @@ public final class NukerPacingController {
     private long windowStartNs;
     private long pauseUntilNs;
     private int startsInWindow;
+    private int burstStarts;
     private int hotWindows;
     private boolean sustainMode;
     private long lastStartNs;
@@ -37,6 +38,16 @@ public final class NukerPacingController {
         rollWindow(now);
 
         if (now < pauseUntilNs) return false;
+
+        // Short burst pacing: allow four consecutive starts, then yield briefly.
+        // This keeps the Nuker's configured range/multi/targeting intact while
+        // preventing an uninterrupted stream of break-start work.
+        int burstLimit = sustainMode ? 3 : 4;
+        if (burstStarts >= burstLimit) {
+            burstStarts = 0;
+            pauseUntilNs = now + (sustainMode ? 140_000_000L : 90_000_000L);
+            return false;
+        }
 
         int ping = LatencyMetrics.get().getLastPing();
         if (ping < 0) ping = 50;
@@ -80,6 +91,7 @@ public final class NukerPacingController {
         long now = System.nanoTime();
         rollWindow(now);
         startsInWindow++;
+        burstStarts++;
         totalStarts++;
         lastStartNs = now;
     }
@@ -98,6 +110,7 @@ public final class NukerPacingController {
 
         windowStartNs = now;
         startsInWindow = 0;
+        burstStarts = 0;
     }
 
     public boolean isSustainMode() { return sustainMode; }
@@ -113,6 +126,7 @@ public final class NukerPacingController {
         windowStartNs = 0L;
         pauseUntilNs = 0L;
         startsInWindow = 0;
+        burstStarts = 0;
         hotWindows = 0;
         sustainMode = false;
         lastStartNs = 0L;

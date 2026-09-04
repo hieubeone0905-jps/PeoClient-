@@ -774,6 +774,14 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
+                    // Adaptive local pacing: preserve Nuker's configured power,
+                    // but break uninterrupted start bursts into short runs.
+                    com.peoclient.nuker.optimize.NukerPacingController pacing =
+                            com.peoclient.nuker.optimize.NukerPacingController.get();
+                    if (!pacing.allowBreakStart()) {
+                        break;
+                    }
+                    pacing.recordBreakStart();
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
