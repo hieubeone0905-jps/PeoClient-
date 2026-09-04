@@ -660,11 +660,14 @@ public final class PeoClient implements ClientModInitializer {
                 cooldown--;
                 return;
             }
-            // Stability monitors are observational only. Never add latency-based
-            // cooldown here: configured Nuker throughput remains unchanged.
+            // Apply the optional dynamic cooldown from AntiKickEngine without
+            // replacing the normal Nuker interaction path.
             int dynamicCooldown = 0;
-            // BypassV2 is retained as a UI/config compatibility facade, but it is
-            // not a second packet producer. NukerLogic owns block breaking.
+            if (AntiKickEngine.isActive()) {
+                dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
+            }
+            // BypassV2 remains a compatibility facade; NukerLogic stays the
+            // single owner of block-breaking packets.
 
             // Lightweight local recovery: keep the fast Nuker engine intact, but
             // recover automatically if the vanilla breaking state stops changing.

@@ -172,18 +172,16 @@ public final class AntiVipProMaxModule {
                 setBypassV2(false);
             }
         }
-        // Auto Adjust is intentionally diagnostic-only. It never changes Nuker strength.
+        // Auto Adjust: only tune the existing compatibility intensity at
+        // elevated suspicion; it does not create a second packet producer.
         if (isEnabled() && isAutoAdjust()) {
-            // Diagnostic-only. Do not emit a disk write every client tick: that
-            // creates unnecessary I/O during long farm sessions. Record when the
-            // level changes or at a low-rate heartbeat instead.
-            int suspicion = getSuspicionLevel();
-            long now = System.currentTimeMillis();
-            if (suspicion != lastLoggedSuspicion || now - lastAutoAdjustLogMs >= 5000L) {
-                lastLoggedSuspicion = suspicion;
-                lastAutoAdjustLogMs = now;
-                DiagnosticRecorder.get().record("AntiVipProMax",
-                        "AutoAdjust observation suspicion=" + suspicion);
+            int susp = getSuspicionLevel();
+            if (susp > 6) {
+                NukerBypassUltimateV2.setIntensity(8);
+            } else if (susp > 4) {
+                NukerBypassUltimateV2.setIntensity(6);
+            } else {
+                NukerBypassUltimateV2.setIntensity(4);
             }
         }
     }

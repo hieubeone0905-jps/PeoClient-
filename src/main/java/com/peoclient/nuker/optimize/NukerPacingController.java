@@ -14,7 +14,7 @@ public final class NukerPacingController {
     private static final NukerPacingController INSTANCE = new NukerPacingController();
 
     private static final long WINDOW_NS = 1_000_000_000L;
-    private static final long MIN_PAUSE_NS = 120_000_000L;
+    private static final long MIN_PAUSE_NS = 250_000_000L;
 
     private long windowStartNs;
     private long pauseUntilNs;
@@ -41,22 +41,22 @@ public final class NukerPacingController {
         int ping = LatencyMetrics.get().getLastPing();
         if (ping < 0) ping = 50;
 
-        int softLimit = sustainMode ? 28 : 36;
-        int hardLimit = sustainMode ? 34 : 44;
-        long pause = sustainMode ? 420_000_000L : 280_000_000L;
+        int softLimit = sustainMode ? 7 : 10;
+        int hardLimit = sustainMode ? 10 : 14;
+        long pause = sustainMode ? 1_000_000_000L : 700_000_000L;
 
         if (ping >= 300) {
-            softLimit -= 8;
-            hardLimit -= 8;
-            pause += 120_000_000L;
+            softLimit -= 2;
+            hardLimit -= 2;
+            pause += 300_000_000L;
         } else if (ping >= 200) {
-            softLimit -= 5;
-            hardLimit -= 5;
-            pause += 70_000_000L;
+            softLimit -= 1;
+            hardLimit -= 1;
+            pause += 150_000_000L;
         }
 
-        softLimit = Math.max(12, softLimit);
-        hardLimit = Math.max(16, hardLimit);
+        softLimit = Math.max(4, softLimit);
+        hardLimit = Math.max(6, hardLimit);
 
         if (startsInWindow >= hardLimit) {
             pauseUntilNs = now + Math.max(MIN_PAUSE_NS, pause);
@@ -91,7 +91,7 @@ public final class NukerPacingController {
         }
         if (now - windowStartNs < WINDOW_NS) return;
 
-        if (startsInWindow <= 20) {
+        if (startsInWindow <= 6) {
             hotWindows = Math.max(0, hotWindows - 1);
             if (hotWindows == 0) sustainMode = false;
         }
