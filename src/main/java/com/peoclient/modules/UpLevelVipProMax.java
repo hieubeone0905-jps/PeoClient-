@@ -348,7 +348,7 @@ public final class UpLevelVipProMax {
 
     private static int findHopperSlot(class_310 client) {
         var handler = client.field_1724.field_7512;
-        int limit = handler.slots.size();
+        int limit = 100;
         for (int i = 0; i < limit; i++) {
             class_1799 stack;
             try {
