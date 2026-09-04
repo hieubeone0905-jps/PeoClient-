@@ -738,7 +738,14 @@ public final class PeoClient implements ClientModInitializer {
                 queue.sort(comparator(mc));
             }
 
-            int batch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
+            // Preserve the strongest Nuker batch as the normal level.
+            // Every fifth processing tick uses half of that batch to smooth
+            // local/server workload, then immediately returns to MAX.
+            com.peoclient.nuker.optimize.NukerPacingController pacing =
+                    com.peoclient.nuker.optimize.NukerPacingController.get();
+            pacing.tick();
+            int configuredBatch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
+            int batch = pacing.adjustBatch(configuredBatch);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
                 // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
@@ -774,14 +781,6 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
-                    // Adaptive local pacing: preserve Nuker's configured power,
-                    // but break uninterrupted start bursts into short runs.
-                    com.peoclient.nuker.optimize.NukerPacingController pacing =
-                            com.peoclient.nuker.optimize.NukerPacingController.get();
-                    if (!pacing.allowBreakStart()) {
-                        break;
-                    }
-                    pacing.recordBreakStart();
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);

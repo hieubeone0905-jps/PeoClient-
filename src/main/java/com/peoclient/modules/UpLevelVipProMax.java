@@ -49,10 +49,10 @@ public final class UpLevelVipProMax {
     );
 
     private static final String LEVEL_SCREEN_TITLE = "Cấp độ đảo";
-    private static final int PROCESS_WAIT_TICKS = 10;
+    private static final int PROCESS_WAIT_TICKS = 8;
     private static final int CLOSE_WAIT_TICKS = 10;
-    private static final int ACTION_COOLDOWN_TICKS = 10;
-    private static final int INVENTORY_ACTION_COOLDOWN = 3;
+    private static final int ACTION_COOLDOWN_TICKS = 5;
+    private static final int INVENTORY_ACTION_COOLDOWN = 2;
     private static final int FALLBACK_HOTBAR_SLOT = 8;
     private static final int INVENTORY_VERIFY_TICKS = 2;
 
@@ -134,7 +134,7 @@ public final class UpLevelVipProMax {
         }
 
         // Dispose matching blocks in a bounded batch. This keeps the normal
-        // inventory THROW action while allowing up to 16 stacks/actions per tick.
+        // inventory THROW action while allowing up to 31 stacks/actions per tick.
         int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
         if (dropped > 0) {
             return;
