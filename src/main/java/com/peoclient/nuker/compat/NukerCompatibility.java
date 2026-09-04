@@ -21,9 +21,10 @@ public final class NukerCompatibility {
 
         TickMetrics.get().recordTickStart();
         // Never gate, sleep, delay or skip NukerLogic here.
+        // NukerLogic is the single owner of block-breaking state.
+        // Do not call WorldSync here again: NukerLogic already performs its
+        // observational sync once per client tick.
         PeoClient.NukerLogic.tick(mc);
-        // WorldSync is intentionally observational/recovery-only and never gates throughput.
-        NukerWorldSync.tick(mc);
         LatencyMetrics.get().updatePing();
         AccountSessionMetrics.get().tick();
         TickMetrics.get().recordTickEnd();

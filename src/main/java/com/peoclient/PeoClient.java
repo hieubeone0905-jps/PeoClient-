@@ -863,13 +863,17 @@ public final class PeoClient implements ClientModInitializer {
                     breakingPos = null;
                     breakingSide = null;
                 } else {
-                    // Keep the current target as the active vanilla breaking state.
-                    // For SurvMulti, stop after the first partially-mined block so the
-                    // next tick can resume it instead of issuing conflicting states.
-                    if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode)) break;
-                    queue.remove(0);
-                    breakingPos = null;
-                    breakingSide = null;
+                    // The server/world has not confirmed the block as broken yet.
+                    // Keep the same vanilla breaking state and resume it next tick.
+                    // Re-selecting a new target (or starting the same target again)
+                    // every iteration can generate an excessive stream of start/
+                    // progress actions and is the main source of instability seen
+                    // when Nuker is combined with the compatibility monitors.
+                    //
+                    // One progress interaction per client tick is intentional here:
+                    // it lets Minecraft's normal interaction manager advance the
+                    // current break state without creating duplicate actions.
+                    break;
                 }
 
             }
