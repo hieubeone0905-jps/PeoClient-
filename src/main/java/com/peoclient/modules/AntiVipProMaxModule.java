@@ -130,6 +130,9 @@ public final class AntiVipProMaxModule {
     public static int getPing() { return LatencyMetrics.get().getLastPing(); }
     public static double getAverageTickMs() { return NukerBypassEngine.getAvgTickMs(); }
 
+    private static int lastLoggedSuspicion = -1;
+    private static long lastAutoAdjustLogMs;
+
     private static void updateEngine() {
         boolean enable = isEnabled();
         NukerBypassEngine.setEnabled(enable);
@@ -171,9 +174,17 @@ public final class AntiVipProMaxModule {
         }
         // Auto Adjust is intentionally diagnostic-only. It never changes Nuker strength.
         if (isEnabled() && isAutoAdjust()) {
-            // Diagnostic-only: never rewrite Nuker's configured strength or timing.
-            DiagnosticRecorder.get().record("AntiVipProMax",
-                    "AutoAdjust observation suspicion=" + getSuspicionLevel());
+            // Diagnostic-only. Do not emit a disk write every client tick: that
+            // creates unnecessary I/O during long farm sessions. Record when the
+            // level changes or at a low-rate heartbeat instead.
+            int suspicion = getSuspicionLevel();
+            long now = System.currentTimeMillis();
+            if (suspicion != lastLoggedSuspicion || now - lastAutoAdjustLogMs >= 5000L) {
+                lastLoggedSuspicion = suspicion;
+                lastAutoAdjustLogMs = now;
+                DiagnosticRecorder.get().record("AntiVipProMax",
+                        "AutoAdjust observation suspicion=" + suspicion);
+            }
         }
     }
 }

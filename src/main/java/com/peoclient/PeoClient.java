@@ -14,6 +14,7 @@ import com.peoclient.nuker.optimize.AntiKickEngine;
 import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import com.peoclient.nuker.optimize.ClientStabilizer;
 import com.peoclient.nuker.optimize.LatencyCompensator;
+import com.peoclient.nuker.optimize.NukerPacingController;
 import com.peoclient.nuker.optimize.AutoReloadEnhancer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -771,6 +772,12 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
+                    // Preserve Nuker range/multi/targeting strength, but pace only
+                    // sustained new break-start bursts that can create excessive
+                    // server-side action traffic over long sessions.
+                    if (!NukerPacingController.get().allowBreakStart()) {
+                        break;
+                    }
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
@@ -808,6 +815,7 @@ public final class PeoClient implements ClientModInitializer {
                         queue.remove(0);
                         continue;
                     }
+                    NukerPacingController.get().recordBreakStart();
                     diagnosticAttemptTime = System.currentTimeMillis();
                     if (diagnosticTargetTime > 0) {
                         com.peoclient.diagnostic.NukerTimingMetrics.get().recordTargetToAttempt(
@@ -895,6 +903,7 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
+            NukerPacingController.get().reset();
         }
 
         public static List<class_2338> getRenderBlocks() {
