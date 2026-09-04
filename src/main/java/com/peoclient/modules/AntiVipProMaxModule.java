@@ -160,30 +160,39 @@ public final class AntiVipProMaxModule {
     }
 
     public static void tick() {
-        if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
-        if (isEnabled()) {
-            NukerBypassEngine.tick();
-            NukerBypassUltimateV2.tick();
+    if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
+    if (isEnabled()) {
+        NukerBypassEngine.tick();
+        NukerBypassUltimateV2.tick();
+    }
+    if (isEnabled()) {
+        if (PeoClient.CFG.bypassV2Enabled) {
+            if (!NukerBypassUltimateV2.isActive()) setBypassV2(true);
+        } else if (NukerBypassUltimateV2.isActive()) {
+            setBypassV2(false);
         }
-        if (isEnabled()) {
-            if (PeoClient.CFG.bypassV2Enabled) {
-                if (!NukerBypassUltimateV2.isActive()) setBypassV2(true);
-            } else if (NukerBypassUltimateV2.isActive()) {
-                setBypassV2(false);
-            }
+    }
+    // AutoAdjust nâng cấp
+    if (isEnabled() && isAutoAdjust()) {
+        int susp = getSuspicionLevel();
+        int ping = getPing();
+        // Tăng cường nếu ping cao hoặc suspicion cao
+        if (susp > 5 || ping > 200) {
+            // Tăng cường độ bypass (gửi nhiều packet giả hơn)
+            NukerBypassUltimateV2.setIntensity(Math.min(10, PeoClient.CFG.bypassV2Intensity + 1));
+            // Tăng tần suất gửi packet giả trong AntiKickEngine
+            AntiKickEngine.setProtectionLevel(Math.min(10, AntiKickEngine.getProtectionLevel() + 1));
+        } else if (susp < 3 && ping < 100) {
+            // Giảm cường độ để tiết kiệm tài nguyên
+            NukerBypassUltimateV2.setIntensity(Math.max(1, PeoClient.CFG.bypassV2Intensity - 1));
+            AntiKickEngine.setProtectionLevel(Math.max(1, AntiKickEngine.getProtectionLevel() - 1));
         }
-        // Auto Adjust: monitoring/logging only. Never inject packets and never
-        // alter Nuker batch/range/rotation/cooldown.
-        if (isEnabled() && isAutoAdjust()) {
-            int susp = getSuspicionLevel();
-            int ping = getPing();
-            if (System.currentTimeMillis() - lastAutoAdjustLogMs > 30000L) {
-                lastAutoAdjustLogMs = System.currentTimeMillis();
-                DiagnosticRecorder.get().record("AutoAdjust",
-                        "susp=" + susp + " ping=" + ping +
-                        " v2I=" + NukerBypassUltimateV2.getIntensity() +
-                        " antiKick=" + AntiVipProMaxModule.isAntiKickEnabled());
-            }
+        // Ghi log mỗi 30 giây
+        if (System.currentTimeMillis() - lastAutoAdjustLogMs > 30000) {
+            lastAutoAdjustLogMs = System.currentTimeMillis();
+            DiagnosticRecorder.get().record("AutoAdjust", "susp=" + susp + " ping=" + ping +
+                " v2I=" + NukerBypassUltimateV2.getIntensity() +
+                " akeL=" + AntiKickEngine.getProtectionLevel());
         }
     }
 }
