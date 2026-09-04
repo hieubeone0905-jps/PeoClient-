@@ -689,7 +689,7 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 8) {
+                    if (stagnantTicks >= 16) {
                         com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
@@ -700,7 +700,9 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
-                        mc.field_1761.method_2925();
+                        // NukerWorldSync already aborts the vanilla break state here.
+                        // Avoid issuing the same abort twice; duplicate aborts can cause
+                        // unnecessary state churn without changing legitimate break speed.
                         breakingPos = null;
                         breakingSide = null;
                         queue.clear();
