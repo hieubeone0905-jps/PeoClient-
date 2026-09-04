@@ -348,7 +348,7 @@ public final class UpLevelVipProMax {
 
     private static int findHopperSlot(class_310 client) {
         var handler = client.field_1724.field_7512;
-        int limit = Math.min(90, handler.method_7608());
+        int limit = handler.method_7608(client.field_1724);
         for (int i = 0; i < limit; i++) {
             class_1799 stack;
             try {
@@ -365,6 +365,16 @@ public final class UpLevelVipProMax {
                     || name.contains("all block") || name.contains("tất cả block")) return i;
         }
         return -1;
+    }
+
+    /**
+     * Maps PlayerInventory indices (0..35) to PlayerScreenHandler slot ids.
+     * In the vanilla player handler, hotbar inventory slots 0..8 are exposed
+     * as screen slots 36..44, while main inventory slots 9..35 keep their ids.
+     */
+    private static int playerInventoryScreenSlot(int inventorySlot) {
+        if (inventorySlot < 0 || inventorySlot >= 36) return -1;
+        return inventorySlot < 9 ? 36 + inventorySlot : inventorySlot;
     }
 
     private static void restoreSelectedHotbar(class_310 client) {
