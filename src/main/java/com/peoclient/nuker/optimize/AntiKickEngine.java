@@ -169,39 +169,23 @@ public final class AntiKickEngine {
     }
     
     private static void checkSuspiciousActivity() {
+        // Telemetry only. Never translate local success-rate statistics into
+        // pauses, cooldowns, rotation changes, or other Nuker behaviour.
         int attempts = AccountSessionMetrics.get().getBreakAttempts();
         int successes = AccountSessionMetrics.get().getBreakSuccesses();
-        
-        if (attempts > 100 && successes > 80) {
-            double successRate = (double) successes / attempts;
-            int rate = (int)(successRate * 100);
-            
-            // Nếu success rate quá cao (> 95%), server có thể đang theo dõi
+
+        if (attempts > 100) {
+            int rate = (int) Math.max(0, Math.min(100,
+                    ((double) successes / Math.max(1, attempts)) * 100.0));
+            lastSuccessRate = rate;
             if (rate > 95) {
-                consecutiveSuccess++;
-                DiagnosticRecorder.get().record("AntiKickEngine", 
-                    "High success rate: " + rate + "% (consecutive=" + consecutiveSuccess + ")");
-                
-                if (consecutiveSuccess > 3) {
-                    // Tăng cường bảo vệ
-                    protectionLevel = Math.min(10, protectionLevel + 1);
-                    // Tạo micro-pause bất thường để phá pattern
-                    if (!isPaused) {
-                        isPaused = true;
-                        pauseTicks = 0;
-                        DiagnosticRecorder.get().record("AntiKickEngine", 
-                            "Emergency pause due to high success rate");
-                    }
-                    consecutiveSuccess = 0;
-                }
+                consecutiveSuccess = Math.min(consecutiveSuccess + 1, 1000);
             } else {
                 consecutiveSuccess = Math.max(0, consecutiveSuccess - 1);
             }
-            
-            lastSuccessRate = rate;
         }
     }
-    
+
     private static void adjustProtectionLevel() {
         // Tự động điều chỉnh protection level
         if (protectionLevel < 5) {

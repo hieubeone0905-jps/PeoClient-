@@ -39,7 +39,12 @@ public final class UpLevelVipProMax {
             "minecraft:gold_block"
     );
 
-    private static final int DROP_STACKS_PER_TICK = 16;
+    private static final int DROP_STACKS_PER_TICK = 18;
+    // Keep the configured 16-action ceiling, but smooth inventory THROW bursts.
+    // Four full ticks followed by one half-load tick.
+    private static final int DROP_FULL_TICKS = 4;
+    private static final int DROP_CYCLE_TICKS = 5;
+    private static int dropCycleTick;
 
     private static final Set<String> DROP_BLOCKS = Set.of(
             "minecraft:stone",
@@ -133,9 +138,18 @@ public final class UpLevelVipProMax {
             return;
         }
 
+        // A handled level screen is no longer open. Arm the next one cleanly.
+        if (lastContainerSyncId != -1) {
+            lastContainerSyncId = -1;
+        }
+
         // Dispose matching blocks in a bounded batch. This keeps the normal
         // inventory THROW action while allowing up to 31 stacks/actions per tick.
-        int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
+        dropCycleTick = (dropCycleTick + 1) % DROP_CYCLE_TICKS;
+        int dropBudget = (dropCycleTick == DROP_FULL_TICKS)
+                ? Math.max(1, (DROP_STACKS_PER_TICK + 1) / 2)
+                : DROP_STACKS_PER_TICK;
+        int dropped = dropInvalidBlocksBatch(client, dropBudget);
         if (dropped > 0) {
             return;
         }
@@ -274,11 +288,6 @@ public final class UpLevelVipProMax {
             lastContainerSyncId = syncId;
             state = State.CLICK_HOPPER;
             waitTicks = 0;
-        } else if (state == State.WAIT_FOR_LEVEL_GUI || state == State.IDLE) {
-            // A server can reuse a handler sync id. The fact that the expected
-            // level screen is visible is enough to arm a fresh hopper click.
-            state = State.CLICK_HOPPER;
-            waitTicks = 0;
         }
 
         if (state == State.CLICK_HOPPER) {
@@ -315,11 +324,10 @@ public final class UpLevelVipProMax {
             }
             restoreSelectedHotbar(client);
             workingHotbar = -1;
-            // Give the server a short normal post-close acknowledgement window.
-            // Then briefly open the vanilla inventory (same screen the player gets
-            // with E) and close it again; this forces the client to consume the
-            // latest player/inventory state without sending synthetic packets.
-            state = State.OPEN_INVENTORY_VERIFY;
+            // Give the server a normal post-close acknowledgement window.
+            // Do not open/close an extra inventory screen: that only adds GUI
+            // traffic and can contend with another inventory operation.
+            state = State.COOLDOWN;
             waitTicks = CLOSE_WAIT_TICKS;
             return;
         }
@@ -405,6 +413,7 @@ public final class UpLevelVipProMax {
         state = State.IDLE;
         waitTicks = 0;
         cooldown = 0;
+        dropCycleTick = 0;
         lastContainerSyncId = -1;
         selectedHotbar = -1;
         workingHotbar = -1;
