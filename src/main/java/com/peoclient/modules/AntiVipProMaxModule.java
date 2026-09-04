@@ -130,9 +130,6 @@ public final class AntiVipProMaxModule {
     public static int getPing() { return LatencyMetrics.get().getLastPing(); }
     public static double getAverageTickMs() { return NukerBypassEngine.getAvgTickMs(); }
 
-    private static int lastLoggedSuspicion = -1;
-    private static long lastAutoAdjustLogMs;
-
     private static void updateEngine() {
         boolean enable = isEnabled();
         NukerBypassEngine.setEnabled(enable);
@@ -172,17 +169,11 @@ public final class AntiVipProMaxModule {
                 setBypassV2(false);
             }
         }
-        // Auto Adjust: only tune the existing compatibility intensity at
-        // elevated suspicion; it does not create a second packet producer.
+        // Auto Adjust is intentionally diagnostic-only. It never changes Nuker strength.
         if (isEnabled() && isAutoAdjust()) {
-            int susp = getSuspicionLevel();
-            if (susp > 6) {
-                NukerBypassUltimateV2.setIntensity(8);
-            } else if (susp > 4) {
-                NukerBypassUltimateV2.setIntensity(6);
-            } else {
-                NukerBypassUltimateV2.setIntensity(4);
-            }
+            // Diagnostic-only: never rewrite Nuker's configured strength or timing.
+            DiagnosticRecorder.get().record("AntiVipProMax",
+                    "AutoAdjust observation suspicion=" + getSuspicionLevel());
         }
     }
 }

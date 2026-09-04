@@ -14,7 +14,6 @@ import com.peoclient.nuker.optimize.AntiKickEngine;
 import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import com.peoclient.nuker.optimize.ClientStabilizer;
 import com.peoclient.nuker.optimize.LatencyCompensator;
-import com.peoclient.nuker.optimize.NukerPacingController;
 import com.peoclient.nuker.optimize.AutoReloadEnhancer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -65,6 +64,8 @@ public final class PeoClient implements ClientModInitializer {
         com.peoclient.diagnostic.DisconnectListener.register();
         com.peoclient.diagnostic.DiagnosticHealthMonitor.get().checkHealth();
         // Initialize optional Nuker optimization/monitoring engines.
+        if (CFG.autoBlockReload) AutoBlockReload.start();
+        if (CFG.autoBlockReload) AutoReloadEnhancer.start();
         if (CFG.antiKickEnabled) AntiKickEngine.start();
         if (CFG.antiKickEnabled) ClientStabilizer.start();
         if (CFG.antiKickEnabled) LatencyCompensator.start();
@@ -163,6 +164,13 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         // Keep the new optimization engines synchronized with Config.
+        if (CFG.nuker && CFG.autoBlockReload) {
+            if (!AutoBlockReload.isActive()) AutoBlockReload.start();
+            if (!AutoReloadEnhancer.isEnabled()) AutoReloadEnhancer.start();
+        } else if (AutoBlockReload.isActive()) {
+            AutoBlockReload.stop();
+            AutoReloadEnhancer.stop();
+        }
         if (CFG.nuker && CFG.antiKickEnabled) {
             if (!AntiKickEngine.isActive()) AntiKickEngine.start();
             if (!ClientStabilizer.isEnabled()) ClientStabilizer.start();
@@ -634,8 +642,11 @@ public final class PeoClient implements ClientModInitializer {
                     ) return;
 
             renderBlocks.clear();
-            // Ghost-block/reload handling is intentionally outside the Nuker
-            // break loop. Nuker owns only legitimate vanilla break state.
+            com.peoclient.nuker.compat.NukerWorldSync.tick(mc);
+
+            // New optimization/monitoring engines run alongside the existing
+            // vanilla Nuker state machine; they do not replace it.
+            if (CFG.autoBlockReload) AutoBlockReload.tick();
             if (CFG.antiKickEnabled) {
                 ClientStabilizer.tick();
                 LatencyCompensator.tick();
@@ -648,14 +659,11 @@ public final class PeoClient implements ClientModInitializer {
                 cooldown--;
                 return;
             }
-            // Apply the optional dynamic cooldown from AntiKickEngine without
-            // replacing the normal Nuker interaction path.
+            // Stability monitors are observational only. Never add latency-based
+            // cooldown here: configured Nuker throughput remains unchanged.
             int dynamicCooldown = 0;
-            if (AntiKickEngine.isActive()) {
-                dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
-            }
-            // BypassV2 remains a compatibility facade; NukerLogic stays the
-            // single owner of block-breaking packets.
+            // BypassV2 is retained as a UI/config compatibility facade, but it is
+            // not a second packet producer. NukerLogic owns block breaking.
 
             // Lightweight local recovery: keep the fast Nuker engine intact, but
             // recover automatically if the vanilla breaking state stops changing.
@@ -681,12 +689,8 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 40) {
-                        // Conservative local watchdog: abandon only a genuinely
-                        // frozen vanilla break state. No ghost-block reload or
-                        // synthetic interaction is issued here.
-                        mc.field_1761.method_2925();
-
+                    if (stagnantTicks >= 8) {
+                        com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
                         }
@@ -696,6 +700,7 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
+                        mc.field_1761.method_2925();
                         breakingPos = null;
                         breakingSide = null;
                         queue.clear();
@@ -764,12 +769,6 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
-                    // Preserve Nuker range/multi/targeting strength, but pace only
-                    // sustained new break-start bursts that can create excessive
-                    // server-side action traffic over long sessions.
-                    if (!NukerPacingController.get().allowBreakStart()) {
-                        break;
-                    }
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
@@ -807,7 +806,6 @@ public final class PeoClient implements ClientModInitializer {
                         queue.remove(0);
                         continue;
                     }
-                    NukerPacingController.get().recordBreakStart();
                     diagnosticAttemptTime = System.currentTimeMillis();
                     if (diagnosticTargetTime > 0) {
                         com.peoclient.diagnostic.NukerTimingMetrics.get().recordTargetToAttempt(
@@ -895,7 +893,6 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
-            NukerPacingController.get().reset();
         }
 
         public static List<class_2338> getRenderBlocks() {
