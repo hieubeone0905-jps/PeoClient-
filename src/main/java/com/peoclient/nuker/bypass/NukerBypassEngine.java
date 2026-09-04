@@ -78,7 +78,7 @@ public final class NukerBypassEngine {
         lastTickNanos = now;
         ticks++;
 
-        LatencyMetrics.get().updatePing();
+        if ((ticks & 9L) == 0L) LatencyMetrics.get().updatePing();
         String server = getServerAddress();
         int ping = LatencyMetrics.get().getLastPing();
         if (server != null && ping >= 0) serverProfile.recordPing(server, ping);

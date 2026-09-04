@@ -82,118 +82,37 @@ public final class AntiKickEngine {
      * Gọi mỗi tick từ NukerLogic
      */
     public static void tick(class_310 mc) {
-        if (!isActive()) return;
-        if (mc.field_1724 == null || mc.field_1687 == null) return;
-        
+        if (!isActive() || mc.field_1724 == null || mc.field_1687 == null) return;
+
         antiKickTick++;
         breakCounter++;
-        
-        // === Micro-pause: tránh pattern ===
-        if (useMicroPause) {
-            microPauseTicks++;
-            if (microPauseTicks >= MICRO_PAUSE_INTERVAL) {
-                microPauseTicks = 0;
-                if (!isPaused) {
-                    isPaused = true;
-                    pauseTicks = 0;
-                    DiagnosticRecorder.get().record("AntiKickEngine", "Micro-pause triggered");
-                }
-            }
-        }
-        
-        // === Check Health ===
-        if (useHealthCheck) {
-            checkHealth(mc);
-        }
-        
-        // === Rotation Randomization (mỗi tick, mạnh hơn) ===
-        if (useRotationRandomization) {
-            applyRotationRandomization(mc);
-        }
-        
-        // === Dynamic Interval (mỗi 2 tick) ===
-        if (useDynamicInterval && breakCounter % 2 == 0) {
-            applyDynamicInterval();
-        }
-        
-        // === Ping Monitoring ===
-        if (usePingMonitoring && antiKickTick % 3 == 0) {
-            monitorPing(mc);
-        }
-        
-        // === Server Response Monitoring ===
-        if (antiKickTick % 8 == 0) {
-            monitorServerResponses();
-        }
-        
-        // === Handle Pause State ===
-        handlePauseState();
-        
-        // === Suspicious Activity Detection ===
-        if (antiKickTick % 20 == 0) {
-            checkSuspiciousActivity();
-        }
-        
-        // === Điều chỉnh protection level dựa trên success rate ===
+
+        // Observation only. Never pause Nuker, alter rotation, or alter cooldown.
+        if (useHealthCheck && antiKickTick % 20 == 0) checkHealth(mc);
+        if (usePingMonitoring && antiKickTick % 10 == 0) monitorPing(mc);
+        if (antiKickTick % 20 == 0) monitorServerResponses();
+        if (antiKickTick % 40 == 0) checkSuspiciousActivity();
         adjustProtectionLevel();
     }
-    
+
     private static void checkHealth(class_310 mc) {
         if (mc.field_1724 == null) return;
-        
         float health = mc.field_1724.method_6032();
         int food = mc.field_1724.method_7344().method_7586();
-        
         if (health < 5.0f || food < 5) {
-            if (!isPaused) {
-                isPaused = true;
-                pauseTicks = 0;
-                DiagnosticRecorder.get().record("AntiKickEngine", 
-                    "Paused - Health=" + health + ", Food=" + food);
-            }
-        } else if (isPaused && health > 7.0f && food > 7) {
-            isPaused = false;
-            pauseTicks = 0;
-            DiagnosticRecorder.get().record("AntiKickEngine", "Resumed");
+            DiagnosticRecorder.get().record("AntiKickEngine",
+                    "Low health/food observed: H=" + health + " F=" + food);
         }
     }
-    
+
     private static void applyRotationRandomization(class_310 mc) {
-        if (mc.field_1724 == null) return;
-        
-        long now = System.currentTimeMillis();
-        if (now - lastRotationChange < 1500) return; // Giảm xuống 1.5s
-        
-        // Noise mạnh hơn, random theo Gaussian
-        float yawNoise = (float)(RANDOM.nextGaussian() * 0.8);
-        float pitchNoise = (float)(RANDOM.nextGaussian() * 0.4);
-        
-        float currentYaw = mc.field_1724.method_36454();
-        float currentPitch = mc.field_1724.method_36455();
-        
-        mc.field_1724.method_36456(currentYaw + yawNoise);
-        mc.field_1724.method_36457(class_3532.method_15363(currentPitch + pitchNoise, -90, 90));
-        
-        lastRotationChange = now;
-        rotationPhase = (rotationPhase + 1) % 3;
-        
-        if (rotationPhase == 0 && antiKickTick % 30 == 0) {
-            DiagnosticRecorder.get().record("AntiKickEngine", 
-                "Rotation noise: yaw=" + String.format("%.2f", yawNoise) + 
-                ", pitch=" + String.format("%.2f", pitchNoise));
-        }
+        // Intentionally observation-only: NukerLogic owns player rotation.
     }
-    
+
     private static void applyDynamicInterval() {
-        // Variation rộng hơn
-        int variation = (int)((RANDOM.nextDouble() - 0.5) * 8);
-        int base = PeoClient.CFG.nukerCooldown;
-        int newCooldown = Math.max(0, base + variation);
-        
-        // Lưu vào static để NukerLogic đọc
-        // (cần thêm getter)
+        // Intentionally disabled. Nuker speed/cooldown remains exactly CFG-controlled.
     }
-    
+
     private static void monitorPing(class_310 mc) {
         int ping = LatencyMetrics.get().getLastPing();
         if (ping <= 0) return;
@@ -291,14 +210,13 @@ public final class AntiKickEngine {
     }
     
     // ===== Getters/Setters =====
-    public static boolean shouldPause() { return isPaused; }
+    public static boolean shouldPause() { return false; }
     
     public static int getDynamicCooldown() {
-        if (!useDynamicInterval) return PeoClient.CFG.nukerCooldown;
-        int variation = (int)((RANDOM.nextDouble() - 0.5) * 8);
-        return Math.max(0, PeoClient.CFG.nukerCooldown + variation);
+        // Preserve Nuker strength/speed: compatibility adds no cooldown.
+        return 0;
     }
-    
+
     public static int getProtectionLevel() { return protectionLevel; }
     public static void setProtectionLevel(int level) {
         protectionLevel = Math.max(1, Math.min(10, level));

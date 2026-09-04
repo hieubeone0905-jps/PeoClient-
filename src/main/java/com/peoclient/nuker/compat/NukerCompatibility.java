@@ -25,7 +25,8 @@ public final class NukerCompatibility {
         // Do not call WorldSync here again: NukerLogic already performs its
         // observational sync once per client tick.
         PeoClient.NukerLogic.tick(mc);
-        LatencyMetrics.get().updatePing();
+        // Keep compatibility overhead out of the critical path.
+        // Ping sampling is owned by the diagnostics layer and is not needed here.
         AccountSessionMetrics.get().tick();
         TickMetrics.get().recordTickEnd();
     }

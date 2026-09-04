@@ -40,7 +40,8 @@ public final class LatencyCompensator {
         int ping = LatencyMetrics.get().getLastPing();
         if (ping < 0) ping = 50;
 
-        dynamicCooldownBase = ping > pingSpikeThreshold ? 2 : 0;
+        // Monitoring only: never add cooldown, so Nuker speed remains unchanged.
+        dynamicCooldownBase = 0;
 
         if (dynamicCooldownBase > 0 && tickCounter % 20 == 0) {
             long now = System.currentTimeMillis();
