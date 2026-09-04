@@ -18,12 +18,13 @@ public final class AutoBlockReload {
     private static boolean active = false;
     private static int checkInterval = 0;
     private static long lastReloadTime = 0;
-    private static final int RELOAD_COOLDOWN_MS = 50; // Giảm xuống 50ms để reload nhanh hơn
+    private static final int RELOAD_COOLDOWN_MS = 80; // Prevent repeated reload attempts from the same stale state
     private static class_2338 lastGhostPos = null;
     private static int ghostCheckCount = 0;
 
     public static void start() {
-        active = true;
+        // Retained for config compatibility; ghost reload is disabled.
+        active = false;
         reloadQueue.clear();
         lastReloadTime = 0;
         DiagnosticRecorder.get().record("AutoBlockReload", "Started");
@@ -36,7 +37,7 @@ public final class AutoBlockReload {
     }
 
     public static boolean isActive() {
-        return active && PeoClient.CFG.nuker;
+        return false;
     }
 
     public static void tick() {
@@ -46,7 +47,7 @@ public final class AutoBlockReload {
         checkInterval++;
 
         // Mỗi 2 tick kiểm tra ghost block (nhanh hơn)
-        if (checkInterval % 2 == 0) {
+        if (checkInterval % 5 == 0) {
             detectAndReloadGhostBlocks();
         }
 
@@ -72,9 +73,10 @@ public final class AutoBlockReload {
         class_2680 state = mc.field_1687.method_8320(target);
         boolean clientSeesAir = state.method_26215();
 
-        // Ghost detection: ưu tiên target đang đào, sau đó kiểm tra raycast để bắt lệch target.
-        if (clientSeesAir) {
-            boolean breaking = PeoClient.NukerLogic.getBreakingProgress() > 0.0f;
+        // Ghost detection: only reload when the client sees air while a real
+        // break is still in progress. This avoids unnecessary recovery traffic.
+        if (clientSeesAir && PeoClient.NukerLogic.getBreakingProgress() > 0.02f) {
+            boolean breaking = true;
             class_2338 reloadPos = target;
             if (!breaking && mc.field_1724 != null) {
                 net.minecraft.class_239 rayHit = mc.field_1724.method_5745(PeoClient.CFG.nukerRange + 1.0, 0.0f, false);
@@ -84,9 +86,15 @@ public final class AutoBlockReload {
                 }
             }
             if (reloadPos != null && (breaking || !reloadPos.equals(target))) {
+                long now = System.currentTimeMillis();
+                if (lastGhostPos != null && lastGhostPos.equals(reloadPos)
+                        && now - lastReloadTime < 3000L) {
+                    return;
+                }
                 if (!reloadQueue.contains(reloadPos)) {
                     reloadQueue.add(reloadPos);
-                    DiagnosticRecorder.get().record("AutoBlockReload", 
+                    lastGhostPos = reloadPos;
+                    DiagnosticRecorder.get().record("AutoBlockReload",
                         "Ghost detected at " + target + ", queued reload " + reloadPos);
                 }
             }
@@ -95,7 +103,7 @@ public final class AutoBlockReload {
         // Nếu Nuker bị kẹt (progress không tăng trong 5 tick)
         if (PeoClient.NukerLogic.getBreakingProgress() < 0.01f && 
             PeoClient.CFG.nuker && 
-            checkInterval % 10 == 0) {
+            checkInterval % 20 == 0) {
             if (target != null && !reloadQueue.contains(target)) {
                 reloadQueue.add(target);
                 DiagnosticRecorder.get().record("AutoBlockReload", 

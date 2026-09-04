@@ -15,6 +15,7 @@ public final class AutoReloadEnhancer {
     private AutoReloadEnhancer() {}
 
     public static void start() {
+        if (enabled) return;
         enabled = true;
         if (PeoClient.CFG.autoBlockReload && !AutoBlockReload.isActive()) {
             AutoBlockReload.start();

@@ -1,15 +1,12 @@
-# PeoClient stability patch — 2026-09-04
+# Nuker Stability Patch – 2026-09-04
 
-## What changed
-- Added `NukerPacingController`.
-- Nuker range, multi, target selection and immediate burst behavior are unchanged.
-- Sustained block-start bursts are paced only after the action rate remains high across multiple 1-second windows.
-- Pacing becomes more conservative automatically when ping is high.
-- `AntiVipProMaxModule` no longer writes an `AutoAdjust observation` line every client tick; it logs on suspicion changes or every 5 seconds.
-- Nuker reset now also resets the pacing state.
+This patch keeps the existing Nuker targeting/range/multi/break path intact while removing ghost-block reload/recovery from the active Nuker loop.
 
-## Why
-The supplied diagnostic showed very high long-session break-start counts, including 39,993/39,993 and 70,820/70,820 successful attempts. The log itself does not contain a captured server disconnect reason, so the exact server-side kick rule cannot be proven from this diagnostic alone.
+Changes:
+- AutoBlockReload and AutoReloadEnhancer are no longer started/ticked by the main client.
+- AntiKickEngine is monitor-only: no rotation noise, micro-pauses, or dynamic Nuker cooldown changes.
+- Nuker no longer invokes NukerWorldSync for normal stale-progress recovery.
+- A conservative 40-tick local frozen-break watchdog remains; it only abandons a genuinely frozen vanilla break state and does not synthesize interaction packets.
+- Existing Nuker pacing and normal Minecraft interaction manager remain the sole action path.
 
-## Build note
-A local `./gradlew build --no-daemon` attempt could not complete in the sandbox because the Gradle Wrapper tried to download Gradle and outbound DNS/network access was unavailable.
+Goal: reduce client-side state churn and duplicate recovery while preserving Nuker strength and normal break mechanics. This is not an anti-cheat bypass.
