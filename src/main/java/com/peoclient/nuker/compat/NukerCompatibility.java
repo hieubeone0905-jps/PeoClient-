@@ -1,6 +1,7 @@
 package com.peoclient.nuker.compat;
 
 import com.peoclient.PeoClient;
+import com.peoclient.modules.UpLevelVipProMax;
 import com.peoclient.diagnostic.AccountSessionMetrics;
 import com.peoclient.diagnostic.LatencyMetrics;
 import com.peoclient.diagnostic.TickMetrics;
@@ -18,6 +19,9 @@ public final class NukerCompatibility {
     public static void tick(class_310 mc) {
         if (mc.field_1724 == null || mc.field_1687 == null || mc.field_1761 == null) return;
         if (!PeoClient.CFG.nuker) return;
+        // UpLevelVipProMax owns the interaction while its handled level GUI is open.
+        // Do not let Nuker issue a competing block interaction in that window.
+        if (UpLevelVipProMax.isBusy()) return;
 
         TickMetrics.get().recordTickStart();
         // Never gate, sleep, delay or skip NukerLogic here.

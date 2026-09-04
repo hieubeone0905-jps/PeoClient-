@@ -91,6 +91,11 @@ public final class UpLevelVipProMax {
         return enabled;
     }
 
+    /** True while this module owns the current handled level-screen interaction. */
+    public static boolean isBusy() {
+        return enabled && state != State.IDLE && state != State.COOLDOWN;
+    }
+
     public static void tick(class_310 client) {
         if (!configInitialized) {
             enabled = PeoClient.CFG.upLevelVipProMax;

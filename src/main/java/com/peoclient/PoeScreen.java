@@ -2,6 +2,7 @@ package com.peoclient;
 
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.PeoJoinModule;
+import com.peoclient.modules.UpLevelVipProMax;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -38,7 +39,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "PeoJoin",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "UpLevelVipProMax", "PeoJoin",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
@@ -69,7 +70,7 @@ public final class PoeScreen extends class_437 {
     private boolean implemented(String name) {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
                 || name.equals("Nuker [Multi]") || name.equals("X-Ray")
-                || name.equals("AntiVipProMax") || name.equals("PeoJoin");
+                || name.equals("AntiVipProMax") || name.equals("UpLevelVipProMax") || name.equals("PeoJoin");
     }
 
     private boolean enabled(String name) {
@@ -79,6 +80,7 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.CFG.xray;
             case "AntiVipProMax" -> AntiVipProMaxModule.isEnabled();
+            case "UpLevelVipProMax" -> UpLevelVipProMax.isEnabled();
             case "PeoJoin" -> PeoJoinModule.isEnabled();
             default -> false;
         };
@@ -91,6 +93,7 @@ public final class PoeScreen extends class_437 {
             case "Nuker [Multi]" -> PeoClient.CFG.nuker = !PeoClient.CFG.nuker;
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
+            case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
         }
         PeoClient.CFG.save();
@@ -203,6 +206,7 @@ public final class PoeScreen extends class_437 {
                 case "X-Ray" -> drawXray(d, x, yy, w);
                 case "Fullbright" -> drawFullbright(d, x, yy, w);
                 case "AntiVipProMax" -> drawAntiVipProMax(d, x, yy, w);
+                case "UpLevelVipProMax" -> drawUpLevelVipProMax(d, x, yy, w);
                 case "PeoJoin" -> drawPeoJoin(d, x, yy, w);
             }
         } else {
@@ -410,6 +414,7 @@ public final class PoeScreen extends class_437 {
             case "Fullbright" -> "Makes dark areas bright.";
             case "X-Ray" -> "Shows selected blocks through the world.";
             case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
+            case "UpLevelVipProMax" -> "Automates island-level block submission using normal server inventory interactions.";
             case "PeoJoin" -> "Automatic local recovery after disconnect; reconnects and sends /home.";
             default -> "";
         };
@@ -446,6 +451,18 @@ public final class PoeScreen extends class_437 {
         y = sliderRow(d, x, y, w, "Ping Threshold", PeoClient.CFG.compensatorPingThreshold, 50, 300, "%.0f ms");
         y = rowValue(d, x, y, w, "Status", AntiVipProMaxModule.getStatus());
         y = rowValue(d, x, y, w, "Mode", "Compatibility/status only; no anti-cheat bypass");
+        return y;
+    }
+
+    private int drawUpLevelVipProMax(class_332 d, int x, int y, int w) {
+        y = section(d, x, y, "Island Level");
+        y = rowToggle(d, x, y, w, "Enable", UpLevelVipProMax.isEnabled());
+        y = rowValue(d, x, y, w, "State", UpLevelVipProMax.getStatus());
+        y = rowValue(d, x, y, w, "Level blocks", "Diamond / Emerald / Lapis / Coal / Redstone / Iron / Gold");
+        y = rowValue(d, x, y, w, "Discard blocks", "Stone / Cobblestone / Raw Gold / Raw Iron");
+        y = section(d, x, y, "Nuker compatibility");
+        y = rowValue(d, x, y, w, "Nuker", PeoClient.CFG.nuker ? "ON" : "OFF");
+        y = rowValue(d, x, y, w, "Interaction", "Paused while level GUI is handled");
         return y;
     }
 
@@ -586,6 +603,7 @@ public final class PoeScreen extends class_437 {
                 case "X-Ray" -> clickXray(mouseY, contentY);
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
                 case "AntiVipProMax" -> clickAntiVipProMax(mouseX, mouseY, settingsX, settingsW, contentY);
+                case "UpLevelVipProMax" -> clickUpLevelVipProMax(mouseY, contentY);
             }
             return true;
         }
@@ -602,6 +620,11 @@ public final class PoeScreen extends class_437 {
     private double roundSlider(double value, double min, double max, double step) {
         double v = class_3532.method_15350(value, min, max);
         return Math.round(v / step) * step;
+    }
+
+    private void clickUpLevelVipProMax(double my, int y) {
+        int p = y + 26;
+        if (hit(my, p)) { UpLevelVipProMax.toggle(); save(); }
     }
 
     private void clickAntiVipProMax(double mx, double my, int x, int w, int y) {

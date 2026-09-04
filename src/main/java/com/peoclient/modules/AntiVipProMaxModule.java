@@ -157,10 +157,21 @@ public final class AntiVipProMaxModule {
     }
 
     public static void tick() {
+        // AntiVipProMax is a Nuker compatibility controller in this client.
+        // Keep it synchronized with Nuker instead of running a second interaction loop.
+        if (!PeoClient.CFG.nuker) {
+            if (NukerBypassEngine.isEnabled()) {
+                NukerBypassEngine.setEnabled(false);
+                NukerBypassUltimateV2.stop();
+            }
+            return;
+        }
         if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
         if (isEnabled()) {
             NukerBypassEngine.tick();
-            NukerBypassUltimateV2.tick();
+            if (!UpLevelVipProMax.isBusy()) {
+                NukerBypassUltimateV2.tick();
+            }
         }
         if (isEnabled()) {
             if (PeoClient.CFG.bypassV2Enabled) {

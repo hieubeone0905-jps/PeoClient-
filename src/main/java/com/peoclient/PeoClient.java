@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.PeoJoinModule;
+import com.peoclient.modules.UpLevelVipProMax;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
@@ -96,6 +97,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
+                case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
                 case "PeoJoin" -> GLFW.GLFW_KEY_P;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
@@ -127,6 +129,7 @@ public final class PeoClient implements ClientModInitializer {
             case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
+                case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
                 case "PeoJoin" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
@@ -181,6 +184,10 @@ public final class PeoClient implements ClientModInitializer {
 
         FullbrightLogic.tick(mc);
 
+        // UpLevelVipProMax gets first ownership of the interaction tick.
+        // This prevents Nuker/compatibility engines from competing with the level GUI.
+        UpLevelVipProMax.tick(mc);
+
         // Targeted client-side render resync for server block updates.
 
         NukerAreaLimiter.tick(mc, CFG.nukerRangeHighlight, CFG.nukerRange);
@@ -222,6 +229,7 @@ public final class PeoClient implements ClientModInitializer {
             case "Fullbright" -> toggleFullbright(mc);
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
+            case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
             default -> { /* reserved for modules that are not implemented yet */ }
         }
