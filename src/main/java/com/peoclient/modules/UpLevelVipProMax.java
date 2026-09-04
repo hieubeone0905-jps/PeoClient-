@@ -51,6 +51,8 @@ public final class UpLevelVipProMax {
     private static final int CLOSE_WAIT_TICKS = 10;
     private static final int ACTION_COOLDOWN_TICKS = 5;
     private static final int INVENTORY_ACTION_COOLDOWN = 2;
+    /** Maximum complete inventory stacks disposed by the zero-value filter per client tick. */
+    private static final int DROP_STACKS_PER_TICK = 31;
     private static final int FALLBACK_HOTBAR_SLOT = 8;
     private static final int INVENTORY_VERIFY_TICKS = 2;
 
@@ -131,9 +133,17 @@ public final class UpLevelVipProMax {
             return;
         }
 
-        // Always dispose only the four explicitly configured zero-value blocks.
-        if (dropOneInvalidBlock(client)) {
-            cooldown = ACTION_COOLDOWN_TICKS;
+        // Fast disposal path: remove up to 31 complete stacks per client tick.
+        // This mirrors the high-throughput batching used by InventoryCleaner while
+        // keeping the filter strict: only the four configured zero-value blocks are
+        // ever selected here.
+        int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
+        if (dropped > 0) {
+            // Do not add a per-stack delay; the requested throughput is achieved by
+            // batching the normal inventory THROW action in the same client tick.
+            // A small cooldown is only applied if the batch exhausted the configured
+            // limit, preventing an unnecessary delay when the inventory is already clean.
+            if (dropped >= DROP_STACKS_PER_TICK) cooldown = ACTION_COOLDOWN_TICKS;
             return;
         }
 
@@ -155,14 +165,20 @@ public final class UpLevelVipProMax {
         }
     }
 
-    private static boolean dropOneInvalidBlock(class_310 client) {
+    private static int dropInvalidBlocksBatch(class_310 client, int maxStacks) {
         var inv = client.field_1724.method_31548();
-        for (int slot = 0; slot < 36; slot++) {
+        int dropped = 0;
+
+        // THROW does not shift the remaining inventory slots, so scanning the
+        // inventory once is enough. Re-check the live stack before every action
+        // so an already-empty slot is never sent again.
+        for (int slot = 0; slot < 36 && dropped < maxStacks; slot++) {
             class_1799 stack = inv.method_5438(slot);
-            if (stack.method_7960()) continue;
-            if (!DROP_BLOCKS.contains(itemId(stack))) continue;
+            if (stack.method_7960() || !DROP_BLOCKS.contains(itemId(stack))) continue;
 
             int screenSlot = playerInventoryScreenSlot(slot);
+            if (screenSlot < 0) continue;
+
             client.field_1761.method_2906(
                     client.field_1724.field_7512.field_7763,
                     screenSlot,
@@ -170,9 +186,9 @@ public final class UpLevelVipProMax {
                     class_1713.field_7795,
                     client.field_1724
             );
-            return true;
+            dropped++;
         }
-        return false;
+        return dropped;
     }
 
     /**
