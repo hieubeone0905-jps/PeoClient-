@@ -172,16 +172,17 @@ public final class AntiVipProMaxModule {
                 setBypassV2(false);
             }
         }
-        // Auto Adjust: only tune the existing compatibility intensity at
-        // elevated suspicion; it does not create a second packet producer.
+        // Auto Adjust: monitoring/logging only. Never inject packets and never
+        // alter Nuker batch/range/rotation/cooldown.
         if (isEnabled() && isAutoAdjust()) {
             int susp = getSuspicionLevel();
-            if (susp > 6) {
-                NukerBypassUltimateV2.setIntensity(8);
-            } else if (susp > 4) {
-                NukerBypassUltimateV2.setIntensity(6);
-            } else {
-                NukerBypassUltimateV2.setIntensity(4);
+            int ping = getPing();
+            if (System.currentTimeMillis() - lastAutoAdjustLogMs > 30000L) {
+                lastAutoAdjustLogMs = System.currentTimeMillis();
+                DiagnosticRecorder.get().record("AutoAdjust",
+                        "susp=" + susp + " ping=" + ping +
+                        " v2I=" + NukerBypassUltimateV2.getIntensity() +
+                        " antiKick=" + AntiVipProMaxModule.isAntiKickEnabled());
             }
         }
     }

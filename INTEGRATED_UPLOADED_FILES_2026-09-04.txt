@@ -1,0 +1,7 @@
+Integrated uploaded snippets into the current ZIP base where compatible with the existing architecture.
+
+- AntiKick snippet: existing base already uses monitor-only behavior and preserves Nuker performance.
+- AutoAdjust snippet: integrated as monitoring/logging only; no packet injection or Nuker strength changes.
+- Packet injection helper snippet: existing BypassPacketManager already contains the network-send helper; no duplicate copy added.
+- Pacing snippet: NOT replaced; the base MAX4/HALF1 controller is retained because it is the user's required Nuker pattern.
+- Packet-spoof / fake-action snippets are not integrated.
