@@ -414,7 +414,7 @@ public final class PoeScreen extends class_437 {
             case "Fullbright" -> "Makes dark areas bright.";
             case "X-Ray" -> "Shows selected blocks through the world.";
             case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
-            case "UpLevelVipProMax" -> "Automates island-level block submission using normal server inventory interactions.";
+            case "UpLevelVipProMax" -> "Scans your inventory for valuable blocks, submits them to Island Level, then closes the level screen.";
             case "PeoJoin" -> "Automatic local recovery after disconnect; reconnects and sends /home.";
             default -> "";
         };
@@ -456,13 +456,10 @@ public final class PoeScreen extends class_437 {
 
     private int drawUpLevelVipProMax(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Island Level");
-        y = rowToggle(d, x, y, w, "Enable", UpLevelVipProMax.isEnabled());
-        y = rowValue(d, x, y, w, "State", UpLevelVipProMax.getStatus());
-        y = rowValue(d, x, y, w, "Level blocks", "Diamond / Emerald / Lapis / Coal / Redstone / Iron / Gold");
-        y = rowValue(d, x, y, w, "Discard blocks", "Stone / Cobblestone / Raw Gold / Raw Iron");
-        y = section(d, x, y, "Nuker compatibility");
-        y = rowValue(d, x, y, w, "Nuker", PeoClient.CFG.nuker ? "ON" : "OFF");
-        y = rowValue(d, x, y, w, "Interaction", "Paused while level GUI is handled");
+        y = rowValue(d, x, y, w, "Status", UpLevelVipProMax.getStatus());
+        y = rowValue(d, x, y, w, "Scan", "All 36 inventory slots");
+        y = rowValue(d, x, y, w, "Valuable", "Diamond / Emerald / Lapis / Coal / Redstone / Iron / Gold");
+        y = rowValue(d, x, y, w, "Submit", "Click hopper, wait for server, close GUI");
         return y;
     }
 
@@ -603,7 +600,7 @@ public final class PoeScreen extends class_437 {
                 case "X-Ray" -> clickXray(mouseY, contentY);
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
                 case "AntiVipProMax" -> clickAntiVipProMax(mouseX, mouseY, settingsX, settingsW, contentY);
-                case "UpLevelVipProMax" -> clickUpLevelVipProMax(mouseY, contentY);
+                case "UpLevelVipProMax" -> { UpLevelVipProMax.toggle(); save(); }
             }
             return true;
         }
@@ -620,11 +617,6 @@ public final class PoeScreen extends class_437 {
     private double roundSlider(double value, double min, double max, double step) {
         double v = class_3532.method_15350(value, min, max);
         return Math.round(v / step) * step;
-    }
-
-    private void clickUpLevelVipProMax(double my, int y) {
-        int p = y + 26;
-        if (hit(my, p)) { UpLevelVipProMax.toggle(); save(); }
     }
 
     private void clickAntiVipProMax(double mx, double my, int x, int w, int y) {
@@ -959,6 +951,7 @@ public final class PoeScreen extends class_437 {
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;
             case "AntiVipProMax" -> 300;
+            case "UpLevelVipProMax" -> 220;
             default -> 120;
         };
     }

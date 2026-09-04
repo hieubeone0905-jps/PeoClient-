@@ -8,6 +8,7 @@ import net.minecraft.class_239;
 import net.minecraft.class_3965;
 import net.minecraft.class_310;
 import net.minecraft.class_7923;
+import net.minecraft.class_490;
 
 import java.util.Set;
 
@@ -46,9 +47,12 @@ public final class UpLevelVipProMax {
     );
 
     private static final String LEVEL_SCREEN_TITLE = "Cấp độ đảo";
-    private static final int PROCESS_WAIT_TICKS = 4;
-    private static final int CLOSE_WAIT_TICKS = 8;
-    private static final int ACTION_COOLDOWN_TICKS = 3;
+    private static final int PROCESS_WAIT_TICKS = 8;
+    private static final int CLOSE_WAIT_TICKS = 10;
+    private static final int ACTION_COOLDOWN_TICKS = 5;
+    private static final int INVENTORY_ACTION_COOLDOWN = 2;
+    private static final int FALLBACK_HOTBAR_SLOT = 8;
+    private static final int INVENTORY_VERIFY_TICKS = 2;
 
     private static boolean enabled;
     private static State state = State.IDLE;
@@ -56,6 +60,7 @@ public final class UpLevelVipProMax {
     private static int cooldown;
     private static int lastContainerSyncId = -1;
     private static int selectedHotbar = -1;
+    private static int workingHotbar = -1;
     private static boolean configInitialized;
 
     private enum State {
@@ -65,6 +70,8 @@ public final class UpLevelVipProMax {
         CLICK_HOPPER,
         WAIT_FOR_SERVER,
         CLOSE_GUI,
+        OPEN_INVENTORY_VERIFY,
+        CLOSE_INVENTORY_VERIFY,
         COOLDOWN
     }
 
@@ -91,11 +98,6 @@ public final class UpLevelVipProMax {
         return enabled;
     }
 
-    /** True while this module owns the current handled level-screen interaction. */
-    public static boolean isBusy() {
-        return enabled && state != State.IDLE && state != State.COOLDOWN;
-    }
-
     public static void tick(class_310 client) {
         if (!configInitialized) {
             enabled = PeoClient.CFG.upLevelVipProMax;
@@ -107,6 +109,13 @@ public final class UpLevelVipProMax {
 
         if (cooldown > 0) {
             cooldown--;
+            return;
+        }
+
+        // Post-level verification deliberately uses the vanilla inventory screen
+        // for a couple of ticks so the player state visibly refreshes like pressing E.
+        if (state == State.OPEN_INVENTORY_VERIFY || state == State.CLOSE_INVENTORY_VERIFY) {
+            handleInventoryVerify(client);
             return;
         }
 
@@ -139,7 +148,7 @@ public final class UpLevelVipProMax {
                     waitTicks = 0;
                 }
             }
-            case CLICK_HOPPER, WAIT_FOR_SERVER, CLOSE_GUI, COOLDOWN -> {
+            case CLICK_HOPPER, WAIT_FOR_SERVER, CLOSE_GUI, OPEN_INVENTORY_VERIFY, CLOSE_INVENTORY_VERIFY, COOLDOWN -> {
                 // These states are normally consumed by handleLevelScreen().
                 state = State.IDLE;
             }
@@ -151,17 +160,14 @@ public final class UpLevelVipProMax {
         for (int slot = 0; slot < 36; slot++) {
             class_1799 stack = inv.method_5438(slot);
             if (stack.method_7960()) continue;
-            String id = itemId(stack);
-            if (!DROP_BLOCKS.contains(id)) continue;
+            if (!DROP_BLOCKS.contains(itemId(stack))) continue;
 
-            // Player inventory screen slots are 9..44. THROW + button 1 drops
-            // the complete stack, allowing it to enter the server's water loop.
-            int screenSlot = slot < 9 ? 36 + slot : slot;
+            int screenSlot = playerInventoryScreenSlot(slot);
             client.field_1761.method_2906(
                     client.field_1724.field_7512.field_7763,
                     screenSlot,
                     1,
-                    class_1713.field_7794,
+                    class_1713.field_7795,
                     client.field_1724
             );
             return true;
@@ -169,17 +175,51 @@ public final class UpLevelVipProMax {
         return false;
     }
 
-    private static void tryPlaceLevelBlock(class_310 client) {
+    /**
+     * Find a valuable block in the COMPLETE player inventory, not just the hotbar.
+     * If it is in the main inventory, swap it into a dedicated hotbar slot using
+     * the normal inventory SWAP action. This is the important part that was missing
+     * from the previous version.
+     */
+    private static int findAndPrepareValuableBlock(class_310 client) {
         var inv = client.field_1724.method_31548();
 
-        int foundHotbar = -1;
+        // Prefer an already available hotbar stack.
         for (int slot = 0; slot < 9; slot++) {
             class_1799 stack = inv.method_5438(slot);
-            if (!stack.method_7960() && LEVEL_BLOCKS.contains(itemId(stack))) {
-                foundHotbar = slot;
-                break;
-            }
+            if (!stack.method_7960() && LEVEL_BLOCKS.contains(itemId(stack))) return slot;
         }
+
+        // Then scan the entire main inventory (slots 9..35).
+        for (int slot = 9; slot < 36; slot++) {
+            class_1799 stack = inv.method_5438(slot);
+            if (stack.method_7960() || !LEVEL_BLOCKS.contains(itemId(stack))) continue;
+
+            int targetHotbar = FALLBACK_HOTBAR_SLOT;
+            // If the fallback slot somehow contains a valuable block, choose another slot.
+            for (int h = 0; h < 9; h++) {
+                if (inv.method_5438(h).method_7960()) {
+                    targetHotbar = h;
+                    break;
+                }
+            }
+
+            client.field_1761.method_2906(
+                    client.field_1724.field_7512.field_7763,
+                    playerInventoryScreenSlot(slot),
+                    targetHotbar,
+                    class_1713.field_7791,
+                    client.field_1724
+            );
+            workingHotbar = targetHotbar;
+            return targetHotbar;
+        }
+        return -1;
+    }
+
+    private static void tryPlaceLevelBlock(class_310 client) {
+        var inv = client.field_1724.method_31548();
+        int foundHotbar = findAndPrepareValuableBlock(client);
 
         if (foundHotbar < 0) {
             state = State.IDLE;
@@ -193,18 +233,9 @@ public final class UpLevelVipProMax {
         }
 
         selectedHotbar = inv.field_7545;
-        if (selectedHotbar != foundHotbar) {
-            inv.field_7545 = foundHotbar;
-        }
+        if (selectedHotbar != foundHotbar) inv.field_7545 = foundHotbar;
 
-        // Normal block interaction against the player's current crosshair target.
-        // The server decides whether this placement is valid and opens its GUI.
-        client.field_1761.method_2896(
-                client.field_1724,
-                class_1268.field_5808,
-                blockHit
-        );
-
+        client.field_1761.method_2896(client.field_1724, class_1268.field_5808, blockHit);
         state = State.WAIT_FOR_LEVEL_GUI;
         waitTicks = 0;
     }
@@ -219,7 +250,8 @@ public final class UpLevelVipProMax {
         } catch (Throwable ignored) {
             return false;
         }
-        return LEVEL_SCREEN_TITLE.equals(title);
+        String normalized = title == null ? "" : title.trim().toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains(LEVEL_SCREEN_TITLE.toLowerCase(java.util.Locale.ROOT));
     }
 
     private static void handleLevelScreen(class_310 client) {
@@ -230,25 +262,26 @@ public final class UpLevelVipProMax {
             lastContainerSyncId = syncId;
             state = State.CLICK_HOPPER;
             waitTicks = 0;
-        } else if (state != State.WAIT_FOR_SERVER && state != State.CLOSE_GUI) {
-            // The server may reuse a sync id. Seeing the expected level screen is
-            // itself enough to arm the hopper click for a fresh GUI instance.
+        } else if (state == State.WAIT_FOR_LEVEL_GUI || state == State.IDLE) {
+            // A server can reuse a handler sync id. The fact that the expected
+            // level screen is visible is enough to arm a fresh hopper click.
             state = State.CLICK_HOPPER;
+            waitTicks = 0;
         }
 
         if (state == State.CLICK_HOPPER) {
             int hopperSlot = findHopperSlot(client);
             if (hopperSlot < 0) {
+                // Give the server one more tick to populate/update the menu.
+                if (++waitTicks <= 10) return;
+                state = State.WAIT_FOR_SERVER;
+                waitTicks = 3;
                 return;
             }
 
+            // Normal PICKUP click on the server-provided hopper/action item.
             client.field_1761.method_2906(
-                    syncId,
-                    hopperSlot,
-                    0,
-                    class_1713.field_7790,
-                    client.field_1724
-            );
+                    syncId, hopperSlot, 0, class_1713.field_7790, client.field_1724);
             state = State.WAIT_FOR_SERVER;
             waitTicks = PROCESS_WAIT_TICKS;
             return;
@@ -260,15 +293,21 @@ public final class UpLevelVipProMax {
         }
 
         if (state == State.CLOSE_GUI) {
-            // Normal handled-screen close: sends the proper close interaction
-            // rather than just replacing the screen client-side.
+            // closeHandledScreen() sends the normal close packet and closes the
+            // server-backed menu. This is equivalent to leaving with ESC, without
+            // opening another screen or desynchronizing the handler.
             try {
                 client.field_1724.method_7346();
             } catch (Throwable ignored) {
                 client.method_1507(null);
             }
             restoreSelectedHotbar(client);
-            state = State.COOLDOWN;
+            workingHotbar = -1;
+            // Give the server a short normal post-close acknowledgement window.
+            // Then briefly open the vanilla inventory (same screen the player gets
+            // with E) and close it again; this forces the client to consume the
+            // latest player/inventory state without sending synthetic packets.
+            state = State.OPEN_INVENTORY_VERIFY;
             waitTicks = CLOSE_WAIT_TICKS;
             return;
         }
@@ -281,18 +320,49 @@ public final class UpLevelVipProMax {
         }
     }
 
+    private static void handleInventoryVerify(class_310 client) {
+        if (state == State.OPEN_INVENTORY_VERIFY) {
+            if (--waitTicks > 0) return;
+            if (client.field_1755 == null && client.field_1724 != null) {
+                client.method_1507(new class_490(client.field_1724));
+                state = State.CLOSE_INVENTORY_VERIFY;
+                waitTicks = INVENTORY_VERIFY_TICKS;
+                return;
+            }
+            state = State.COOLDOWN;
+            waitTicks = CLOSE_WAIT_TICKS;
+            return;
+        }
+
+        if (state == State.CLOSE_INVENTORY_VERIFY) {
+            if (--waitTicks > 0) return;
+            try {
+                client.field_1724.method_7346();
+            } catch (Throwable ignored) {
+                client.method_1507(null);
+            }
+            state = State.COOLDOWN;
+            waitTicks = CLOSE_WAIT_TICKS;
+        }
+    }
+
     private static int findHopperSlot(class_310 client) {
         var handler = client.field_1724.field_7512;
-        int limit = 54;
+        int limit = Math.min(90, handler.method_7608());
         for (int i = 0; i < limit; i++) {
             class_1799 stack;
             try {
                 stack = handler.method_7611(i).method_7677();
-            } catch (IndexOutOfBoundsException ignored) {
-                break;
+            } catch (Throwable ignored) {
+                continue;
             }
             if (stack.method_7960()) continue;
             if ("minecraft:hopper".equals(itemId(stack))) return i;
+
+            // Some server menus use a renamed item instead of the literal hopper id.
+            String name = stack.method_7964().getString().toLowerCase(java.util.Locale.ROOT);
+            if (name.contains("chuyển tất cả") || name.contains("transfer all")
+                    || name.contains("all block") || name.contains("tất cả block")) return i;
         }
         return -1;
     }
@@ -302,6 +372,7 @@ public final class UpLevelVipProMax {
             client.field_1724.method_31548().field_7545 = selectedHotbar;
         }
         selectedHotbar = -1;
+        workingHotbar = -1;
     }
 
     private static String itemId(class_1799 stack) {
@@ -314,6 +385,7 @@ public final class UpLevelVipProMax {
         cooldown = 0;
         lastContainerSyncId = -1;
         selectedHotbar = -1;
+        workingHotbar = -1;
     }
 
     /** Exposed for the GUI/diagnostics without exposing mutable collections. */

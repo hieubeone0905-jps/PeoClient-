@@ -4,8 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
-import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.modules.UpLevelVipProMax;
+import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
 import com.peoclient.nuker.compat.NukerAreaLimiter;
@@ -184,10 +184,6 @@ public final class PeoClient implements ClientModInitializer {
 
         FullbrightLogic.tick(mc);
 
-        // UpLevelVipProMax gets first ownership of the interaction tick.
-        // This prevents Nuker/compatibility engines from competing with the level GUI.
-        UpLevelVipProMax.tick(mc);
-
         // Targeted client-side render resync for server block updates.
 
         NukerAreaLimiter.tick(mc, CFG.nukerRangeHighlight, CFG.nukerRange);
@@ -201,6 +197,7 @@ public final class PeoClient implements ClientModInitializer {
         }
         SafeCompatibilityDiagnostics.tick();
         AntiVipProMaxModule.tick();
+        UpLevelVipProMax.tick(mc);
         if (com.peoclient.diagnostic.DiagnosticUtil.clientTick() % 20 == 0) {
             com.peoclient.diagnostic.PreDisconnectSnapshot.get().record(mc);
             com.peoclient.diagnostic.LatencyMetrics.get().updatePing();
@@ -1057,6 +1054,7 @@ public final class PeoClient implements ClientModInitializer {
             if (NukerAreaLimiter.isLocked()) y = active(d, mc, CFG.nukerRangeHighlight ? "Nuker Area [VISIBLE]" : "Nuker Area [LOCKED]", y);
             if (CFG.cleaner) y = active(d, mc, "InventoryCleaner", y);
             if (AntiVipProMaxModule.isEnabled()) y = active(d, mc, "AntiVipProMax", y);
+            if (UpLevelVipProMax.isEnabled()) y = active(d, mc, "UpLevelVipProMax", y);
         }
 
         private static int active(net.minecraft.class_332 d, class_310 mc, String name, int y) {
