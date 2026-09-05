@@ -1,8 +1,9 @@
 package com.peoclient.nuker.bypass;
 
 import net.minecraft.class_2338;
-import net.minecraft.class_634;
 import net.minecraft.class_2350;
+import net.minecraft.class_243; // IMPORT THIẾU - FIX COMPILE
+import net.minecraft.class_634;
 import net.minecraft.class_2596;
 import net.minecraft.class_310;
 
@@ -106,7 +107,7 @@ public final class BypassPacketManager {
             double cx = pos.method_10263() + 0.5;
             double cy = pos.method_10264() + 0.5;
             double cz = pos.method_10260() + 0.5;
-            class_243 hitPos = new class_243(cx, cy, cz);
+            class_243 hitPos = new class_243(cx, cy, cz); // Đã import class_243
             // Nếu side null, dùng mặt trên (UP)
             if (side == null) side = class_2350.field_11033;
             
