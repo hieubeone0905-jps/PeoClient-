@@ -41,7 +41,14 @@ public final class PeoJoinModule {
     private static boolean disconnectRecoveryArmed = false;
     private static long lastNukerOnChange = 0L;
     private static int stableHubTicks = 0;
+    private static boolean hasLeftHub = false;
+    private static boolean sawNoCompassWhileNukerOn = false;
+    private static int hubProfileTicks = 0;
+    private static long lastRecoveryTrigger = 0L;
+    private static boolean compassRightClickSent = false;
     private static final long HUB_WAIT_MILLIS = 3000L;
+    // Give the server one tick to receive the selected-slot change before the right-click.
+    private static final long COMPASS_EQUIP_WAIT_MILLIS = 100L;
 
     private static String serverName = "Skyblock";
     private static int preJoinDelay = 5;
@@ -49,6 +56,8 @@ public final class PeoJoinModule {
 
     private static final String COMPASS_ID = "minecraft:compass";
     private static final String SKYBLOCK_ICON_ID = "minecraft:diamond_pickaxe";
+    // Server-specific Hub layout: the compass is ALWAYS hotbar slot 5 (index 4).
+    private static final int HUB_COMPASS_SLOT = 4;
 
     public enum State {
         IDLE,
@@ -80,7 +89,7 @@ public final class PeoJoinModule {
         commandSent = false;
         guiSlot = -1;
         previousHotbar = -1;
-        lastCompassPresent = findHotbarItem(COMPASS_ID) >= 0;
+        lastCompassPresent = isFixedHubCompassPresent();
         hubReturnArmed = PeoClient.CFG.nuker;
         nukerOnSince = PeoClient.CFG.nuker ? System.currentTimeMillis() : 0L;
         hadNuker = PeoClient.CFG.nuker;
@@ -93,6 +102,11 @@ public final class PeoJoinModule {
         disconnectRecoveryArmed = false;
         lastNukerOnChange = System.currentTimeMillis();
         stableHubTicks = 0;
+        hasLeftHub = !isHubProfile();
+        sawNoCompassWhileNukerOn = findHotbarItem(COMPASS_ID) < 0;
+        hubProfileTicks = 0;
+        lastRecoveryTrigger = 0L;
+        compassRightClickSent = false;
         DiagnosticRecorder.get().record("PeoJoin",
                 "Started; passive until Nuker is turned OFF (Nuker was " + hadNuker + ")");
     }
@@ -112,6 +126,11 @@ public final class PeoJoinModule {
         sawActiveMiningWorld = false;
         disconnectRecoveryArmed = false;
         stableHubTicks = 0;
+        hasLeftHub = false;
+        sawNoCompassWhileNukerOn = false;
+        hubProfileTicks = 0;
+        lastRecoveryTrigger = 0L;
+        compassRightClickSent = false;
         DiagnosticRecorder.get().record("PeoJoin", "Stopped");
     }
 
@@ -164,6 +183,7 @@ public final class PeoJoinModule {
                     if (findHotbarItem(COMPASS_ID) >= 0 && mc.field_1755 == null) {
                         currentState = State.OPENING_SERVER_MENU;
                         stateStartTime = System.currentTimeMillis();
+                        compassRightClickSent = false;
                     }
                 }
 
@@ -175,15 +195,35 @@ public final class PeoJoinModule {
                         }
                         return;
                     }
-                    if (openCompass()) {
+                    // First equip the compass in the fixed slot 5. Do NOT right-click
+                    // in the same tick: the server must receive the held-item change
+                    // before the interaction, otherwise the server can ignore it.
+                    if (equipHubCompass()) {
                         currentState = State.WAITING_FOR_SERVER_MENU;
                         stateStartTime = System.currentTimeMillis();
-                        DiagnosticRecorder.get().record("PeoJoin", "Opened hub compass");
+                        compassRightClickSent = false;
+                        DiagnosticRecorder.get().record("PeoJoin",
+                                "Compass equipped in fixed hotbar slot 5; waiting before right-click");
                     }
                 }
 
                 case WAITING_FOR_SERVER_MENU -> {
                     if (!connected) return;
+                    // Immediately after equipping the compass, this state is used to
+                    // perform exactly one normal right-click. Only do it when the
+                    // compass is actually in the player's main hand.
+                    if (mc.field_1755 == null && !compassRightClickSent
+                            && elapsedMillis() >= COMPASS_EQUIP_WAIT_MILLIS) {
+                        if (isCompassInMainHand() && rightClickHubCompass()) {
+                            compassRightClickSent = true;
+                            DiagnosticRecorder.get().record("PeoJoin",
+                                    "Right-clicked held compass to open hub server GUI");
+                        } else if (!isFixedHubCompassPresent()) {
+                            currentState = State.WAITING_FOR_HUB;
+                            stateStartTime = System.currentTimeMillis();
+                            return;
+                        }
+                    }
                     if (mc.field_1755 != null) {
                         int slot = findHandledScreenItem(SKYBLOCK_ICON_ID);
                         if (slot >= 0) {
@@ -196,6 +236,7 @@ public final class PeoJoinModule {
                             closeScreen();
                             currentState = State.WAITING_FOR_HUB;
                             stateStartTime = System.currentTimeMillis();
+                            compassRightClickSent = false;
                         }
                     } else if (elapsedSeconds() >= 3) {
                         currentState = State.WAITING_FOR_HUB;
@@ -231,8 +272,7 @@ public final class PeoJoinModule {
                 case WAITING_HOME -> {
                     if (!connected) return;
                     if (elapsedSeconds() >= Math.max(0, postJoinDelay)) {
-                        PeoClient.CFG.nuker = true;
-                        PeoClient.CFG.save();
+                        enableNukerDirectly();
                         hadNuker = true;
                         currentState = State.DONE;
                         stateStartTime = System.currentTimeMillis();
@@ -265,70 +305,29 @@ public final class PeoJoinModule {
      * PeoJoin recovery immediately. This avoids requiring a manual key press.
      */
     private static void detectHubReturnAndDisableNuker() {
-        if (!hubReturnArmed || !PeoClient.CFG.nuker || mc.field_1724 == null) return;
-        if (nukerOnSince == 0L) nukerOnSince = System.currentTimeMillis();
+        if (!hubReturnArmed || !PeoClient.CFG.nuker || mc.field_1724 == null || mc.field_1687 == null) return;
 
-        long activeFor = System.currentTimeMillis() - nukerOnSince;
-        if (activeFor < 3000L) {
-            lastCompassPresent = findHotbarItem(COMPASS_ID) >= 0;
-            return;
-        }
+        // This server has a fixed Hub layout: compass is ALWAYS slot 5.
+        // Do not scan the hotbar and do not require a previous "no compass"
+        // observation. A kick back to Hub can keep the same ClientWorld, so
+        // the fixed slot is the reliable server-specific signal.
+        if (!isFixedHubCompassPresent()) return;
 
-        boolean compassPresent = findHotbarItem(COMPASS_ID) >= 0;
-        boolean compassAppeared = compassPresent && !lastCompassPresent;
-        lastCompassPresent = compassPresent;
+        // Avoid firing immediately if PeoJoin was enabled while already in Hub.
+        // Nuker must have been genuinely active for at least 8 seconds first.
+        if (nukerOnSince <= 0L || System.currentTimeMillis() - nukerOnSince < 8000L) return;
+        if (System.currentTimeMillis() - lastRecoveryTrigger < 10000L) return;
 
-        Object worldNow = mc.field_1687;
-        boolean worldChanged = worldNow != null && lastWorldInstance != null && worldNow != lastWorldInstance;
-        boolean worldRecreated = worldNow != null && lastWorldInstance == null && hadMiningWorld;
-        if (worldNow != null) lastWorldInstance = worldNow;
-        else lastWorldInstance = null;
-
-        double x = mc.field_1724.method_23317();
-        double y = mc.field_1724.method_23318();
-        double z = mc.field_1724.method_23321();
-        boolean largeTeleport = false;
-        if (!Double.isNaN(lastPlayerX) && !Double.isNaN(lastPlayerY) && !Double.isNaN(lastPlayerZ)) {
-            double dx = x - lastPlayerX;
-            double dy = y - lastPlayerY;
-            double dz = z - lastPlayerZ;
-            largeTeleport = (dx * dx + dy * dy + dz * dz) >= (40.0 * 40.0);
-        }
-        lastPlayerX = x;
-        lastPlayerY = y;
-        lastPlayerZ = z;
-
-        if (worldNow != null) {
-            hadMiningWorld = true;
-            sawActiveMiningWorld = true;
-        }
-
-        // On the user's server, Hub gives the player the compass and the
-        // slimeball utility item. This is the reliable visual/inventory signal
-        // that still works when the server reuses the same ClientWorld object
-        // and does not produce a large teleport.
-        boolean hubHotbarProfile = compassPresent && findHotbarItem("minecraft:slime_ball") >= 0;
-
-        // Do not require a world-object replacement. A server-side transfer can
-        // leave ClientWorld unchanged, so any of these confirmed Hub signals is
-        // sufficient once Nuker has actually been running.
-        boolean hubSignal = hubHotbarProfile
-                || (compassPresent && (worldChanged || worldRecreated
-                || disconnectRecoveryArmed || largeTeleport))
-                || (compassAppeared && (disconnectRecoveryArmed || worldChanged || worldRecreated));
-
-        if (!hubSignal) {
-            stableHubTicks = 0;
-            return;
-        }
-
+        // Require the compass to be stable for 3 ticks before triggering.
         stableHubTicks++;
-        if (stableHubTicks < 2) return;
+        if (stableHubTicks < 3) return;
+        stableHubTicks = 0;
+        lastRecoveryTrigger = System.currentTimeMillis();
 
-        // This is intentionally the same logical toggle path used by the M/N
-        // Nuker keybind. It updates CFG, session bookkeeping and the HUD just
-        // like a normal key press; the user's configured key remains untouched.
-        PeoClient.toggleModuleByName("Nuker [Multi]", mc);
+        // Turn Nuker OFF directly. This is intentionally independent of M.
+        PeoClient.CFG.nuker = false;
+        com.peoclient.diagnostic.NukerSessionRecorder.get().endSession();
+        PeoClient.CFG.save();
 
         currentState = State.WAITING_FOR_HUB;
         stateStartTime = System.currentTimeMillis();
@@ -336,10 +335,20 @@ public final class PeoJoinModule {
         guiSlot = -1;
         hubReturnArmed = false;
         disconnectRecoveryArmed = false;
-        stableHubTicks = 0;
         hadNuker = true;
         DiagnosticRecorder.get().record("PeoJoin",
-                "Hub detected; Nuker auto-OFF via Nuker keybind logic. Waiting 3s before compass right-click");
+                "HUB DETECTED: fixed compass slot 5; Nuker forced OFF; waiting 3s before right-click");
+    }
+
+    private static boolean isHubProfile() {
+        return isFixedHubCompassPresent();
+    }
+
+    private static boolean isFixedHubCompassPresent() {
+        if (mc.field_1724 == null) return false;
+        var inv = mc.field_1724.method_31548();
+        class_1799 stack = inv.method_5438(HUB_COMPASS_SLOT);
+        return !stack.method_7960() && COMPASS_ID.equals(itemId(stack));
     }
 
     /**
@@ -358,23 +367,45 @@ public final class PeoJoinModule {
                 "Disconnect/transfer observed while Nuker ON; waiting for hub return");
     }
 
-    private static boolean openCompass() {
-        if (mc.field_1724 == null || mc.field_1761 == null) return false;
-        int slot = findHotbarItem(COMPASS_ID);
-        if (slot < 0) return false;
-
+    private static boolean equipHubCompass() {
+        if (mc.field_1724 == null) return false;
+        // The compass is immovable and permanently occupies hotbar slot 5.
+        // Slot indexes are zero-based, so slot 5 is index 4.
+        if (!isFixedHubCompassPresent()) return false;
         var inv = mc.field_1724.method_31548();
         previousHotbar = inv.field_7545;
-        if (previousHotbar != slot) inv.method_61496(slot);
+        if (previousHotbar != HUB_COMPASS_SLOT) {
+            inv.method_61496(HUB_COMPASS_SLOT);
+        }
+        return isCompassInMainHand();
+    }
 
-        // Same normal client interaction path as a real right-click on the
-        // selected compass. No raw packet injection is used.
-        mc.field_1761.method_2919(mc.field_1724, class_1268.field_5808);
-        return true;
+    private static boolean isCompassInMainHand() {
+        if (mc.field_1724 == null) return false;
+        class_1799 held = mc.field_1724.method_6047();
+        return !held.method_7960() && COMPASS_ID.equals(itemId(held));
+    }
+
+    private static boolean rightClickHubCompass() {
+        if (mc.field_1724 == null || mc.field_1761 == null) return false;
+        if (!isCompassInMainHand()) return false;
+        try {
+            // Exactly the normal client interaction used for right-clicking the
+            // selected item in the player's hand. No keybind or alternate GUI path.
+            mc.field_1761.method_2919(mc.field_1724, class_1268.field_5808);
+            return true;
+        } catch (Throwable t) {
+            DiagnosticRecorder.get().record("PeoJoin",
+                    "Compass right-click failed: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            return false;
+        }
     }
 
     private static int findHotbarItem(String wantedId) {
         if (mc.field_1724 == null) return -1;
+        // The Hub compass is server-fixed to slot 5. Keep this method compatible
+        // with existing callers but never search other slots for the compass.
+        if (COMPASS_ID.equals(wantedId)) return isFixedHubCompassPresent() ? HUB_COMPASS_SLOT : -1;
         var inv = mc.field_1724.method_31548();
         for (int slot = 0; slot < 9; slot++) {
             class_1799 stack = inv.method_5438(slot);
@@ -426,6 +457,15 @@ public final class PeoJoinModule {
 
     private static long elapsedSeconds() {
         return elapsedMillis() / 1000L;
+    }
+
+    private static void enableNukerDirectly() {
+        if (!PeoClient.CFG.nuker) {
+            PeoClient.CFG.nuker = true;
+            com.peoclient.diagnostic.NukerSessionRecorder.get().startSession();
+            PeoClient.CFG.save();
+            DiagnosticRecorder.get().record("PeoJoin", "Nuker forced ON directly (equivalent to M toggle)");
+        }
     }
 
     private static void sendHome() {
