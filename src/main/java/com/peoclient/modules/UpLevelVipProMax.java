@@ -40,11 +40,11 @@ public final class UpLevelVipProMax {
             "minecraft:gold_block"
     );
 
-    private static final int DROP_STACKS_PER_TICK = 2;
+    private static final int DROP_STACKS_PER_TICK = 1;
     // Keep inventory THROW traffic deliberately low: one or two actions per tick.
     // This avoids bursty inventory traffic that can trigger server-side rate checks.
-    private static final int DROP_FULL_TICKS = 4;
-    private static final int DROP_CYCLE_TICKS = 5;
+    private static final int DROP_FULL_TICKS = 8;
+    private static final int DROP_CYCLE_TICKS = 8;
     private static int dropCycleTick;
 
     private static final Set<String> DROP_BLOCKS = Set.of(
@@ -55,16 +55,16 @@ public final class UpLevelVipProMax {
     );
 
     private static final String LEVEL_SCREEN_TITLE = "Cấp độ đảo";
-    private static final int PROCESS_WAIT_TICKS = 8;
-    private static final int CLOSE_WAIT_TICKS = 10;
-    private static final int ACTION_COOLDOWN_TICKS = 5;
+    private static final int PROCESS_WAIT_TICKS = 12;
+    private static final int CLOSE_WAIT_TICKS = 16;
+    private static final int ACTION_COOLDOWN_TICKS = 12;
     private static final int INVENTORY_ACTION_COOLDOWN = 2;
     private static final int FALLBACK_HOTBAR_SLOT = 8;
     private static final int INVENTORY_VERIFY_TICKS = 2;
     // Let the normal client tick send the hotbar-selection packet and let the
     // inventory SWAP settle before attempting the block use. This keeps the
     // placement sequence closer to an actual vanilla right-click.
-    private static final int VANILLA_PLACEMENT_DELAY_TICKS = 2;
+    private static final int VANILLA_PLACEMENT_DELAY_TICKS = 4;
 
     private static boolean enabled;
     private static State state = State.IDLE;
@@ -172,13 +172,15 @@ public final class UpLevelVipProMax {
 
         // Dispose matching blocks in a bounded batch. This keeps the normal
         // inventory THROW action while allowing up to 31 stacks/actions per tick.
-        dropCycleTick = (dropCycleTick + 1) % DROP_CYCLE_TICKS;
-        int dropBudget = (dropCycleTick == DROP_FULL_TICKS)
-                ? Math.max(1, (DROP_STACKS_PER_TICK + 1) / 2)
-                : DROP_STACKS_PER_TICK;
-        int dropped = dropInvalidBlocksBatch(client, dropBudget);
-        if (dropped > 0) {
-            return;
+        if (dropCycleTick > 0) {
+            dropCycleTick--;
+        } else {
+            int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
+            if (dropped > 0) {
+                // Leave a quiet window between inventory actions.
+                dropCycleTick = DROP_CYCLE_TICKS;
+                return;
+            }
         }
 
         switch (state) {
@@ -231,33 +233,37 @@ public final class UpLevelVipProMax {
 
     private static int dropInvalidBlocksBatch(class_310 client, int maxActions) {
         var inv = client.field_1724.method_31548();
-        int dropped = 0;
 
-        // Re-scan after each THROW so slot contents are always current. The
-        // upper bound prevents an accidental unbounded inventory loop.
-        while (dropped < maxActions) {
-            boolean found = false;
-            for (int slot = 0; slot < 36 && dropped < maxActions; slot++) {
-                class_1799 stack = inv.method_5438(slot);
-                if (stack.method_7960()) continue;
-                if (!DROP_BLOCKS.contains(itemId(stack))) continue;
+        // Deliberately perform at most ONE THROW per invocation. The previous
+        // implementation could send several THROW actions in the same tick,
+        // which produced bursty inventory traffic and, on the target server,
+        // could result in the player being returned to the Hub.
+        for (int slot = 0; slot < 36; slot++) {
+            class_1799 stack = inv.method_5438(slot);
+            if (stack.method_7960()) continue;
+            if (!DROP_BLOCKS.contains(itemId(stack))) continue;
 
-                int screenSlot = playerInventoryScreenSlot(slot);
-                client.field_1761.method_2906(
-                        client.field_1724.field_7512.field_7763,
-                        screenSlot,
-                        1,
-                        class_1713.field_7795,
-                        client.field_1724
-                );
-                log("DROP block=" + itemId(stack) + " inventorySlot=" + slot
-                        + " screenSlot=" + screenSlot + " syncId=" + client.field_1724.field_7512.field_7763);
-                dropped++;
-                found = true;
-            }
-            if (!found) break;
+            int screenSlot = playerInventoryScreenSlot(slot);
+            if (screenSlot < 0) continue;
+
+            String id = itemId(stack);
+            // Re-check the live stack immediately before sending the action.
+            // This prevents stale scans from ever issuing a THROW for air.
+            class_1799 live = inv.method_5438(slot);
+            if (live.method_7960() || !id.equals(itemId(live))) continue;
+
+            client.field_1761.method_2906(
+                    client.field_1724.field_7512.field_7763,
+                    screenSlot,
+                    1,
+                    class_1713.field_7795,
+                    client.field_1724
+            );
+            log("DROP block=" + id + " inventorySlot=" + slot
+                    + " screenSlot=" + screenSlot + " syncId=" + client.field_1724.field_7512.field_7763);
+            return 1;
         }
-        return dropped;
+        return 0;
     }
 
     /**
