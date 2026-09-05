@@ -583,6 +583,12 @@ public final class PeoClient implements ClientModInitializer {
         private static final Random RANDOM = new Random();
         private static int skipCounter = 0;
         private static int ghostRecoveryCounter = 0;
+        // Server-refresh recovery state. This stays entirely inside NukerLogic.
+        private static class_2338 recoveryPos;
+        private static class_2350 recoverySide;
+        private static int recoveryWaitTicks;
+        private static int recoveryAttempts;
+        private static long lastRecoveryTime;
 
         private NukerLogic() {}
 
@@ -604,31 +610,78 @@ public final class PeoClient implements ClientModInitializer {
                 return;
             }
 
+            // === BYPASS PACKET ===
+            if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
+                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
+                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.3);
+                boolean onGround = mc.field_1724.method_24828();
+                BypassPacketManager.sendRotation(yaw, pitch, onGround);
+                if (RANDOM.nextInt(4) == 0) {
+                    class_243 pos = mc.field_1724.method_19538();
+                    BypassPacketManager.sendPosition(
+                        pos.field_1352 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                        pos.field_1351 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                        pos.field_1350 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                        onGround
+                    );
+                }
+            }
+
             int dynamicCooldown = 0;
             if (AntiKickEngine.isActive()) {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
             }
 
-            // === GHOST BLOCK RECOVERY ===
-            // If the active break target has stopped progressing, perform a real
-            // client-side right-click interaction through Minecraft's interaction
-            // manager. This lets the server resend/update the block state without
-            // injecting a synthetic interaction packet.
-            if (breakingPos != null) {
-                class_2680 ghostState = mc.field_1687.method_8320(breakingPos);
-                if (ghostState.method_26215()) {
-                    ghostRecoveryCounter++;
-                    recoverGhostBlock(mc, breakingPos, breakingSide);
-                    class_2338 recoveredPos = breakingPos;
-                    mc.field_1761.method_2925();
-                    breakingPos = null;
-                    breakingSide = null;
+                       // === GHOST BLOCK RECOVERY ===
+            // Do not treat a client-side air result as a successful break immediately.
+            // Ask the server for the real block state through the normal interaction
+            // manager path, then rebuild the Nuker queue after the update arrives.
+            if (recoveryPos != null) {
+                class_2680 refreshed = mc.field_1687.method_8320(recoveryPos);
+                if (!refreshed.method_26215()) {
+                    recoveryPos = null;
+                    recoverySide = null;
+                    recoveryWaitTicks = 0;
+                    recoveryAttempts = 0;
                     queue.clear();
-                    stagnantTicks = 0;
-                    lastBreakingProgress = 0.0f;
-                    progressPos = null;
-                    com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, recoveredPos, 0.0f);
+                } else if (recoveryWaitTicks > 0) {
+                    recoveryWaitTicks--;
+                    return;
+                } else if (recoveryAttempts < 3) {
+                    requestRealBlockRefresh(mc, recoveryPos, recoverySide);
+                    recoveryAttempts++;
+                    recoveryWaitTicks = 2;
+                    return;
+                } else {
+                    // Server did not restore the block; assume it really was broken.
+                    recoveryPos = null;
+                    recoverySide = null;
+                    recoveryWaitTicks = 0;
+                    recoveryAttempts = 0;
                 }
+            }
+
+            if (breakingPos != null && mc.field_1687.method_8320(breakingPos).method_26215()) {
+                class_2338 ghostPos = breakingPos;
+                class_2350 ghostSide = breakingSide;
+                ghostRecoveryCounter++;
+                mc.field_1761.method_2925();
+                breakingPos = null;
+                breakingSide = null;
+                stagnantTicks = 0;
+                lastBreakingProgress = 0.0f;
+                progressPos = null;
+                queue.clear();
+                recoveryPos = ghostPos;
+                recoverySide = ghostSide;
+                recoveryAttempts = 0;
+                recoveryWaitTicks = 0;
+                lastRecoveryTime = System.currentTimeMillis();
+                requestRealBlockRefresh(mc, ghostPos, ghostSide);
+                recoveryAttempts = 1;
+                recoveryWaitTicks = 2;
+                if (mc.field_1769 != null) mc.field_1769.method_3279();
+                return;
             }
 
             // === STALE DETECTION ===
@@ -667,14 +720,23 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
-                        // Real right-click recovery through the interaction manager.
-                        recoverGhostBlock(mc, breakingPos, breakingSide);
+                        class_2338 stalePos = breakingPos;
+                        class_2350 staleSide = breakingSide;
+                        mc.field_1761.method_2925();
                         breakingPos = null;
                         breakingSide = null;
                         queue.clear();
                         stagnantTicks = 0;
                         lastBreakingProgress = 0.0f;
                         progressPos = null;
+                        recoveryPos = stalePos;
+                        recoverySide = staleSide;
+                        recoveryAttempts = 0;
+                        recoveryWaitTicks = 0;
+                        requestRealBlockRefresh(mc, stalePos, staleSide);
+                        recoveryAttempts = 1;
+                        recoveryWaitTicks = 2;
+                        return;
                     }
                 }
             }
@@ -799,8 +861,6 @@ public final class PeoClient implements ClientModInitializer {
                 renderBlocks.add(target.pos);
                 processed++;
                 if (processed > 0) {
-                    // Do not add an artificial random delay: keep the configured Nuker
-                    // cooldown as the only pacing value.
                     cooldown = Math.max(0, CFG.nukerCooldown + dynamicCooldown);
                 }
 
@@ -833,21 +893,25 @@ public final class PeoClient implements ClientModInitializer {
             }
         }
 
-        private static void recoverGhostBlock(class_310 mc, class_2338 pos, class_2350 side) {
-            if (mc.field_1724 == null || mc.field_1761 == null || pos == null) return;
-
-            class_2350 hitSide = side != null ? side : class_2350.field_11033;
-            class_243 hitPos = new class_243(
-                    pos.method_10263() + 0.5,
-                    pos.method_10264() + 0.5,
-                    pos.method_10260() + 0.5);
-
-            class_3965 hit = new class_3965(hitPos, hitSide, pos, false);
-            // method_2896 is ClientPlayerInteractionManager.interactBlock in
-            // Minecraft 1.21.4 intermediary mappings. This is the normal client
-            // interaction path used by a real right-click, not a raw packet.
-            mc.field_1761.method_2896(mc.field_1724, class_1268.field_5808, hit);
-            mc.field_1724.method_6104(class_1268.field_5808);
+        /**
+         * Requests a fresh server-side block state using the same InteractionManager
+         * route as an actual player right-click. We intentionally do not construct
+         * or inject a raw click packet here.
+         */
+        private static void requestRealBlockRefresh(class_310 mc, class_2338 pos, class_2350 side) {
+            if (mc == null || mc.field_1724 == null || mc.field_1761 == null || pos == null) return;
+            try {
+                if (side == null) side = class_2350.field_11036;
+                class_243 hitPos = class_243.method_24953(pos).method_1031(
+                        side.method_10148() * 0.49,
+                        side.method_10164() * 0.49,
+                        side.method_10165() * 0.49);
+                class_3965 hit = new class_3965(hitPos, side, pos, false);
+                mc.field_1761.method_2896(mc.field_1724, class_1268.field_5808, hit);
+                mc.field_1724.method_6104(class_1268.field_5808);
+            } catch (Throwable ignored) {
+                // Never let recovery break the client. The next scan will continue normally.
+            }
         }
 
         public static void resetState() {
@@ -864,6 +928,11 @@ public final class PeoClient implements ClientModInitializer {
             progressPos = null;
             skipCounter = 0;
             ghostRecoveryCounter = 0;
+            recoveryPos = null;
+            recoverySide = null;
+            recoveryWaitTicks = 0;
+            recoveryAttempts = 0;
+            lastRecoveryTime = 0L;
         }
 
         public static List<class_2338> getRenderBlocks() {
