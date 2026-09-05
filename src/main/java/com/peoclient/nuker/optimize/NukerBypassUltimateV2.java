@@ -13,7 +13,7 @@ public final class NukerBypassUltimateV2 {
     private static final class_310 mc = class_310.method_1551();
     private static boolean requested;
     private static boolean grimMode = true, vulcanMode = true, nocheatplusMode = true;
-    private static int intensity = 5, desyncLevel = 4;
+    private static int intensity = 7, desyncLevel = 4;
     private static final Random RANDOM = new Random();
     private static class_2338 target;
 
@@ -27,18 +27,19 @@ public final class NukerBypassUltimateV2 {
 
     public static void stop() { requested = false; target = null; }
     public static boolean isActive() { return requested && PeoClient.CFG.nuker && mc.field_1724 != null; }
-    
+
     public static void tick() {
         if (!isActive()) { target = null; return; }
         class_2338 current = PeoClient.NukerLogic.getCurrentTarget();
         if (current != null) target = current.method_10062();
 
-        // Gửi packet giả mỗi tick (tần suất cao nhất)
         if (target != null && mc.field_1724 != null) {
+            // Gửi rotation giả mỗi tick
             float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
             float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
             boolean onGround = mc.field_1724.method_24828();
             BypassPacketManager.sendRotation(yaw, pitch, onGround);
+
             // Gửi position giả 2 lần mỗi 5 tick
             if (RANDOM.nextInt(5) < 2) {
                 class_243 pos = mc.field_1724.method_19538();
@@ -49,8 +50,9 @@ public final class NukerBypassUltimateV2 {
                     onGround
                 );
             }
-            // Gửi block action giả (abort) để che giấu
-            if (RANDOM.nextInt(10) == 0) {
+
+            // Gửi abort block action ngẫu nhiên
+            if (RANDOM.nextInt(8) == 0) {
                 BypassPacketManager.sendBlockAction(target, class_2350.field_11036);
             }
         }

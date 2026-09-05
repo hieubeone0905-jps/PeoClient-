@@ -1,15 +1,7 @@
 package com.peoclient.nuker.optimize;
 
-import java.util.Random;
-
-/**
- * Load-smoothing và tạo ngẫu nhiên cho Nuker.
- * Không làm giảm tốc độ trung bình, nhưng phá vỡ pattern đều đặn.
- */
 public final class NukerPacingController {
     private static final NukerPacingController INSTANCE = new NukerPacingController();
-    private static final Random RANDOM = new Random();
-
     private long tickCounter;
     private long totalFullTicks;
     private long totalHalfTicks;
@@ -20,39 +12,31 @@ public final class NukerPacingController {
 
     public void tick() {
         tickCounter++;
+        if (isHalfLoadTick()) totalHalfTicks++;
+        else totalFullTicks++;
     }
 
-    /**
-     * Điều chỉnh batch để tạo ngẫu nhiên:
-     * - 40% số tick: batch = 100%
-     * - 30% số tick: batch = 80-95%
-     * - 20% số tick: batch = 60-80%
-     * - 10% số tick: batch = 40-60% (pause giả)
-     * Trung bình vẫn giữ ~85-90% hiệu suất.
-     */
     public int adjustBatch(int maxBatch) {
-        int safeMax = Math.max(1, maxBatch);
-        double roll = RANDOM.nextDouble();
-
-        double factor;
-        if (roll < 0.40) {
-            factor = 1.0; // 100% - đào mạnh
-        } else if (roll < 0.70) {
-            factor = 0.80 + RANDOM.nextDouble() * 0.15; // 80-95%
-        } else if (roll < 0.90) {
-            factor = 0.60 + RANDOM.nextDouble() * 0.20; // 60-80%
-        } else {
-            factor = 0.40 + RANDOM.nextDouble() * 0.20; // 40-60% (pause nhẹ)
-        }
-
-        int result = (int) Math.round(safeMax * factor);
-        return Math.max(1, Math.min(safeMax, result));
+        int cycle = (int)(tickCounter % 6);
+        double factor = switch (cycle) {
+            case 0 -> 1.0;
+            case 1 -> 0.9;
+            case 2 -> 0.7;
+            case 3 -> 0.8;
+            case 4 -> 0.9;
+            default -> 1.0;
+        };
+        // Thêm nhiễu ngẫu nhiên để tránh pattern
+        double noise = 0.95 + 0.1 * Math.random();
+        int result = (int) Math.round(maxBatch * factor * noise);
+        return Math.max(2, Math.min(maxBatch, result));
     }
 
-    public boolean isHalfLoadMode() {
-        return RANDOM.nextDouble() < 0.15; // 15% số tick coi như "half load"
+    private boolean isHalfLoadTick() {
+        return tickCounter > 0 && ((tickCounter - 1) % 5) == 3;
     }
 
+    public boolean isHalfLoadMode() { return isHalfLoadTick(); }
     public long getTickCounter() { return tickCounter; }
     public long getTotalFullTicks() { return totalFullTicks; }
     public long getTotalHalfTicks() { return totalHalfTicks; }
