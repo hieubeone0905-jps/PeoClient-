@@ -359,7 +359,9 @@ public final class PeoJoinModule {
             // method_7353 only displays a local HUD message; it does NOT send
             // a command to the server. Use the 1.21.4 ClientPlayerEntity
             // sendCommand mapping so /home actually reaches the server.
-            mc.field_1724.method_44099("home");
+            if (mc.method_1562() != null) {
+                mc.method_1562().method_45730("home");
+            }
         } catch (Throwable t) {
             DiagnosticRecorder.get().record("PeoJoin", "Could not send /home: " + t.getMessage());
         }
