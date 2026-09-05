@@ -1,6 +1,7 @@
 package com.peoclient.diagnostic;
 
 import net.minecraft.class_9812;
+import com.peoclient.modules.PeoJoinModule;
 
 /** Client-side disconnect finalizer. It observes only; it never alters network state. */
 public final class DisconnectListener {
@@ -20,6 +21,7 @@ public final class DisconnectListener {
             KickReasonRecorder.get().recordReason(reason);
             ClientConnectionMonitor.get().onDisconnected(reason);
             SessionResetManager.get().finalizeDisconnect();
+            PeoJoinModule.onDisconnectObserved();
         } finally {
             handling = false;
         }
