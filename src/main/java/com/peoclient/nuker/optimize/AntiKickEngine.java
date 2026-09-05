@@ -1,7 +1,7 @@
 package com.peoclient.nuker.optimize;
 
 import com.peoclient.PeoClient;
-import com.peoclient.diagnostic.*;
+import com.peoclient.diagnostic.DiagnosticRecorder;
 import net.minecraft.class_310;
 import net.minecraft.class_3532;
 
@@ -25,7 +25,7 @@ public final class AntiKickEngine {
     public static void start() {
         active.set(true);
         reset();
-        DiagnosticRecorder.get().record("AntiKickEngine", "Started (light bypass)");
+        DiagnosticRecorder.get().record("AntiKickEngine", "Started (enhanced bypass)");
     }
 
     public static void stop() {
@@ -54,11 +54,11 @@ public final class AntiKickEngine {
         antiKickTick++;
         breakCounter++;
 
-        // === MICRO-PAUSE RẤT NHẸ: chỉ 1-2 ticks, tần suất thấp ===
-        if (breakCounter % (5 + RANDOM.nextInt(4)) == 0 && RANDOM.nextInt(3) != 0) {
+        // MICRO-PAUSE: chỉ 1-2 ticks, tần suất thấp
+        if (breakCounter % (4 + RANDOM.nextInt(3)) == 0 && RANDOM.nextInt(3) != 0) {
             isPaused = true;
-            pauseTicks = 1 + RANDOM.nextInt(2); // 1-2 ticks
-            if (RANDOM.nextInt(20) == 0) {
+            pauseTicks = 1 + RANDOM.nextInt(2);
+            if (RANDOM.nextInt(15) == 0) {
                 DiagnosticRecorder.get().record("AntiKickEngine",
                         "Light pause " + pauseTicks + " ticks (breakCounter=" + breakCounter + ")");
             }
@@ -69,18 +69,18 @@ public final class AntiKickEngine {
             if (pauseTicks <= 0) isPaused = false;
         }
 
-        // === ROTATION RANDOMIZATION ===
+        // ROTATION RANDOMIZATION: thường xuyên hơn
         if (mc.field_1724 != null && RANDOM.nextInt(2) == 0) {
             float yaw = mc.field_1724.method_36454();
             float pitch = mc.field_1724.method_36455();
-            yaw += (RANDOM.nextFloat() - 0.5f) * 0.6f;
-            pitch += (RANDOM.nextFloat() - 0.5f) * 0.3f;
+            yaw += (RANDOM.nextFloat() - 0.5f) * 0.8f;
+            pitch += (RANDOM.nextFloat() - 0.5f) * 0.4f;
             pitch = Math.max(-90, Math.min(90, pitch));
             mc.field_1724.method_36456(yaw);
             mc.field_1724.method_36457(pitch);
         }
 
-        // === CẬP NHẬT TỶ LỆ THÀNH CÔNG ẢO (chỉ để log) ===
+        // CẬP NHẬT TỶ LỆ THÀNH CÔNG ẢO (chỉ để log)
         if (antiKickTick % 20 == 0) {
             lastSuccessRate = getSuccessRate();
             if (antiKickTick % 60 == 0) {
@@ -91,7 +91,7 @@ public final class AntiKickEngine {
 
         // Tự động điều chỉnh protection level
         if (antiKickTick % 40 == 0) {
-            if (lastSuccessRate > 97) {
+            if (lastSuccessRate > 95) {
                 protectionLevel = Math.min(10, protectionLevel + 1);
             } else if (lastSuccessRate < 80) {
                 protectionLevel = Math.max(1, protectionLevel - 1);
@@ -110,7 +110,7 @@ public final class AntiKickEngine {
     }
 
     public static int getDynamicCooldown() {
-        return 0; // không thêm cooldown
+        return 0;
     }
 
     public static int getProtectionLevel() {

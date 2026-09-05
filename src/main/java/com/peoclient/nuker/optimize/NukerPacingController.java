@@ -14,12 +14,9 @@ public final class NukerPacingController {
         tickCounter++;
     }
 
-    /**
-     * Luôn trả về maxBatch (không giảm tốc độ), chỉ thêm random 0-1 để tránh pattern.
-     */
     public int adjustBatch(int maxBatch) {
-        int noise = (int)(Math.random() * 2); // 0 hoặc 1
-        int result = maxBatch - noise; // có thể giảm 1 block ngẫu nhiên
+        int noise = (int)(Math.random() * 2);
+        int result = maxBatch - noise;
         return Math.max(1, result);
     }
 

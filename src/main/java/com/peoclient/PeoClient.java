@@ -578,6 +578,7 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
         private static final Random RANDOM = new Random();
+        private static int skipCounter = 0;
         private static int ghostRecoveryCounter = 0;
 
         private NukerLogic() {}
@@ -595,7 +596,6 @@ public final class PeoClient implements ClientModInitializer {
                 AntiKickEngine.tick(mc);
             }
 
-            // Cooldown chính: nếu >0 thì giảm và return
             if (cooldown > 0) {
                 cooldown--;
                 return;
@@ -742,6 +742,32 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
+                    // === TẠO FAIL THỰC TẾ: dùng abort packet ===
+                    skipCounter++;
+                    if (skipCounter % (3 + RANDOM.nextInt(3)) == 0) {
+                        // Thực hiện đào giả nhưng sau đó gửi abort packet để tạo failure thực tế
+                        if (RANDOM.nextInt(2) == 0) {
+                            // Gửi gói tin đào bắt đầu
+                            if (mc.field_1761.method_2910(target.pos, target.side)) {
+                                // Ngay lập tức gửi abort để hủy đào
+                                BypassPacketManager.sendBlockAction(target.pos, target.side);
+                                mc.field_1761.method_2925();
+                                com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
+                                if (RANDOM.nextInt(10) == 0) {
+                                    DiagnosticRecorder.get().record("NukerLogic", "Real fail (abort) at " + target.pos);
+                                }
+                            } else {
+                                // Nếu không thể bắt đầu đào, coi như fail
+                                com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
+                            }
+                        } else {
+                            // Đơn giản là skip target này
+                            com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
+                        }
+                        queue.remove(0);
+                        continue;
+                    }
+
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
@@ -803,8 +829,7 @@ public final class PeoClient implements ClientModInitializer {
                 renderBlocks.add(target.pos);
                 processed++;
                 if (processed > 0) {
-                    // === RANDOM COOLDOWN: 0 hoặc 1 tick ===
-                    int randomCooldown = RANDOM.nextInt(2); // 0 hoặc 1
+                    int randomCooldown = RANDOM.nextInt(2);
                     cooldown = Math.max(0, CFG.nukerCooldown + dynamicCooldown + randomCooldown);
                 }
 
@@ -849,6 +874,7 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
+            skipCounter = 0;
             ghostRecoveryCounter = 0;
         }
 
