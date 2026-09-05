@@ -9,7 +9,6 @@ import net.minecraft.class_243;
 import net.minecraft.class_310;
 import java.util.Random;
 
-/** Compatibility facade with enhanced packet spoofing. */
 public final class NukerBypassUltimateV2 {
     private static final class_310 mc = class_310.method_1551();
     private static boolean requested;
@@ -28,6 +27,7 @@ public final class NukerBypassUltimateV2 {
 
     public static void stop() { requested = false; target = null; }
     public static boolean isActive() { return requested && PeoClient.CFG.nuker && mc.field_1724 != null; }
+    
     public static void tick() {
         if (!isActive()) { target = null; return; }
         class_2338 current = PeoClient.NukerLogic.getCurrentTarget();
