@@ -587,14 +587,11 @@ public final class PeoClient implements ClientModInitializer {
 
             // BleachHack scans a cube around the eye position and filters by
             // the selected shape/range before doing any break interaction.
-            for (int x = class_3532.method_15363(rangeCeil, -6, 6);
-                 x >= Math.floor(-range); x--) {
-                for (int y = class_3532.method_15363(rangeCeil, -6, 6);
-                     y >= (CFG.nukerFlatten
+            for (int x = rangeCeil; x >= (int) Math.floor(-range); x--) {
+                for (int y = rangeCeil; y >= (CFG.nukerFlatten
                              ? -(mc.field_1724.method_33571().field_1351 - mc.field_1724.method_23318()) + 0.2
                              : Math.floor(-range)); y--) {
-                    for (int z = class_3532.method_15363(rangeCeil, -6, 6);
-                         z >= Math.floor(-range); z--) {
+                    for (int z = rangeCeil; z >= (int) Math.floor(-range); z--) {
                         class_2338 pos = center.method_10069(x, y, z);
 
                         double distTo = "Cube".equalsIgnoreCase(CFG.nukerShape)
