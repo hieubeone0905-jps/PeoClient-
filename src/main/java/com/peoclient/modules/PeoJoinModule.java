@@ -5,7 +5,6 @@ import com.peoclient.diagnostic.DiagnosticRecorder;
 import net.minecraft.class_1268;
 import net.minecraft.class_1713;
 import net.minecraft.class_1799;
-import net.minecraft.class_2561;
 import net.minecraft.class_310;
 import net.minecraft.class_7923;
 
@@ -33,6 +32,8 @@ public final class PeoJoinModule {
     private static boolean hubReturnArmed = false;
     private static boolean lastCompassPresent = false;
     private static long nukerOnSince = 0L;
+    private static Object lastWorldInstance = null;
+    private static boolean sawActiveMiningWorld = false;
 
     private static String serverName = "Skyblock";
     private static int preJoinDelay = 5;
@@ -75,6 +76,8 @@ public final class PeoJoinModule {
         hubReturnArmed = PeoClient.CFG.nuker;
         nukerOnSince = PeoClient.CFG.nuker ? System.currentTimeMillis() : 0L;
         hadNuker = PeoClient.CFG.nuker;
+        lastWorldInstance = mc.field_1687;
+        sawActiveMiningWorld = PeoClient.CFG.nuker && mc.field_1687 != null && findHotbarItem(COMPASS_ID) < 0;
         DiagnosticRecorder.get().record("PeoJoin",
                 "Started; passive until Nuker is turned OFF (Nuker was " + hadNuker + ")");
     }
@@ -88,6 +91,8 @@ public final class PeoJoinModule {
         hubReturnArmed = false;
         lastCompassPresent = false;
         nukerOnSince = 0L;
+        lastWorldInstance = null;
+        sawActiveMiningWorld = false;
         DiagnosticRecorder.get().record("PeoJoin", "Stopped");
     }
 
@@ -239,10 +244,34 @@ public final class PeoJoinModule {
         boolean compassAppeared = compassPresent && !lastCompassPresent;
         lastCompassPresent = compassPresent;
 
-        // Give the mining session time to establish itself before accepting the
-        // compass transition as a hub return. This also prevents a startup
-        // compass from immediately disabling Nuker.
-        if (!compassAppeared || System.currentTimeMillis() - nukerOnSince < 3000L) return;
+        Object worldNow = mc.field_1687;
+        boolean reconnectedWorld = worldNow != null && lastWorldInstance == null && sawActiveMiningWorld;
+        boolean worldChanged = worldNow != null && lastWorldInstance != null && worldNow != lastWorldInstance;
+        if (worldNow != null) lastWorldInstance = worldNow;
+        else if (PeoClient.CFG.nuker) {
+            // A real kick/disconnect can briefly clear the client world before
+            // the hub world is created again. Keep the recovery detector armed.
+            lastWorldInstance = null;
+            sawActiveMiningWorld = true;
+        }
+
+        // If the Nuker session started in a normal mining world (no hub
+        // compass), remember that fact. A later compass appearance is then a
+        // strong hub-return signal.
+        if (PeoClient.CFG.nuker && !compassPresent && mc.field_1687 != null) {
+            sawActiveMiningWorld = true;
+        }
+
+        // Some servers keep the compass in the hotbar even outside the hub.
+        // In that case the compass itself does not transition. Replacing the
+        // ClientWorld when the server sends the player back to hub is an
+        // additional signal, but only after we have actually seen a mining
+        // world, and never during the first few seconds after enabling.
+        boolean validWorldReturn = (worldChanged || reconnectedWorld) && sawActiveMiningWorld && compassPresent;
+        boolean validCompassReturn = compassAppeared && sawActiveMiningWorld;
+
+        if ((!validCompassReturn && !validWorldReturn)
+                || System.currentTimeMillis() - nukerOnSince < 3000L) return;
 
         // Mimic the configured Nuker-key toggle so all existing Nuker shutdown
         // bookkeeping (session recorder, bypass/compatibility cleanup) remains
@@ -255,7 +284,7 @@ public final class PeoJoinModule {
         hubReturnArmed = false;
         hadNuker = true;
         DiagnosticRecorder.get().record("PeoJoin",
-                "Hub return detected (compass appeared); Nuker auto-OFF, starting recovery");
+                "Hub return detected (compass/world transition); Nuker auto-OFF, starting recovery");
     }
 
     private static boolean openCompass() {
@@ -327,7 +356,10 @@ public final class PeoJoinModule {
     private static void sendHome() {
         if (mc.field_1724 == null) return;
         try {
-            mc.field_1724.method_7353(class_2561.method_43470("/home"), true);
+            // method_7353 only displays a local HUD message; it does NOT send
+            // a command to the server. Use the 1.21.4 ClientPlayerEntity
+            // sendCommand mapping so /home actually reaches the server.
+            mc.field_1724.method_44099("home");
         } catch (Throwable t) {
             DiagnosticRecorder.get().record("PeoJoin", "Could not send /home: " + t.getMessage());
         }
