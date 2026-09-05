@@ -626,11 +626,11 @@ public final class PeoClient implements ClientModInitializer {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
             }
 
-            // === FIX GHOST BLOCK ===
+                       // === FIX GHOST BLOCK (có giới hạn tần suất) ===
             if (breakingPos != null && mc.field_1687.method_8320(breakingPos).method_26215()) {
-                // Block đã trở thành air trên client → ghost block
                 ghostRecoveryCounter++;
                 // Gửi packet tương tác (right-click) để server gửi lại state đúng
+                // Hàm sendInteractPacket tự động giới hạn tần suất bên trong
                 BypassPacketManager.sendInteractPacket(breakingPos, breakingSide);
                 // Reset trạng thái break
                 mc.field_1761.method_2925();
@@ -640,7 +640,6 @@ public final class PeoClient implements ClientModInitializer {
                 stagnantTicks = 0;
                 lastBreakingProgress = 0.0f;
                 progressPos = null;
-                // Reload chunk để cập nhật hiển thị
                 if (mc.field_1769 != null) mc.field_1769.method_3279();
                 DiagnosticRecorder.get().record("NukerLogic", "Ghost block fixed via interact packet at " + breakingPos);
             }
