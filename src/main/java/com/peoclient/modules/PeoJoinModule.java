@@ -2,15 +2,23 @@ package com.peoclient.modules;
 
 import com.peoclient.PeoClient;
 import com.peoclient.diagnostic.DiagnosticRecorder;
+import net.minecraft.class_1268;
+import net.minecraft.class_1713;
+import net.minecraft.class_1799;
 import net.minecraft.class_2561;
 import net.minecraft.class_310;
+import net.minecraft.class_7923;
 
 /**
- * PeoJoin - safe connection recovery.
+ * PeoJoin - optional Skyblock recovery helper.
  *
- * Automatically recovers the client connection after a disconnect, waits for
- * the player to enter the server, sends /home once, and waits for the configured
- * post-join delay. It does not re-enable Nuker or simulate combat/mining input.
+ * When enabled together with Nuker, this module is passive. It watches for the
+ * user/server recovery sequence: Nuker is turned OFF (normally with the
+ * configured Nuker key), then the module opens the hub compass, clicks the
+ * diamond-pickaxe Skyblock entry, waits for the Skyblock world, sends /home,
+ * waits again, and restores Nuker.
+ *
+ * It never changes Nuker range, multi, cooldown, targeting or break speed.
  */
 public final class PeoJoinModule {
     private static final class_310 mc = class_310.method_1551();
@@ -20,17 +28,27 @@ public final class PeoJoinModule {
     private static long stateStartTime = 0L;
     private static boolean hadNuker = false;
     private static boolean commandSent = false;
+    private static int previousHotbar = -1;
+    private static int guiSlot = -1;
+    private static boolean hubReturnArmed = false;
+    private static boolean lastCompassPresent = false;
+    private static long nukerOnSince = 0L;
 
     private static String serverName = "Skyblock";
     private static int preJoinDelay = 5;
     private static int postJoinDelay = 5;
 
+    private static final String COMPASS_ID = "minecraft:compass";
+    private static final String SKYBLOCK_ICON_ID = "minecraft:diamond_pickaxe";
+
     public enum State {
         IDLE,
-        WAITING_FOR_DISCONNECT,
-        DISCONNECTED,
-        WAITING_FOR_JOIN,
-        JOINED,
+        WAITING_FOR_TRIGGER,
+        WAITING_FOR_HUB,
+        OPENING_SERVER_MENU,
+        WAITING_FOR_SERVER_MENU,
+        CLICKING_SKYBLOCK,
+        WAITING_FOR_SKYBLOCK,
         WAITING_HOME,
         DONE
     }
@@ -39,107 +57,267 @@ public final class PeoJoinModule {
 
     public static void toggle() {
         enabled = !enabled;
-        if (enabled) {
-            start();
-        } else {
-            stop();
-        }
+        if (enabled) start();
+        else stop();
         PeoClient.CFG.save();
         DiagnosticRecorder.get().record("PeoJoin", "Toggled to " + enabled);
     }
 
-    public static boolean isEnabled() {
-        return enabled;
-    }
+    public static boolean isEnabled() { return enabled; }
 
     private static void start() {
-        currentState = State.WAITING_FOR_DISCONNECT;
+        currentState = State.WAITING_FOR_TRIGGER;
         stateStartTime = System.currentTimeMillis();
         commandSent = false;
+        guiSlot = -1;
+        previousHotbar = -1;
+        lastCompassPresent = findHotbarItem(COMPASS_ID) >= 0;
+        hubReturnArmed = PeoClient.CFG.nuker;
+        nukerOnSince = PeoClient.CFG.nuker ? System.currentTimeMillis() : 0L;
         hadNuker = PeoClient.CFG.nuker;
         DiagnosticRecorder.get().record("PeoJoin",
-                "Started; monitoring connection (Nuker was " + hadNuker + ")");
+                "Started; passive until Nuker is turned OFF (Nuker was " + hadNuker + ")");
     }
 
     private static void stop() {
         enabled = false;
         currentState = State.IDLE;
         commandSent = false;
+        guiSlot = -1;
+        previousHotbar = -1;
+        hubReturnArmed = false;
+        lastCompassPresent = false;
+        nukerOnSince = 0L;
         DiagnosticRecorder.get().record("PeoJoin", "Stopped");
     }
 
-    /**
-     * Call once from the normal client tick. All state changes happen on the
-     * client thread; no background thread touches Minecraft GUI/network state.
-     */
+    /** Called once from the normal client tick. */
     public static void tick() {
         if (!enabled || mc == null) return;
 
         try {
             boolean connected = mc.field_1724 != null && mc.field_1687 != null;
 
-            switch (currentState) {
-                case WAITING_FOR_DISCONNECT -> {
-                    if (!connected) {
-                        hadNuker = PeoClient.CFG.nuker;
-                        if (hadNuker) {
-                            PeoClient.CFG.nuker = false;
-                            PeoClient.CFG.save();
-                        }
-                        currentState = State.DISCONNECTED;
-                        stateStartTime = System.currentTimeMillis();
-                        DiagnosticRecorder.get().record("PeoJoin",
-                                "Disconnect detected; Nuker disabled for recovery");
-                    }
-                }
+            // Automatic kick-to-hub trigger: while Nuker is actively running,
+            // watch for the hub compass appearing in the hotbar after it was
+            // absent during the mining session. This is the server-side hub
+            // return signal used by the requested recovery flow.
+            if (currentState == State.WAITING_FOR_TRIGGER && connected) {
+                detectHubReturnAndDisableNuker();
+            }
 
-                case DISCONNECTED -> {
-                    // Do not manipulate server-selection GUI or inject packets.
-                    // A reconnect can be initiated by the normal client/server UI.
-                    // Once the player is back in-world, recovery continues automatically.
-                    if (connected) {
-                        currentState = State.JOINED;
+            switch (currentState) {
+                case WAITING_FOR_TRIGGER -> {
+                    // PeoJoin does nothing while Nuker is running. A transition
+                    // ON -> OFF is the explicit recovery trigger requested by the user.
+                    if (hadNuker && !PeoClient.CFG.nuker) {
+                        currentState = connected ? State.WAITING_FOR_HUB : State.WAITING_FOR_HUB;
                         stateStartTime = System.currentTimeMillis();
                         commandSent = false;
-                        DiagnosticRecorder.get().record("PeoJoin", "Connection restored");
+                        guiSlot = -1;
+                        DiagnosticRecorder.get().record("PeoJoin",
+                                "Nuker OFF detected; starting hub -> Skyblock recovery");
+                    } else if (PeoClient.CFG.nuker) {
+                        hadNuker = true;
+                        hubReturnArmed = true;
+                        if (nukerOnSince == 0L) nukerOnSince = System.currentTimeMillis();
                     }
                 }
 
-                case JOINED -> {
-                    if (!commandSent &&
-                            elapsedSeconds() >= Math.max(0, preJoinDelay)) {
+                case WAITING_FOR_HUB -> {
+                    // A normal kick-to-hub keeps the player connected. If the
+                    // connection is briefly absent, simply wait for it to return.
+                    if (!connected) return;
+                    if (findHotbarItem(COMPASS_ID) >= 0 && mc.field_1755 == null) {
+                        currentState = State.OPENING_SERVER_MENU;
+                        stateStartTime = System.currentTimeMillis();
+                    }
+                }
+
+                case OPENING_SERVER_MENU -> {
+                    if (!connected || mc.field_1755 != null) {
+                        if (mc.field_1755 != null) {
+                            currentState = State.WAITING_FOR_SERVER_MENU;
+                            stateStartTime = System.currentTimeMillis();
+                        }
+                        return;
+                    }
+                    if (openCompass()) {
+                        currentState = State.WAITING_FOR_SERVER_MENU;
+                        stateStartTime = System.currentTimeMillis();
+                        DiagnosticRecorder.get().record("PeoJoin", "Opened hub compass");
+                    }
+                }
+
+                case WAITING_FOR_SERVER_MENU -> {
+                    if (!connected) return;
+                    if (mc.field_1755 != null) {
+                        int slot = findHandledScreenItem(SKYBLOCK_ICON_ID);
+                        if (slot >= 0) {
+                            guiSlot = slot;
+                            currentState = State.CLICKING_SKYBLOCK;
+                            stateStartTime = System.currentTimeMillis();
+                        } else if (elapsedSeconds() >= 8) {
+                            // The server menu may be a little different. Retry the
+                            // compass action after a short timeout rather than spam-clicking.
+                            closeScreen();
+                            currentState = State.WAITING_FOR_HUB;
+                            stateStartTime = System.currentTimeMillis();
+                        }
+                    } else if (elapsedSeconds() >= 3) {
+                        currentState = State.WAITING_FOR_HUB;
+                        stateStartTime = System.currentTimeMillis();
+                    }
+                }
+
+                case CLICKING_SKYBLOCK -> {
+                    if (!connected || mc.field_1755 == null) return;
+                    if (guiSlot >= 0 && clickHandledScreenSlot(guiSlot)) {
+                        currentState = State.WAITING_FOR_SKYBLOCK;
+                        stateStartTime = System.currentTimeMillis();
+                        guiSlot = -1;
+                        DiagnosticRecorder.get().record("PeoJoin",
+                                "Clicked diamond-pickaxe Skyblock entry; waiting 5s");
+                    } else {
+                        currentState = State.WAITING_FOR_SERVER_MENU;
+                        stateStartTime = System.currentTimeMillis();
+                    }
+                }
+
+                case WAITING_FOR_SKYBLOCK -> {
+                    if (!connected) return;
+                    if (elapsedSeconds() >= Math.max(0, preJoinDelay)) {
                         sendHome();
                         commandSent = true;
                         currentState = State.WAITING_HOME;
                         stateStartTime = System.currentTimeMillis();
-                        DiagnosticRecorder.get().record("PeoJoin", "Sent /home");
+                        DiagnosticRecorder.get().record("PeoJoin", "Sent /home after Skyblock wait");
                     }
                 }
 
                 case WAITING_HOME -> {
+                    if (!connected) return;
                     if (elapsedSeconds() >= Math.max(0, postJoinDelay)) {
+                        PeoClient.CFG.nuker = true;
+                        PeoClient.CFG.save();
+                        hadNuker = true;
                         currentState = State.DONE;
                         stateStartTime = System.currentTimeMillis();
-                        DiagnosticRecorder.get().record("PeoJoin", "Recovery complete");
+                        DiagnosticRecorder.get().record("PeoJoin", "Recovery complete; Nuker re-enabled");
                     }
                 }
 
                 case DONE -> {
-                    // Stay idle until another disconnect occurs.
-                    if (!connected) {
-                        currentState = State.DISCONNECTED;
+                    // Stay passive until the next explicit Nuker OFF transition.
+                    if (PeoClient.CFG.nuker) hadNuker = true;
+                    else {
+                        hadNuker = true;
+                        currentState = State.WAITING_FOR_TRIGGER;
                         stateStartTime = System.currentTimeMillis();
-                        commandSent = false;
                     }
                 }
 
-                default -> { }
+                case IDLE -> { }
             }
         } catch (Throwable t) {
             DiagnosticRecorder.get().record("PeoJoin",
-                    "Recovery error: " + t.getClass().getSimpleName() +
-                    ": " + String.valueOf(t.getMessage()));
+                    "Recovery error: " + t.getClass().getSimpleName() + ": " + String.valueOf(t.getMessage()));
         }
+    }
+
+
+    /**
+     * Detect a return to the hub while Nuker is still ON, then perform the
+     * same logical action as pressing the Nuker key: turn Nuker OFF and start
+     * PeoJoin recovery immediately. This avoids requiring a manual key press.
+     */
+    private static void detectHubReturnAndDisableNuker() {
+        if (!hubReturnArmed || !PeoClient.CFG.nuker || mc.field_1724 == null) return;
+        if (nukerOnSince == 0L) nukerOnSince = System.currentTimeMillis();
+
+        boolean compassPresent = findHotbarItem(COMPASS_ID) >= 0;
+        boolean compassAppeared = compassPresent && !lastCompassPresent;
+        lastCompassPresent = compassPresent;
+
+        // Give the mining session time to establish itself before accepting the
+        // compass transition as a hub return. This also prevents a startup
+        // compass from immediately disabling Nuker.
+        if (!compassAppeared || System.currentTimeMillis() - nukerOnSince < 3000L) return;
+
+        // Mimic the configured Nuker-key toggle so all existing Nuker shutdown
+        // bookkeeping (session recorder, bypass/compatibility cleanup) remains
+        // intact. PeoJoin then owns the recovery sequence.
+        PeoClient.toggleModuleByName("Nuker [Multi]", mc);
+        currentState = State.WAITING_FOR_HUB;
+        stateStartTime = System.currentTimeMillis();
+        commandSent = false;
+        guiSlot = -1;
+        hubReturnArmed = false;
+        hadNuker = true;
+        DiagnosticRecorder.get().record("PeoJoin",
+                "Hub return detected (compass appeared); Nuker auto-OFF, starting recovery");
+    }
+
+    private static boolean openCompass() {
+        if (mc.field_1724 == null || mc.field_1761 == null) return false;
+        int slot = findHotbarItem(COMPASS_ID);
+        if (slot < 0) return false;
+
+        var inv = mc.field_1724.method_31548();
+        previousHotbar = inv.field_7545;
+        if (previousHotbar != slot) inv.method_61496(slot);
+
+        // Same normal client interaction path as a real right-click on the
+        // selected compass. No raw packet injection is used.
+        mc.field_1761.method_2919(mc.field_1724, class_1268.field_5808);
+        return true;
+    }
+
+    private static int findHotbarItem(String wantedId) {
+        if (mc.field_1724 == null) return -1;
+        var inv = mc.field_1724.method_31548();
+        for (int slot = 0; slot < 9; slot++) {
+            class_1799 stack = inv.method_5438(slot);
+            if (!stack.method_7960() && wantedId.equals(itemId(stack))) return slot;
+        }
+        return -1;
+    }
+
+    private static int findHandledScreenItem(String wantedId) {
+        if (mc.field_1724 == null || mc.field_1724.field_7512 == null) return -1;
+        var handler = mc.field_1724.field_7512;
+        for (int i = 0; i < 100; i++) {
+            try {
+                class_1799 stack = handler.method_7611(i).method_7677();
+                if (!stack.method_7960() && wantedId.equals(itemId(stack))) return i;
+            } catch (Throwable ignored) {
+                break;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean clickHandledScreenSlot(int slot) {
+        if (mc.field_1724 == null || mc.field_1761 == null || mc.field_1724.field_7512 == null) return false;
+        if (mc.field_1755 == null) return false;
+        try {
+            mc.field_1761.method_2906(
+                    mc.field_1724.field_7512.field_7763,
+                    slot,
+                    0,
+                    class_1713.field_7790,
+                    mc.field_1724);
+            return true;
+        } catch (Throwable t) {
+            DiagnosticRecorder.get().record("PeoJoin", "Skyblock GUI click failed: " + t.getMessage());
+            return false;
+        }
+    }
+
+    private static void closeScreen() {
+        try {
+            mc.method_1507(null);
+        } catch (Throwable ignored) { }
     }
 
     private static long elapsedSeconds() {
@@ -149,33 +327,29 @@ public final class PeoJoinModule {
     private static void sendHome() {
         if (mc.field_1724 == null) return;
         try {
-            mc.field_1724.method_7353(
-                    class_2561.method_43470("/home"), true);
+            mc.field_1724.method_7353(class_2561.method_43470("/home"), true);
         } catch (Throwable t) {
-            DiagnosticRecorder.get().record("PeoJoin",
-                    "Could not send /home: " + t.getMessage());
+            DiagnosticRecorder.get().record("PeoJoin", "Could not send /home: " + t.getMessage());
         }
     }
 
+    private static String itemId(class_1799 stack) {
+        return class_7923.field_41178.method_10221(stack.method_7909()).toString();
+    }
+
     public static void setEnableNukerOnJoin(boolean ignored) {
-        // Kept for configuration compatibility. Recovery never re-enables Nuker.
+        // Kept for configuration compatibility. PeoJoin re-enables Nuker only
+        // after the complete requested sequence has finished.
     }
 
     public static void setServerName(String name) {
         if (name != null && !name.isBlank()) serverName = name;
     }
 
-    public static String getServerName() {
-        return serverName;
-    }
+    public static String getServerName() { return serverName; }
 
-    public static void setPreJoinDelay(int seconds) {
-        preJoinDelay = Math.max(0, seconds);
-    }
-
-    public static void setPostJoinDelay(int seconds) {
-        postJoinDelay = Math.max(0, seconds);
-    }
+    public static void setPreJoinDelay(int seconds) { preJoinDelay = Math.max(0, seconds); }
+    public static void setPostJoinDelay(int seconds) { postJoinDelay = Math.max(0, seconds); }
 
     public static String getStatus() {
         return enabled ? "State: " + currentState : "OFF";

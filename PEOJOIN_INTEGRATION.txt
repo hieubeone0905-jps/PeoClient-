@@ -1,15 +1,15 @@
 PeoJoin integration
 ===================
-Added:
-- com/peoclient/modules/PeoJoinModule.java
-- PeoJoin added to PoeScreen module list
-- PeoJoin toggle wired in PeoClient.toggleModuleByName()
-- PeoJoin enableNukerOnJoin default enabled during initialization
 
-Source files supplied:
-- deepseek_java_20260902_54b3f4.java
-- deepseek_java_20260902_b84c8c.java
-- deepseek_java_20260902_b398c2.java
+Behavior:
+- Enable PeoJoin together with Nuker; while Nuker is ON, PeoJoin is passive.
+- The explicit recovery trigger is Nuker changing ON -> OFF (for example, pressing the configured Nuker key M/N).
+- In the hub, PeoJoin finds the minecraft:compass in the hotbar and uses the normal right-click interaction.
+- It waits for the server-selection GUI, finds minecraft:diamond_pickaxe, and performs one normal GUI slot click.
+- Waits 5 seconds, sends /home, waits another 5 seconds, then re-enables Nuker.
+- It does not alter Nuker's range, multi, cooldown, target selection, break speed, or Omni-directional targeting.
+- GUI item matching uses item IDs, not fixed screen coordinates, so different window resolutions are supported.
 
-Note: the supplied PeoJoinModule contains placeholder methods for selecting the Skyblock
-server and Join button, so those parts are not guaranteed to work against a specific server list UI.
+Important:
+- The exact hub/server GUI must expose the Skyblock entry as a diamond pickaxe item. If the server uses a different item, change SKYBLOCK_ICON_ID in PeoJoinModule.java.
+- The module does not inject raw mouse packets; it uses Minecraft's normal interaction manager.

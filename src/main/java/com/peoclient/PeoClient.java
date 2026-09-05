@@ -710,29 +710,52 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         private static class_2350 bestSide(class_310 mc, class_2338 pos) {
+            // Full six-face targeting: the Nuker may approach a block from
+            // above, below, north, south, east or west.  Prefer the face that
+            // points toward the player, then fall back through every other
+            // exposed face.  This keeps the existing break speed/multi logic
+            // untouched while making vertical and straight-on mining reliable.
             class_243 eye = mc.field_1724.method_33571();
+            class_243 center = class_243.method_24953(pos);
+            class_243 toPlayer = eye.method_1020(center);
+
+            class_2350 preferred = class_2350.method_10142(
+                    toPlayer.field_1352, toPlayer.field_1351, toPlayer.field_1350);
+
+            class_2350 found = tryFace(mc, pos, eye, center, preferred);
+            if (found != null) return found;
+
+            // Fall through all remaining faces so vertical mining and straight-on
+            // mining work even when the preferred face is not directly reachable.
             for (class_2350 side : class_2350.values()) {
-                class_2338 neighbour = pos.method_10093(side);
-                if (!mc.field_1687.method_8320(neighbour).method_26234(mc.field_1687, neighbour)) {
-                    class_243 face = class_243.method_24953(pos).method_1031(
-                            side.method_10148() * 0.49,
-                            side.method_10164() * 0.49,
-                            side.method_10165() * 0.49);
-                    try {
-                        class_3965 hit = mc.field_1687.method_17742(new net.minecraft.class_3959(
-                                eye, face,
-                                net.minecraft.class_3959.class_3960.field_17559,
-                                net.minecraft.class_3959.class_242.field_1348,
-                                mc.field_1724));
-                        if (hit.method_17783() == class_239.class_240.field_1332 && hit.method_17777().equals(pos)) {
-                            return side;
-                        }
-                    } catch (Throwable ignored) {}
-                }
+                if (side == null || side == preferred) continue;
+                found = tryFace(mc, pos, eye, center, side);
+                if (found != null) return found;
             }
+
             if (CFG.nukerRaycast) return null;
-            class_243 toPlayer = eye.method_1020(class_243.method_24953(pos));
-            return class_2350.method_10142(toPlayer.field_1352, toPlayer.field_1351, toPlayer.field_1350);
+            return preferred;
+        }
+
+        private static class_2350 tryFace(class_310 mc, class_2338 pos, class_243 eye, class_243 center, class_2350 side) {
+            class_2338 neighbour = pos.method_10093(side);
+            if (mc.field_1687.method_8320(neighbour).method_26234(mc.field_1687, neighbour)) return null;
+
+            class_243 face = center.method_1031(
+                    side.method_10148() * 0.49,
+                    side.method_10164() * 0.49,
+                    side.method_10165() * 0.49);
+            try {
+                class_3965 hit = mc.field_1687.method_17742(new net.minecraft.class_3959(
+                        eye, face,
+                        net.minecraft.class_3959.class_3960.field_17559,
+                        net.minecraft.class_3959.class_242.field_1348,
+                        mc.field_1724));
+                if (hit.method_17783() == class_239.class_240.field_1332 && hit.method_17777().equals(pos)) {
+                    return side;
+                }
+            } catch (Throwable ignored) {}
+            return null;
         }
 
         private static void rotateTo(class_310 mc, class_2338 pos) {
