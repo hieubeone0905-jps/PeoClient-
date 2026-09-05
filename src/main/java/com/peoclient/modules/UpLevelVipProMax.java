@@ -40,9 +40,9 @@ public final class UpLevelVipProMax {
             "minecraft:gold_block"
     );
 
-    private static final int DROP_STACKS_PER_TICK = 1;
+    private static final int DROP_STACKS_PER_TICK = 20;
     /** Minimum number of inventory slots occupied by level-value blocks before opening the level GUI. */
-    private static final int MIN_VALUE_BLOCK_SLOTS = 20;
+    private static final int MIN_VALUE_BLOCK_SLOTS = 15;
     /** Preferred upper target; the scan never needs to wait beyond this if 20 is already reached. */
     private static final int MAX_VALUE_BLOCK_SLOTS = 25;
     // Keep inventory THROW traffic deliberately low: one or two actions per tick.
