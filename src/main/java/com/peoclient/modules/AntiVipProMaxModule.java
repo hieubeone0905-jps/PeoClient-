@@ -9,11 +9,9 @@ import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import com.peoclient.nuker.optimize.AntiKickEngine;
 import net.minecraft.class_2338;
 
-/** AntiVipProMax compatibility, diagnostics and recovery controller. */
 public final class AntiVipProMaxModule {
     private AntiVipProMaxModule() {}
 
-    // --- Các biến dùng cho AutoAdjust ---
     private static int lastLoggedSuspicion = -1;
     private static long lastAutoAdjustLogMs = 0;
 
@@ -142,8 +140,6 @@ public final class AntiVipProMaxModule {
             NukerBypassEngine.setVulcanMode(isVulcanMode());
             NukerBypassEngine.setIntensity(getIntensity());
             NukerBypassEngine.setAutoRecovery(isAutoRecovery());
-            // Compatibility engines are monitors/facades only. NukerLogic remains
-            // the single owner of the real block-breaking interaction state.
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(true);
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setGrimMode(isGrimMode());
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setVulcanMode(isVulcanMode());
@@ -173,20 +169,18 @@ public final class AntiVipProMaxModule {
                 setBypassV2(false);
             }
         }
-        // AutoAdjust nâng cấp dựa trên success rate và suspicion
+        // AutoAdjust dựa trên success rate và suspicion
         if (isEnabled() && isAutoAdjust()) {
             int susp = getSuspicionLevel();
             int ping = getPing();
             int rate = AntiKickEngine.getLastSuccessRate();
 
-            // Điều chỉnh dựa trên tỉ lệ thành công ảo
-            if (rate < 90 && rate > 0) {
+            if (rate < 88 && rate > 0) {
                 AntiKickEngine.setProtectionLevel(Math.min(10, AntiKickEngine.getProtectionLevel() + 1));
             } else if (rate > 97) {
                 NukerBypassUltimateV2.setIntensity(Math.max(1, NukerBypassUltimateV2.getIntensity() - 1));
             }
 
-            // Điều chỉnh dựa trên ping và suspicion
             if (susp > 5 || ping > 200) {
                 NukerBypassUltimateV2.setIntensity(Math.min(10, PeoClient.CFG.bypassV2Intensity + 1));
                 AntiKickEngine.setProtectionLevel(Math.min(10, AntiKickEngine.getProtectionLevel() + 1));
@@ -195,7 +189,6 @@ public final class AntiVipProMaxModule {
                 AntiKickEngine.setProtectionLevel(Math.max(1, AntiKickEngine.getProtectionLevel() - 1));
             }
 
-            // Log mỗi 30 giây
             if (System.currentTimeMillis() - lastAutoAdjustLogMs > 30000) {
                 lastAutoAdjustLogMs = System.currentTimeMillis();
                 DiagnosticRecorder.get().record("AutoAdjust", "susp=" + susp + " ping=" + ping +

@@ -34,25 +34,25 @@ public final class NukerBypassUltimateV2 {
         if (current != null) target = current.method_10062();
 
         if (target != null && mc.field_1724 != null) {
-            // Gửi rotation giả mỗi tick
-            float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
-            float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
+            // Rotation giả mỗi tick
+            float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.6);
+            float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.3);
             boolean onGround = mc.field_1724.method_24828();
             BypassPacketManager.sendRotation(yaw, pitch, onGround);
 
-            // Gửi position giả 2 lần mỗi 5 tick
+            // Position giả 2 lần mỗi 5 tick
             if (RANDOM.nextInt(5) < 2) {
                 class_243 pos = mc.field_1724.method_19538();
                 BypassPacketManager.sendPosition(
-                    pos.field_1352 + RANDOM.nextDouble() * 0.002 - 0.001,
-                    pos.field_1351 + RANDOM.nextDouble() * 0.002 - 0.001,
-                    pos.field_1350 + RANDOM.nextDouble() * 0.002 - 0.001,
+                    pos.field_1352 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                    pos.field_1351 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                    pos.field_1350 + RANDOM.nextDouble() * 0.003 - 0.0015,
                     onGround
                 );
             }
 
-            // Gửi abort block action ngẫu nhiên
-            if (RANDOM.nextInt(8) == 0) {
+            // Abort block action ngẫu nhiên
+            if (RANDOM.nextInt(7) == 0) {
                 BypassPacketManager.sendBlockAction(target, class_2350.field_11036);
             }
         }
@@ -64,14 +64,6 @@ public final class NukerBypassUltimateV2 {
     public static void setNoCheatPlusMode(boolean enable) { nocheatplusMode = enable; }
     public static void setIntensity(int level) { intensity = Math.max(1, Math.min(10, level)); }
     public static void setDesyncLevel(int level) { desyncLevel = Math.max(1, Math.min(5, level)); }
-
-    private static long calculateDynamicDelay() {
-        long base = 12L + RANDOM.nextInt(20);
-        if (intensity > 7) base += 3L;
-        if (desyncLevel > 3) base += 2L;
-        base += (long) (RANDOM.nextGaussian() * 2.0);
-        return Math.max(5L, base);
-    }
 
     public static boolean isGrimMode() { return grimMode; }
     public static boolean isVulcanMode() { return vulcanMode; }
