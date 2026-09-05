@@ -568,371 +568,170 @@ public final class PeoClient implements ClientModInitializer {
     // NUKER LOGIC - ĐÃ CHỈNH SỬA (FIX GHOST BLOCK + TANG MULTI LEN 15)
     // ============================================================
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 15; // Tăng lên 15
+        private static final int MAX_BLOCKS_PER_TICK = 15;
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
-        private static int cooldown;
+
+        // Keep one real breaking target alive across ticks, like BleachHack.
         private static class_2338 breakingPos;
         private static class_2350 breakingSide;
-        private static int stagnantTicks;
         private static float lastBreakingProgress;
         private static class_2338 progressPos;
-        private static long diagnosticTargetTime;
-        private static long diagnosticAttemptTime;
-        private static long diagnosticInteractionTime;
-        private static final Random RANDOM = new Random();
-        private static int skipCounter = 0;
-        private static int ghostRecoveryCounter = 0;
-        // Server-refresh recovery state. This stays entirely inside NukerLogic.
-        private static class_2338 recoveryPos;
-        private static class_2350 recoverySide;
-        private static int recoveryWaitTicks;
-        private static int recoveryAttempts;
-        private static long lastRecoveryTime;
+        private static int stagnantTicks;
 
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
-            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null) return;
+            if (!CFG.nuker || mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null) {
+                return;
+            }
 
             renderBlocks.clear();
-            com.peoclient.nuker.compat.NukerWorldSync.tick(mc);
 
-            if (CFG.autoBlockReload) AutoBlockReload.tick();
-            if (CFG.antiKickEnabled) {
-                ClientStabilizer.tick();
-                LatencyCompensator.tick();
-                AntiKickEngine.tick(mc);
-            }
-
-            if (cooldown > 0) {
-                cooldown--;
-                return;
-            }
-
-            // === BYPASS PACKET ===
-            if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
-                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
-                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.3);
-                boolean onGround = mc.field_1724.method_24828();
-                BypassPacketManager.sendRotation(yaw, pitch, onGround);
-                if (RANDOM.nextInt(4) == 0) {
-                    class_243 pos = mc.field_1724.method_19538();
-                    BypassPacketManager.sendPosition(
-                        pos.field_1352 + RANDOM.nextDouble() * 0.003 - 0.0015,
-                        pos.field_1351 + RANDOM.nextDouble() * 0.003 - 0.0015,
-                        pos.field_1350 + RANDOM.nextDouble() * 0.003 - 0.0015,
-                        onGround
-                    );
-                }
-            }
-
-            int dynamicCooldown = 0;
-            if (AntiKickEngine.isActive()) {
-                dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
-            }
-
-                       // === GHOST BLOCK RECOVERY ===
-            // Do not treat a client-side air result as a successful break immediately.
-            // Ask the server for the real block state through the normal interaction
-            // manager path, then rebuild the Nuker queue after the update arrives.
-            if (recoveryPos != null) {
-                class_2680 refreshed = mc.field_1687.method_8320(recoveryPos);
-                if (!refreshed.method_26215()) {
-                    recoveryPos = null;
-                    recoverySide = null;
-                    recoveryWaitTicks = 0;
-                    recoveryAttempts = 0;
-                    queue.clear();
-                } else if (recoveryWaitTicks > 0) {
-                    recoveryWaitTicks--;
-                    return;
-                } else if (recoveryAttempts < 3) {
-                    requestRealBlockRefresh(mc, recoveryPos, recoverySide);
-                    recoveryAttempts++;
-                    recoveryWaitTicks = 2;
-                    return;
-                } else {
-                    // Server did not restore the block; assume it really was broken.
-                    recoveryPos = null;
-                    recoverySide = null;
-                    recoveryWaitTicks = 0;
-                    recoveryAttempts = 0;
-                }
-            }
-
-            if (breakingPos != null && mc.field_1687.method_8320(breakingPos).method_26215()) {
-                class_2338 ghostPos = breakingPos;
-                class_2350 ghostSide = breakingSide;
-                ghostRecoveryCounter++;
-                mc.field_1761.method_2925();
-                breakingPos = null;
-                breakingSide = null;
-                stagnantTicks = 0;
-                lastBreakingProgress = 0.0f;
-                progressPos = null;
-                queue.clear();
-                recoveryPos = ghostPos;
-                recoverySide = ghostSide;
-                recoveryAttempts = 0;
-                recoveryWaitTicks = 0;
-                lastRecoveryTime = System.currentTimeMillis();
-                requestRealBlockRefresh(mc, ghostPos, ghostSide);
-                recoveryAttempts = 1;
-                recoveryWaitTicks = 2;
-                if (mc.field_1769 != null) mc.field_1769.method_3279();
-                return;
-            }
-
-            // === STALE DETECTION ===
+            /*
+             * Bleach-style core:
+             * 1) Keep the same target while it is still a real block.
+             * 2) Call updateBlockBreakingProgress every tick (no random skips/cooldowns).
+             * 3) Only retarget after the current block is actually resolved/invalid.
+             *
+             * This is deliberately kept inside NukerLogic so no other module is changed.
+             */
             if (breakingPos != null) {
-                class_2680 activeState = mc.field_1687.method_8320(breakingPos);
-                float progress = getBreakingProgress();
-                if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                    com.peoclient.nuker.bypass.NukerBypassEngine.onBreakProgress(progress, breakingPos);
-                }
-                if (activeState.method_26215()) {
-                    // Nếu vẫn là air (có thể do ghost chưa được fix), gọi lại sendInteractPacket
-                    BypassPacketManager.sendInteractPacket(breakingPos, breakingSide);
-                    mc.field_1761.method_2925();
-                    breakingPos = null;
-                    breakingSide = null;
-                    queue.clear();
-                    stagnantTicks = 0;
-                    lastBreakingProgress = 0.0f;
-                    progressPos = null;
+                class_2680 state = mc.field_1687.method_8320(breakingPos);
+
+                if (!isActiveBreakTarget(mc, breakingPos, state)) {
+                    resetBreakingState(mc);
                 } else {
-                    if (!breakingPos.equals(progressPos) || progress > lastBreakingProgress + 0.001f) {
+                    if (CFG.nukerRotate) {
+                        rotateTo(mc, breakingPos);
+                    }
+
+                    // This is the important BleachHack behavior: refresh breaking progress every tick.
+                    mc.field_1761.method_2902(breakingPos, breakingSide);
+                    mc.field_1724.method_6104(class_1268.field_5808);
+                    renderBlocks.add(breakingPos);
+
+                    float progress = getBreakingProgress();
+                    if (!breakingPos.equals(progressPos) || progress > lastBreakingProgress + 0.0005f) {
                         stagnantTicks = 0;
                     } else {
                         stagnantTicks++;
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 12) {
-                        com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
-                        if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                            com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
-                        }
-                        com.peoclient.diagnostic.NukerSessionRecorder.get().recordRecovery();
-                        com.peoclient.diagnostic.BreakEventRecorder.get().recordRecovery(breakingPos, "Stale breaking state");
-                        com.peoclient.diagnostic.AccountSessionMetrics.get().recordRecovery();
-                        com.peoclient.diagnostic.BreakStateTracker.get().transition(
-                                com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
-                        com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
-                        class_2338 stalePos = breakingPos;
-                        class_2350 staleSide = breakingSide;
+
+                    // If the server/client has actually resolved the block, move to the next target.
+                    if (mc.field_1687.method_8320(breakingPos).method_26215()) {
+                        resetBreakingState(mc);
+                    } else if (stagnantTicks >= 40) {
+                        /*
+                         * Do NOT fabricate a client-side block or spam right-click packets.
+                         * Re-send the normal start-break + progress sequence once, then continue
+                         * the normal Bleach-style per-tick progress updates.
+                         */
                         mc.field_1761.method_2925();
-                        breakingPos = null;
-                        breakingSide = null;
-                        queue.clear();
+                        mc.field_1761.method_2910(breakingPos, breakingSide);
                         stagnantTicks = 0;
                         lastBreakingProgress = 0.0f;
-                        progressPos = null;
-                        recoveryPos = stalePos;
-                        recoverySide = staleSide;
-                        recoveryAttempts = 0;
-                        recoveryWaitTicks = 0;
-                        requestRealBlockRefresh(mc, stalePos, staleSide);
-                        recoveryAttempts = 1;
-                        recoveryWaitTicks = 2;
-                        return;
+                        progressPos = breakingPos;
                     }
                 }
             }
 
-            // === OBSERVER ===
-            if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(
-                        breakingPos != null, stagnantTicks > 0);
-            }
+            int batch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
 
-            // === BUILD QUEUE ===
-            if (queue.isEmpty() || !activeTargetStillValid(mc)) {
-                if (breakingPos != null) {
-                    mc.field_1761.method_2925();
-                    breakingPos = null;
-                    breakingSide = null;
-                    stagnantTicks = 0;
-                    lastBreakingProgress = 0.0f;
-                    progressPos = null;
-                }
-                queue.clear();
-                queue.addAll(collect(mc));
-                queue.sort(comparator(mc));
-            }
-
-            // === PACING ===
-            com.peoclient.nuker.optimize.NukerPacingController pacing =
-                    com.peoclient.nuker.optimize.NukerPacingController.get();
-            pacing.tick();
-            int configuredBatch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
-            int batch = pacing.adjustBatch(configuredBatch);
-            if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
-                if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
-            } else if (!queue.isEmpty()) {
-                queue.subList(1, queue.size()).clear();
-            }
+            /*
+             * Normal / single-target mode: keep one target alive.
+             * Multi / SurvMulti: after starting the first target, allow up to batch targets
+             * in this same tick, exactly the style Bleach uses.
+             */
+            queue.clear();
+            queue.addAll(collect(mc));
+            queue.sort(comparator(mc));
 
             int processed = 0;
-            while (!queue.isEmpty() && processed < batch) {
-                Target target = queue.get(0);
-                if (!isValidTarget(mc, target)) {
-                    queue.remove(0);
-                    continue;
-                }
+            for (Target target : queue) {
+                if (processed >= batch) break;
+                if (!isValidTarget(mc, target)) continue;
 
                 class_2680 state = mc.field_1687.method_8320(target.pos);
                 float delta = state.method_26165(mc.field_1724, mc.field_1687, target.pos);
-                if (delta <= 0) {
-                    queue.remove(0);
+                if (delta <= 0.0f) continue;
+
+                // If another target is already being broken, only the same target is refreshed above.
+                if (breakingPos != null && !breakingPos.equals(target.pos)) {
+                    if ("Normal".equalsIgnoreCase(CFG.nukerMode)
+                            || !("Multi".equalsIgnoreCase(CFG.nukerMode)
+                            || "SurvMulti".equalsIgnoreCase(CFG.nukerMode))) {
+                        break;
+                    }
                     continue;
                 }
 
-                if (CFG.nukerRotate) {
-                    rotateTo(mc, target.pos);
-                }
-
-                if (breakingPos != null && !breakingPos.equals(target.pos)) {
-                    mc.field_1761.method_2925();
-                    breakingPos = null;
-                    breakingSide = null;
-                }
-
                 if (breakingPos == null) {
-                    diagnosticTargetTime = System.currentTimeMillis();
-                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                        com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
-                    }
-                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
-                            com.peoclient.diagnostic.BreakStateTracker.State.TARGETING, target.pos);
-                    com.peoclient.diagnostic.TargetHistory.get().recordTarget(
-                            target.pos, mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos)), queue.indexOf(target));
-                    com.peoclient.diagnostic.WorldStateMonitor.get().recordTarget(target.pos);
-                    com.peoclient.diagnostic.NukerSessionRecorder.get().recordTarget(target.pos);
-                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                        com.peoclient.nuker.bypass.NukerBypassEngine.onBreakAttempt(target.pos, target.side);
-                    }
-
-                    if (NukerBypassUltimateV2.isActive()) {
-                        // Bypass V2 active
-                    } else {
-                        // Normal path
+                    if (CFG.nukerRotate) {
+                        rotateTo(mc, target.pos);
                     }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
-                        if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                            com.peoclient.nuker.bypass.NukerBypassEngine.onBreakFailure(
-                                    target.pos, com.peoclient.diagnostic.BreakFailureReason.INTERACTION_FAIL);
-                        }
-                        com.peoclient.diagnostic.BreakEventRecorder.get().recordFailure(
-                                target.pos, com.peoclient.diagnostic.BreakFailureReason.INTERACTION_FAIL.name());
-                        com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
-                        com.peoclient.diagnostic.NukerSessionRecorder.get().recordFailure();
-                        com.peoclient.diagnostic.BreakStateTracker.get().transition(
-                                com.peoclient.diagnostic.BreakStateTracker.State.FAILURE, target.pos);
-                        com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_FAILURE: " + target.pos);
-                        queue.remove(0);
                         continue;
                     }
-                    diagnosticAttemptTime = System.currentTimeMillis();
-                    if (diagnosticTargetTime > 0) {
-                        com.peoclient.diagnostic.NukerTimingMetrics.get().recordTargetToAttempt(
-                                diagnosticAttemptTime - diagnosticTargetTime);
-                    }
-                    com.peoclient.diagnostic.BreakEventRecorder.get().recordStart(target.pos, CFG.nukerRange);
-                    com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakAttempt();
-                    com.peoclient.diagnostic.NukerSessionRecorder.get().recordAttempt();
-                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
-                            com.peoclient.diagnostic.BreakStateTracker.State.BREAKING, target.pos);
-                    com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_ATTEMPT: " + target.pos);
+
                     breakingPos = target.pos.method_10062();
                     breakingSide = target.side;
-                    com.peoclient.nuker.compat.NukerWorldSync.onTargetStarted(mc, breakingPos);
-                }
+                    progressPos = breakingPos;
+                    lastBreakingProgress = 0.0f;
+                    stagnantTicks = 0;
 
-                diagnosticInteractionTime = System.currentTimeMillis();
-                if (diagnosticAttemptTime > 0) {
-                    com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToInteraction(
-                            diagnosticInteractionTime - diagnosticAttemptTime);
-                }
-                mc.field_1761.method_2902(target.pos, target.side);
-                mc.field_1724.method_6104(class_1268.field_5808);
-                renderBlocks.add(target.pos);
-                processed++;
-                if (processed > 0) {
-                    cooldown = Math.max(0, CFG.nukerCooldown + dynamicCooldown);
-                }
+                    // Immediately continue progress on the same tick.
+                    mc.field_1761.method_2902(breakingPos, breakingSide);
+                    mc.field_1724.method_6104(class_1268.field_5808);
+                    renderBlocks.add(breakingPos);
+                    processed++;
 
-                if (mc.field_1687.method_8320(target.pos).method_26215()) {
-                    long successNow = System.currentTimeMillis();
-                    if (diagnosticInteractionTime > 0) {
-                        com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToSuccess(
-                                successNow - diagnosticAttemptTime);
+                    // SurvMulti follows Bleach's behavior: don't start another slow block after
+                    // a partially-mined block.
+                    if ("Normal".equalsIgnoreCase(CFG.nukerMode)) {
+                        break;
                     }
-                    com.peoclient.diagnostic.WorldStateMonitor.get().recordCheck(target.pos);
-                    if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                        com.peoclient.nuker.bypass.NukerBypassEngine.onBreakSuccess(
-                                target.pos, diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
+                    if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode) && delta < 1.0f) {
+                        break;
                     }
-                    com.peoclient.diagnostic.BreakEventRecorder.get().recordSuccess(
-                            target.pos, diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
-                    com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakSuccess();
-                    com.peoclient.diagnostic.NukerSessionRecorder.get().recordSuccess(
-                            diagnosticAttemptTime > 0 ? successNow - diagnosticAttemptTime : 0);
-                    com.peoclient.diagnostic.BreakStateTracker.get().transition(
-                            com.peoclient.diagnostic.BreakStateTracker.State.SUCCESS, target.pos);
-                    com.peoclient.diagnostic.PreKickSnapshot.get().record("BREAK_SUCCESS: " + target.pos);
-                    com.peoclient.nuker.compat.NukerWorldSync.onBreakResolved(mc, target.pos);
-                    queue.remove(0);
-                    breakingPos = null;
-                    breakingSide = null;
-                } else {
-                    break;
+
+                    if (mc.field_1687.method_8320(breakingPos).method_26215()) {
+                        resetBreakingState(mc);
+                    } else {
+                        // One persistent target is enough; subsequent ticks refresh it.
+                        break;
+                    }
                 }
             }
         }
 
-        /**
-         * Requests a fresh server-side block state using the same InteractionManager
-         * route as an actual player right-click. We intentionally do not construct
-         * or inject a raw click packet here.
-         */
-        private static void requestRealBlockRefresh(class_310 mc, class_2338 pos, class_2350 side) {
-            if (mc == null || mc.field_1724 == null || mc.field_1761 == null || pos == null) return;
-            try {
-                if (side == null) side = class_2350.field_11036;
-                class_243 hitPos = class_243.method_24953(pos).method_1031(
-                        side.method_10148() * 0.49,
-                        side.method_10164() * 0.49,
-                        side.method_10165() * 0.49);
-                class_3965 hit = new class_3965(hitPos, side, pos, false);
-                mc.field_1761.method_2896(mc.field_1724, class_1268.field_5808, hit);
-                mc.field_1724.method_6104(class_1268.field_5808);
-            } catch (Throwable ignored) {
-                // Never let recovery break the client. The next scan will continue normally.
+        private static boolean isActiveBreakTarget(class_310 mc, class_2338 pos, class_2680 state) {
+            if (state.method_26215()) return false;
+            if (state.method_26204() instanceof class_2404) return false;
+            if (!NukerAreaLimiter.contains(pos)) return false;
+            if (CFG.nukerFlatten && pos.method_10264() < mc.field_1724.method_31478() - 1) return false;
+            return !CFG.nukerFilter || passesFilter(state.method_26204());
+        }
+
+        private static void resetBreakingState(class_310 mc) {
+            if (mc.field_1761 != null) {
+                mc.field_1761.method_2925();
             }
+            breakingPos = null;
+            breakingSide = null;
+            lastBreakingProgress = 0.0f;
+            progressPos = null;
+            stagnantTicks = 0;
         }
 
         public static void resetState() {
             class_310 mc = class_310.method_1551();
-            if (mc.field_1761 != null && breakingPos != null) {
-                mc.field_1761.method_2925();
-            }
+            resetBreakingState(mc);
             queue.clear();
             renderBlocks.clear();
-            breakingPos = null;
-            breakingSide = null;
-            stagnantTicks = 0;
-            lastBreakingProgress = 0.0f;
-            progressPos = null;
-            skipCounter = 0;
-            ghostRecoveryCounter = 0;
-            recoveryPos = null;
-            recoverySide = null;
-            recoveryWaitTicks = 0;
-            recoveryAttempts = 0;
-            lastRecoveryTime = 0L;
         }
 
         public static List<class_2338> getRenderBlocks() {
