@@ -114,4 +114,22 @@ public final class AntiKickEngine {
     // Phần còn lại giữ nguyên (monitor ping, server responses, ...)
     // ...
 }
+    // Compatibility methods required by the existing client UI/core.
+    // Return neutral values so the existing Nuker configuration remains unchanged.
+    public static int getDynamicCooldown() {
+        return 0;
+    }
+
+    public static String getStatus() {
+        return isActive() ? "ON" : "OFF";
+    }
+
+    public static int getProtectionLevel() {
+        return protectionLevel;
+    }
+
+    public static void setProtectionLevel(int value) {
+        protectionLevel = Math.max(1, Math.min(10, value));
+    }
+
 }

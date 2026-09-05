@@ -6,6 +6,7 @@ import com.peoclient.diagnostic.DiagnosticRecorder;
 import com.peoclient.diagnostic.LatencyMetrics;
 import com.peoclient.nuker.bypass.NukerBypassEngine;
 import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
+import com.peoclient.nuker.optimize.AntiKickEngine;
 import net.minecraft.class_2338;
 
 /** AntiVipProMax compatibility, diagnostics and recovery controller. */
