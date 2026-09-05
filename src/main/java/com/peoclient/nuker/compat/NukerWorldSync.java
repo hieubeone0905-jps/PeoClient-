@@ -2,12 +2,8 @@ package com.peoclient.nuker.compat;
 
 import com.peoclient.diagnostic.DiagnosticRecorder;
 import net.minecraft.class_2338;
-import net.minecraft.class_2680;
 import net.minecraft.class_310;
 
-/**
- * Client-side Nuker/world synchronisation guard với cơ chế phát hiện ghost block mạnh mẽ.
- */
 public final class NukerWorldSync {
     private static class_2338 watched;
     private static long watchedSince;
@@ -20,11 +16,10 @@ public final class NukerWorldSync {
 
     public static void tick(class_310 mc) {
         if (mc == null || mc.field_1687 == null || mc.field_1724 == null) return;
-        // Kiểm tra ghost block: nếu watched block là air nhưng chưa được resolve
+        // Kiểm tra ghost block: nếu watched là air nhưng chưa được resolve
         if (watched != null && mc.field_1687.method_8320(watched).method_26215()) {
-            // Nếu block đã là air nhưng chưa được resolve, đây có thể là ghost block
-            if (System.currentTimeMillis() - watchedSince > 200) {
-                // Coi như ghost block, tự động recover
+            long age = System.currentTimeMillis() - watchedSince;
+            if (age > 150) {
                 ghostBlockDetections++;
                 lastGhostDetectionTime = System.currentTimeMillis();
                 DiagnosticRecorder.get().record("NukerWorldSync", 
@@ -32,7 +27,6 @@ public final class NukerWorldSync {
                 onStaleTarget(mc, watched, 0.0f);
             }
         }
-        // Nếu không có watched, reset
         if (watched != null && mc.field_1687.method_8320(watched).method_26215()) {
             watched = null;
             watchedSince = 0L;
@@ -57,9 +51,9 @@ public final class NukerWorldSync {
         staleRecoveries++;
         // Hủy trạng thái đào hiện tại
         mc.field_1761.method_2925();
-        // Nếu block vẫn còn, gửi packet abort để đồng bộ
-        if (!mc.field_1687.method_8320(pos).method_26215()) {
-            // Gửi packet abort nếu cần
+        // Reload chunk để đồng bộ block
+        if (mc.field_1769 != null) {
+            mc.field_1769.method_3279();
         }
         watched = null;
         watchedSince = 0L;

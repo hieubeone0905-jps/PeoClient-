@@ -624,7 +624,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 10; // giảm từ 15 xuống 10 để giảm pattern
+        private static final int MAX_BLOCKS_PER_TICK = 8;
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -636,8 +636,9 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
-        private static final Random RANDOM = new Random(); // Thêm Random cho fail thực tế
-        private static int skipCounter = 0; // Đếm số block để bỏ qua
+        private static final Random RANDOM = new Random();
+        private static int skipCounter = 0;
+        private static int ghostRecoveryCounter = 0;
 
         private NukerLogic() {}
 
@@ -647,8 +648,6 @@ public final class PeoClient implements ClientModInitializer {
             renderBlocks.clear();
             com.peoclient.nuker.compat.NukerWorldSync.tick(mc);
 
-            // New optimization/monitoring engines run alongside the existing
-            // vanilla Nuker state machine; they do not replace it.
             if (CFG.autoBlockReload) AutoBlockReload.tick();
             if (CFG.antiKickEnabled) {
                 ClientStabilizer.tick();
@@ -656,41 +655,50 @@ public final class PeoClient implements ClientModInitializer {
                 AntiKickEngine.tick(mc);
             }
 
-            // Apply only a local pacing adjustment when latency is genuinely high.
-            // This never fabricates movement/block packets.
             if (cooldown > 0) {
                 cooldown--;
                 return;
             }
 
-            // === BYPASS PACKET: gửi packet giả mỗi tick ===
+            // === BYPASS PACKET ===
             if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
-                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.4);
-                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
+                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
+                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.3);
                 boolean onGround = mc.field_1724.method_24828();
                 BypassPacketManager.sendRotation(yaw, pitch, onGround);
                 if (RANDOM.nextInt(4) == 0) {
                     class_243 pos = mc.field_1724.method_19538();
                     BypassPacketManager.sendPosition(
-                        pos.field_1352 + RANDOM.nextDouble() * 0.002 - 0.001,
-                        pos.field_1351 + RANDOM.nextDouble() * 0.002 - 0.001,
-                        pos.field_1350 + RANDOM.nextDouble() * 0.002 - 0.001,
+                        pos.field_1352 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                        pos.field_1351 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                        pos.field_1350 + RANDOM.nextDouble() * 0.003 - 0.0015,
                         onGround
                     );
                 }
             }
 
-            // Apply the optional dynamic cooldown from AntiKickEngine without
-            // replacing the normal Nuker interaction path.
             int dynamicCooldown = 0;
             if (AntiKickEngine.isActive()) {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
             }
-            // BypassV2 remains a compatibility facade; NukerLogic stays the
-            // single owner of block-breaking packets.
 
-            // Lightweight local recovery: keep the fast Nuker engine intact, but
-            // recover automatically if the vanilla breaking state stops changing.
+            // === GHOST BLOCK RECOVERY ===
+            if (breakingPos != null && mc.field_1687.method_8320(breakingPos).method_26215()) {
+                ghostRecoveryCounter++;
+                if (ghostRecoveryCounter % 5 == 0) {
+                    DiagnosticRecorder.get().record("NukerLogic", "Ghost block detected at " + breakingPos + ", force reload");
+                    if (mc.field_1769 != null) mc.field_1769.method_3279();
+                    mc.field_1761.method_2925();
+                    breakingPos = null;
+                    breakingSide = null;
+                    queue.clear();
+                    stagnantTicks = 0;
+                    lastBreakingProgress = 0.0f;
+                    progressPos = null;
+                }
+            }
+
+            // === STALE DETECTION ===
             if (breakingPos != null) {
                 class_2680 activeState = mc.field_1687.method_8320(breakingPos);
                 float progress = getBreakingProgress();
@@ -713,7 +721,7 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 16) {
+                    if (stagnantTicks >= 12) {
                         com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
@@ -724,9 +732,6 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
-                        // NukerWorldSync already aborts the vanilla break state here.
-                        // Avoid issuing the same abort twice; duplicate aborts can cause
-                        // unnecessary state churn without changing legitimate break speed.
                         breakingPos = null;
                         breakingSide = null;
                         queue.clear();
@@ -737,14 +742,13 @@ public final class PeoClient implements ClientModInitializer {
                 }
             }
 
-            // AntiVipProMax observes the existing vanilla break state; it does
-            // not create a second packet producer and does not alter Nuker speed.
+            // === OBSERVER ===
             if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                 com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(
                         breakingPos != null, stagnantTicks > 0);
             }
 
-            // Build a fresh queue when the old one is exhausted or its active target became invalid.
+            // === BUILD QUEUE ===
             if (queue.isEmpty() || !activeTargetStillValid(mc)) {
                 if (breakingPos != null) {
                     mc.field_1761.method_2925();
@@ -759,16 +763,13 @@ public final class PeoClient implements ClientModInitializer {
                 queue.sort(comparator(mc));
             }
 
-            // Preserve the strongest Nuker batch as the normal level.
-            // Every fifth processing tick uses half of that batch to smooth
-            // local/server workload, then immediately returns to MAX.
+            // === PACING ===
             com.peoclient.nuker.optimize.NukerPacingController pacing =
                     com.peoclient.nuker.optimize.NukerPacingController.get();
             pacing.tick();
             int configuredBatch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
             int batch = pacing.adjustBatch(configuredBatch);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
-                // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
             } else if (!queue.isEmpty()) {
                 queue.subList(1, queue.size()).clear();
@@ -793,8 +794,6 @@ public final class PeoClient implements ClientModInitializer {
                     rotateTo(mc, target.pos);
                 }
 
-                // Use the normal interaction manager for each target. We keep one
-                // active vanilla breaking state and refresh it for the current target.
                 if (breakingPos != null && !breakingPos.equals(target.pos)) {
                     mc.field_1761.method_2925();
                     breakingPos = null;
@@ -802,13 +801,15 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
-                    // === TẠO FAIL THỰC TẾ: bỏ qua đào ngẫu nhiên 20-25% số block ===
+                    // === FAIL THỰC TẾ: bỏ qua 25-35% ===
                     skipCounter++;
-                    if (skipCounter % (4 + RANDOM.nextInt(4)) == 0) {
-                        // Bỏ qua block này, không đào, coi như fail thực tế
+                    if (skipCounter % (3 + RANDOM.nextInt(4)) == 0) {
                         queue.remove(0);
                         com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
-                        continue; // Chuyển sang target tiếp theo
+                        if (RANDOM.nextInt(10) == 0) {
+                            DiagnosticRecorder.get().record("NukerLogic", "Real fail skip: " + target.pos);
+                        }
+                        continue;
                     }
 
                     diagnosticTargetTime = System.currentTimeMillis();
@@ -825,12 +826,10 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onBreakAttempt(target.pos, target.side);
                     }
 
-                    // The V2 engine, when active, is responsible for its own
-                    // packet sequence; otherwise use the normal interaction path.
                     if (NukerBypassUltimateV2.isActive()) {
-                        // Bypass V2 has already prepared its packet path.
+                        // Bypass V2 active
                     } else {
-                        // Normal vanilla attack path remains below.
+                        // Normal path
                     }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
@@ -869,10 +868,6 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToInteraction(
                             diagnosticInteractionTime - diagnosticAttemptTime);
                 }
-                // Keep the Nuker on the normal Minecraft interaction path.
-                // With the vanilla-render build, Nuker does not submit custom
-                // chunk rebuild requests. Minecraft handles the render update
-                // through its normal ClientWorld/WorldRenderer path.
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
@@ -905,16 +900,6 @@ public final class PeoClient implements ClientModInitializer {
                     breakingPos = null;
                     breakingSide = null;
                 } else {
-                    // The server/world has not confirmed the block as broken yet.
-                    // Keep the same vanilla breaking state and resume it next tick.
-                    // Re-selecting a new target (or starting the same target again)
-                    // every iteration can generate an excessive stream of start/
-                    // progress actions and is the main source of instability seen
-                    // when Nuker is combined with the compatibility monitors.
-                    //
-                    // One progress interaction per client tick is intentional here:
-                    // it lets Minecraft's normal interaction manager advance the
-                    // current break state without creating duplicate actions.
                     break;
                 }
             }
@@ -932,7 +917,8 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
-            skipCounter = 0; // reset bộ đếm skip
+            skipCounter = 0;
+            ghostRecoveryCounter = 0;
         }
 
         public static List<class_2338> getRenderBlocks() {
@@ -1033,9 +1019,6 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         private static class_2350 bestSide(class_310 mc, class_2338 pos) {
-            // BleachHack-style face selection: try every face and raycast to a point
-            // on that face instead of raycasting only to the block center. This is
-            // especially important when mining from above/below or around corners.
             class_243 eye = mc.field_1724.method_33571();
             for (class_2350 side : class_2350.values()) {
                 class_2338 neighbour = pos.method_10093(side);
@@ -1085,7 +1068,6 @@ public final class PeoClient implements ClientModInitializer {
             class_310 mc = class_310.method_1551();
             if (mc.field_1724 == null) return;
 
-            // Wurst-style compact HUD: logo at top-left, active modules directly underneath.
             var title = class_2561.method_43470("PeoClient 1.21.4 V1")
                     .method_27694(style -> style.method_10982(true));
             d.method_51439(mc.field_1772, title, 10, 8, 0xFFFFFFFF, false);
