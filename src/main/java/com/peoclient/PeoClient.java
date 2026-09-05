@@ -281,7 +281,6 @@ public final class PeoClient implements ClientModInitializer {
         public boolean xrayExposedOnly = false;
         public boolean xrayFluids = true;
         public int xrayBackgroundOpacity = 0;
-
         public int xrayPresetVersion = 0;
         public Set<String> xrayBlocks = new LinkedHashSet<>(Arrays.asList(
                 "minecraft:coal_ore", "minecraft:deepslate_coal_ore",
@@ -588,7 +587,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 15;
+        private static final int MAX_BLOCKS_PER_TICK = 8; // giảm từ 10 xuống 8 để tránh kick
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -622,23 +621,22 @@ public final class PeoClient implements ClientModInitializer {
                 return;
             }
 
-            // ===== BYPASS PACKET SPOOFING =====
+            // === BYPASS PACKET GIẢ MỖI TICK ===
             if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
-                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.3);
-                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.15);
+                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.4);
+                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
                 boolean onGround = mc.field_1724.method_24828();
                 BypassPacketManager.sendRotation(yaw, pitch, onGround);
-                if (RANDOM.nextInt(5) == 0) {
+                if (RANDOM.nextInt(4) == 0) {
                     class_243 pos = mc.field_1724.method_19538();
                     BypassPacketManager.sendPosition(
-                        pos.field_1352 + RANDOM.nextDouble() * 0.001 - 0.0005,
-                        pos.field_1351 + RANDOM.nextDouble() * 0.001 - 0.0005,
-                        pos.field_1350 + RANDOM.nextDouble() * 0.001 - 0.0005,
+                        pos.field_1352 + RANDOM.nextDouble() * 0.002 - 0.001,
+                        pos.field_1351 + RANDOM.nextDouble() * 0.002 - 0.001,
+                        pos.field_1350 + RANDOM.nextDouble() * 0.002 - 0.001,
                         onGround
                     );
                 }
             }
-            // ==================================
 
             int dynamicCooldown = 0;
             if (AntiKickEngine.isActive()) {
@@ -667,7 +665,7 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 16) {
+                    if (stagnantTicks >= 20) {
                         com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
@@ -759,7 +757,7 @@ public final class PeoClient implements ClientModInitializer {
                     }
 
                     if (NukerBypassUltimateV2.isActive()) {
-                        // Bypass V2 handles its own packets
+                        // Bypass V2 đã gửi packet giả
                     }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
