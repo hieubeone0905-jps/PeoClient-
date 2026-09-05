@@ -106,6 +106,22 @@ public final class KickDiagnostics {
             sb.append(e.getTimestamp()).append(" [").append(e.getCategory()).append("] ")
               .append(e.getEventType()).append(" ").append(e.getMessage()).append('\n');
         }
+
+        // === Bổ sung thông tin server/plugin (passive) ===
+        sb.append("\n--- SERVER INFO (PASSIVE) ---\n");
+        sb.append(ServerInfoCollector.get().getSummary()).append("\n");
+        sb.append("Plugin messages (first 20):\n");
+        int count = 0;
+        for (PluginMessage msg : ServerInfoCollector.get().getPluginMessages()) {
+            if (count++ >= 20) {
+                sb.append("  ... and ").append(ServerInfoCollector.get().getPluginMessages().size() - 20).append(" more\n");
+                break;
+            }
+            sb.append("  ").append(msg.displayName())
+              .append(" (").append(msg.channel()).append(") ")
+              .append(msg.dataLength()).append(" bytes\n");
+        }
+
         sb.append("\n===== END REPORT =====\n");
         return sb.toString();
     }
