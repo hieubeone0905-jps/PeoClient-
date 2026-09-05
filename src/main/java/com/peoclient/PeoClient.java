@@ -264,19 +264,16 @@ public final class PeoClient implements ClientModInitializer {
         public boolean bypassV2Enabled = true;
         public int bypassV2Intensity = 7;
         public int bypassV2Desync = 3;
-
         public int stabilizerRotationStep = 22;
         public double stabilizerPositionJitter = 0.00008;
         public int stabilizerPacketDelay = 2;
         public int compensatorPingThreshold = 150;
         public int compensatorMicroPause = 50;
         public Map<String, Integer> keybinds = new LinkedHashMap<>();
-
         public String usernameOverride = "";
         public boolean randomProxy = false;
         public List<String> proxyList = new ArrayList<>();
         public List<String> savedAccounts = new ArrayList<>();
-
         public boolean xrayFullBright = true;
         public boolean xraySkyOnly = true;
         public boolean xrayExposedOnly = false;
@@ -295,7 +292,6 @@ public final class PeoClient implements ClientModInitializer {
                 "minecraft:nether_quartz_ore", "minecraft:nether_gold_ore",
                 "minecraft:ancient_debris"
         ));
-
         public String nukerMode = "Normal";
         public int nukerMulti = 2;
         public int nukerCooldown = 0;
@@ -315,12 +311,10 @@ public final class PeoClient implements ClientModInitializer {
         public boolean nukerRangeHighlight = false;
         public double nukerRangeWidth = 3.0;
         public String nukerRangeColor = "255,0,0";
-
         public String fullbrightMethod = "Gamma";
         public boolean fullbrightFade = true;
         public double fullbrightDefaultBrightness = 0.5;
         public double fullbrightBrightness = 16.0;
-
         public boolean cleanerGreedy = true;
         public boolean cleanerMergeStacks = true;
         public boolean cleanerTouchHotbar = false;
@@ -333,27 +327,47 @@ public final class PeoClient implements ClientModInitializer {
         public Set<String> cleanerBlacklistSet = new LinkedHashSet<>();
         public String itemsBlacklist = "";
         public String offHandItem = "SHIELD";
-        public String[] slotItems = {"WEAPON", "BOW", "PICKAXE", "AXE", "NONE", "POTION", "FOOD", "BLOCK", "BLOCK"};
+        public String[] slotItems = {
+                "WEAPON", "BOW", "PICKAXE", "AXE", "NONE",
+                "POTION", "FOOD", "BLOCK", "BLOCK"
+        };
 
-        private Path path() { return class_310.method_1551().field_1697.toPath().resolve("config/peoclient.json"); }
+        private Path path() {
+            return class_310.method_1551().field_1697.toPath()
+                    .resolve("config/peoclient.json");
+        }
 
         public void load() {
             try {
                 Path p = path();
-                if (!Files.exists(p)) { save(); return; }
+                if (!Files.exists(p)) {
+                    save();
+                    return;
+                }
                 Config c = new Gson().fromJson(Files.readString(p), Config.class);
                 if (c == null) return;
                 xrayBlocks = c.xrayBlocks != null ? c.xrayBlocks : xrayBlocks;
-                if (c.xrayPresetVersion < 2) { xrayBlocks = defaultOreBlocks(); xrayPresetVersion = 2; } else { xrayPresetVersion = c.xrayPresetVersion; }
-                cleanerBlacklistSet = c.cleanerBlacklistSet != null ? c.cleanerBlacklistSet : cleanerBlacklistSet;
+                if (c.xrayPresetVersion < 2) {
+                    xrayBlocks = defaultOreBlocks();
+                    xrayPresetVersion = 2;
+                } else {
+                    xrayPresetVersion = c.xrayPresetVersion;
+                }
+                cleanerBlacklistSet = c.cleanerBlacklistSet != null
+                        ? c.cleanerBlacklistSet : cleanerBlacklistSet;
                 slotItems = c.slotItems != null ? c.slotItems : slotItems;
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
-                antiVipProMax = c.antiVipProMax; upLevelVipProMax = c.upLevelVipProMax;
-                antiVipProMaxGrim = c.antiVipProMaxGrim; antiVipProMaxVulcan = c.antiVipProMaxVulcan;
+                antiVipProMax = c.antiVipProMax;
+                upLevelVipProMax = c.upLevelVipProMax;
+                antiVipProMaxGrim = c.antiVipProMaxGrim;
+                antiVipProMaxVulcan = c.antiVipProMaxVulcan;
                 antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));
-                antiVipProMaxAutoAdjust = c.antiVipProMaxAutoAdjust; antiVipProMaxAutoRecovery = c.antiVipProMaxAutoRecovery;
-                autoBlockReload = c.autoBlockReload; antiKickEnabled = c.antiKickEnabled;
-                bypassV2Enabled = c.bypassV2Enabled; bypassV2Intensity = Math.max(1, Math.min(10, c.bypassV2Intensity));
+                antiVipProMaxAutoAdjust = c.antiVipProMaxAutoAdjust;
+                antiVipProMaxAutoRecovery = c.antiVipProMaxAutoRecovery;
+                autoBlockReload = c.autoBlockReload;
+                antiKickEnabled = c.antiKickEnabled;
+                bypassV2Enabled = c.bypassV2Enabled;
+                bypassV2Intensity = Math.max(1, Math.min(10, c.bypassV2Intensity));
                 bypassV2Desync = Math.max(1, Math.min(5, c.bypassV2Desync));
                 stabilizerRotationStep = Math.max(1, Math.min(30, c.stabilizerRotationStep));
                 stabilizerPositionJitter = Math.max(0.00001, Math.min(0.001, c.stabilizerPositionJitter));
@@ -362,27 +376,44 @@ public final class PeoClient implements ClientModInitializer {
                 compensatorMicroPause = Math.max(20, Math.min(100, c.compensatorMicroPause));
                 keybinds = c.keybinds != null ? new LinkedHashMap<>(c.keybinds) : new LinkedHashMap<>();
                 usernameOverride = c.usernameOverride != null ? c.usernameOverride : "";
-                randomProxy = c.randomProxy; proxyList = c.proxyList != null ? c.proxyList : proxyList;
+                randomProxy = c.randomProxy;
+                proxyList = c.proxyList != null ? c.proxyList : proxyList;
                 savedAccounts = c.savedAccounts != null ? c.savedAccounts : savedAccounts;
-                xrayFullBright = c.xrayFullBright; xraySkyOnly = c.xraySkyOnly; xrayExposedOnly = c.xrayExposedOnly;
-                xrayFluids = c.xrayFluids; xrayBackgroundOpacity = c.xrayBackgroundOpacity;
-                nukerMode = c.nukerMode; nukerMulti = c.nukerMulti; nukerCooldown = 0;
-                nukerShape = c.nukerShape; nukerRange = c.nukerRange; nukerSort = c.nukerSort;
-                nukerFilter = c.nukerFilter; nukerWhitelist = c.nukerWhitelist; nukerFilterIds = c.nukerFilterIds;
-                nukerRaycast = c.nukerRaycast; nukerFlatten = c.nukerFlatten; nukerRotate = c.nukerRotate;
-                nukerNoParticles = c.nukerNoParticles; nukerHighlight = c.nukerHighlight;
-                nukerHighlightMode = c.nukerHighlightMode; nukerHighlightColor = c.nukerHighlightColor;
-                nukerRangeHighlight = c.nukerRangeHighlight; nukerRangeWidth = c.nukerRangeWidth;
+                xrayFullBright = c.xrayFullBright;
+                xraySkyOnly = c.xraySkyOnly;
+                xrayExposedOnly = c.xrayExposedOnly;
+                xrayFluids = c.xrayFluids;
+                xrayBackgroundOpacity = c.xrayBackgroundOpacity;
+                nukerMode = c.nukerMode; nukerMulti = c.nukerMulti;
+                nukerCooldown = 0; nukerShape = c.nukerShape;
+                nukerRange = c.nukerRange; nukerSort = c.nukerSort;
+                nukerFilter = c.nukerFilter; nukerWhitelist = c.nukerWhitelist;
+                nukerFilterIds = c.nukerFilterIds; nukerRaycast = c.nukerRaycast;
+                nukerFlatten = c.nukerFlatten; nukerRotate = c.nukerRotate;
+                nukerNoParticles = c.nukerNoParticles;
+                nukerHighlight = c.nukerHighlight;
+                nukerHighlightMode = c.nukerHighlightMode;
+                nukerHighlightColor = c.nukerHighlightColor;
+                nukerRangeHighlight = c.nukerRangeHighlight;
+                nukerRangeWidth = c.nukerRangeWidth;
                 nukerRangeColor = c.nukerRangeColor;
-                fullbrightMethod = c.fullbrightMethod; fullbrightFade = c.fullbrightFade;
-                fullbrightDefaultBrightness = c.fullbrightDefaultBrightness; fullbrightBrightness = c.fullbrightBrightness;
-                cleanerGreedy = c.cleanerGreedy; cleanerMergeStacks = c.cleanerMergeStacks;
-                cleanerTouchHotbar = c.cleanerTouchHotbar; cleanerFilterOnly = c.cleanerFilterOnly;
-                cleanerDropFilter = c.cleanerDropFilter != null ? new LinkedHashSet<>(c.cleanerDropFilter) : new LinkedHashSet<>();
-                cleanerActionDelay = c.cleanerActionDelay; cleanerAckTimeout = c.cleanerAckTimeout;
-                maxBlocks = c.maxBlocks; maxArrows = c.maxArrows; maxThrowables = c.maxThrowables;
-                maxFoods = c.maxFoods; maxWaterBuckets = c.maxWaterBuckets; maxLavaBuckets = c.maxLavaBuckets;
-                maxMilkBuckets = c.maxMilkBuckets; itemsBlacklist = c.itemsBlacklist; offHandItem = c.offHandItem;
+                fullbrightMethod = c.fullbrightMethod;
+                fullbrightFade = c.fullbrightFade;
+                fullbrightDefaultBrightness = c.fullbrightDefaultBrightness;
+                fullbrightBrightness = c.fullbrightBrightness;
+                cleanerGreedy = c.cleanerGreedy;
+                cleanerMergeStacks = c.cleanerMergeStacks;
+                cleanerTouchHotbar = c.cleanerTouchHotbar;
+                cleanerFilterOnly = c.cleanerFilterOnly;
+                cleanerDropFilter = c.cleanerDropFilter != null
+                        ? new LinkedHashSet<>(c.cleanerDropFilter) : new LinkedHashSet<>();
+                cleanerActionDelay = c.cleanerActionDelay;
+                cleanerAckTimeout = c.cleanerAckTimeout;
+                maxBlocks = c.maxBlocks; maxArrows = c.maxArrows;
+                maxThrowables = c.maxThrowables; maxFoods = c.maxFoods;
+                maxWaterBuckets = c.maxWaterBuckets; maxLavaBuckets = c.maxLavaBuckets;
+                maxMilkBuckets = c.maxMilkBuckets;
+                itemsBlacklist = c.itemsBlacklist; offHandItem = c.offHandItem;
                 if (keybinds == null) keybinds = new LinkedHashMap<>();
                 if (nukerMode == null) nukerMode = "Normal";
                 if (nukerShape == null) nukerShape = "Cube";
@@ -424,7 +455,9 @@ public final class PeoClient implements ClientModInitializer {
             try {
                 Path p = path();
                 Files.createDirectories(p.getParent());
-                Files.writeString(p, new GsonBuilder().setPrettyPrinting().create().toJson(this));
+                Files.writeString(
+                        p,
+                        new GsonBuilder().setPrettyPrinting().create().toJson(this));
             } catch (IOException ignored) {}
         }
     }
@@ -454,15 +487,20 @@ public final class PeoClient implements ClientModInitializer {
             String entry = CFG.proxyList.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(CFG.proxyList.size()));
             try {
                 String value = entry.trim();
+                boolean socks = value.toLowerCase(java.util.Locale.ROOT).startsWith("socks5://")
+                        || value.toLowerCase(java.util.Locale.ROOT).startsWith("socks4://");
                 int protoEnd = value.indexOf("://");
                 if (protoEnd >= 0) value = value.substring(protoEnd + 3);
                 int colon = value.lastIndexOf(':');
                 if (colon > 0) {
                     String host = value.substring(0, colon);
                     int port = Integer.parseInt(value.substring(colon + 1));
-                    proxy = new java.net.Proxy(java.net.Proxy.Type.SOCKS, new java.net.InetSocketAddress(host, port));
+                    proxy = new java.net.Proxy(java.net.Proxy.Type.SOCKS,
+                            new java.net.InetSocketAddress(host, port));
                 }
-            } catch (Exception ignored) { proxy = java.net.Proxy.NO_PROXY; }
+            } catch (Exception ignored) {
+                proxy = java.net.Proxy.NO_PROXY;
+            }
         }
         try {
             ((com.peoclient.mixin.MinecraftClientAccessor) (Object) mc).peo$setNetworkProxy(proxy);
@@ -472,7 +510,6 @@ public final class PeoClient implements ClientModInitializer {
     public static final class FullbrightLogic {
         private static double originalGamma = 1.0;
         private static boolean captured;
-
         private FullbrightLogic() {}
 
         public static void tick(class_310 mc) {
@@ -487,14 +524,17 @@ public final class PeoClient implements ClientModInitializer {
             }
             if (gammaActive || xrayBrightness) {
                 double old = mc.field_1690.method_42473().method_41753();
-                double next = CFG.fullbrightFade && Math.abs(old - 16.0) > 0.5 ? old + (old < 16.0 ? 0.5 : -0.5) : 16.0;
+                double next = CFG.fullbrightFade && Math.abs(old - 16.0) > 0.5
+                        ? old + (old < 16.0 ? 0.5 : -0.5)
+                        : 16.0;
                 GammaUtil.forceSet(mc, next);
                 if (mc.field_1724.method_6059(class_1294.field_5925))
                     mc.field_1724.method_6016(class_1294.field_5925);
                 return;
             }
             if (nightVisionActive) {
-                mc.field_1724.method_6092(new class_1293(class_1294.field_5925, 20, 0, false, false, false));
+                mc.field_1724.method_6092(new class_1293(
+                        class_1294.field_5925, 20, 0, false, false, false));
                 if (captured) GammaUtil.forceSet(mc, originalGamma);
                 return;
             }
@@ -513,9 +553,11 @@ public final class PeoClient implements ClientModInitializer {
 
     public static final class GammaUtil {
         private GammaUtil() {}
+
         public static void forceSet(class_310 mc, double value) {
             try {
-                ((com.peoclient.mixin.SimpleOptionAccessor) (Object) mc.field_1690.method_42473()).peo$setValue(value);
+                ((com.peoclient.mixin.SimpleOptionAccessor) (Object) mc.field_1690.method_42473())
+                        .peo$setValue(value);
             } catch (Throwable ignored) {
                 mc.field_1690.method_42473().method_41748(class_3532.method_15350(value, 0.0, 1.0));
             }
@@ -523,7 +565,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 8;
+        private static final int MAX_BLOCKS_PER_TICK = 15; // giữ nguyên tốc độ tối đa
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -536,10 +578,7 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
         private static final Random RANDOM = new Random();
-        private static int skipCounter = 0;
         private static int ghostRecoveryCounter = 0;
-        private static boolean realFailInProgress = false;
-        private static int realFailTick = 0;
 
         private NukerLogic() {}
 
@@ -556,6 +595,7 @@ public final class PeoClient implements ClientModInitializer {
                 AntiKickEngine.tick(mc);
             }
 
+            // Cooldown chính: nếu >0 thì giảm và return
             if (cooldown > 0) {
                 cooldown--;
                 return;
@@ -581,31 +621,6 @@ public final class PeoClient implements ClientModInitializer {
             int dynamicCooldown = 0;
             if (AntiKickEngine.isActive()) {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
-            }
-
-            // === XỬ LÝ REAL FAIL: bắt đầu đào 1 tick rồi abort ===
-            if (realFailInProgress) {
-                realFailTick++;
-                if (realFailTick >= 1) {
-                    // Abort block break để tạo fail thực tế
-                    if (breakingPos != null) {
-                        mc.field_1761.method_2925();
-                        com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
-                        DiagnosticRecorder.get().record("NukerLogic", "Real fail completed at " + breakingPos);
-                    }
-                    realFailInProgress = false;
-                    realFailTick = 0;
-                    breakingPos = null;
-                    breakingSide = null;
-                    queue.clear();
-                    return;
-                }
-                // Vẫn tiếp tục đào trong tick đầu tiên
-                if (breakingPos != null) {
-                    mc.field_1761.method_2902(breakingPos, breakingSide);
-                    mc.field_1724.method_6104(class_1268.field_5808);
-                }
-                return;
             }
 
             // === GHOST BLOCK RECOVERY ===
@@ -670,7 +685,8 @@ public final class PeoClient implements ClientModInitializer {
 
             // === OBSERVER ===
             if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
-                com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(breakingPos != null, stagnantTicks > 0);
+                com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(
+                        breakingPos != null, stagnantTicks > 0);
             }
 
             // === BUILD QUEUE ===
@@ -726,27 +742,6 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
-                    // === QUYẾT ĐỊNH REAL FAIL: khoảng 15-20% target sẽ được xử lý như fail thực tế ===
-                    skipCounter++;
-                    if (skipCounter % (5 + RANDOM.nextInt(3)) == 0) {
-                        // Bắt đầu real fail: đào 1 tick rồi abort
-                        DiagnosticRecorder.get().record("NukerLogic", "Real fail start at " + target.pos);
-                        // Bắt đầu đào
-                        if (!mc.field_1761.method_2910(target.pos, target.side)) {
-                            // Nếu không thể đào, coi như fail luôn
-                            com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
-                            queue.remove(0);
-                            continue;
-                        }
-                        breakingPos = target.pos.method_10062();
-                        breakingSide = target.side;
-                        realFailInProgress = true;
-                        realFailTick = 0;
-                        // Đánh dấu target này là fail, sẽ được xóa sau khi abort
-                        queue.remove(0);
-                        return; // Thoát tick để xử lý real fail ở lần tick tiếp theo
-                    }
-
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
@@ -759,6 +754,12 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.diagnostic.NukerSessionRecorder.get().recordTarget(target.pos);
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onBreakAttempt(target.pos, target.side);
+                    }
+
+                    if (NukerBypassUltimateV2.isActive()) {
+                        // Bypass V2 active
+                    } else {
+                        // Normal path
                     }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
@@ -802,7 +803,9 @@ public final class PeoClient implements ClientModInitializer {
                 renderBlocks.add(target.pos);
                 processed++;
                 if (processed > 0) {
-                    cooldown = Math.max(0, CFG.nukerCooldown + dynamicCooldown);
+                    // === RANDOM COOLDOWN: 0 hoặc 1 tick ===
+                    int randomCooldown = RANDOM.nextInt(2); // 0 hoặc 1
+                    cooldown = Math.max(0, CFG.nukerCooldown + dynamicCooldown + randomCooldown);
                 }
 
                 if (mc.field_1687.method_8320(target.pos).method_26215()) {
@@ -846,10 +849,7 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
-            skipCounter = 0;
             ghostRecoveryCounter = 0;
-            realFailInProgress = false;
-            realFailTick = 0;
         }
 
         public static List<class_2338> getRenderBlocks() {
@@ -926,6 +926,7 @@ public final class PeoClient implements ClientModInitializer {
                     filter.add(normalized);
                 }
             }
+
             String blockId = class_7923.field_41175.method_10221(block).toString().toLowerCase(Locale.ROOT);
             if (filter.isEmpty()) return !CFG.nukerWhitelist;
             boolean contains = filter.contains(blockId);
@@ -992,10 +993,12 @@ public final class PeoClient implements ClientModInitializer {
 
     public static final class Hud {
         private Hud() {}
+
         public static void render(net.minecraft.class_332 d) {
             class_310 mc = class_310.method_1551();
             if (mc.field_1724 == null) return;
-            var title = class_2561.method_43470("PeoClient 1.21.4 V1").method_27694(style -> style.method_10982(true));
+            var title = class_2561.method_43470("PeoClient 1.21.4 V1")
+                    .method_27694(style -> style.method_10982(true));
             d.method_51439(mc.field_1772, title, 10, 8, 0xFFFFFFFF, false);
             int y = 24;
             if (CFG.xray) y = active(d, mc, "X-Ray", y);
@@ -1007,8 +1010,11 @@ public final class PeoClient implements ClientModInitializer {
             if (AntiVipProMaxModule.isEnabled()) y = active(d, mc, "AntiVipProMax", y);
             if (UpLevelVipProMax.isEnabled()) y = active(d, mc, "UpLevelVipProMax", y);
         }
+
         private static int active(net.minecraft.class_332 d, class_310 mc, String name, int y) {
-            d.method_51439(mc.field_1772, class_2561.method_43470(name).method_27694(style -> style.method_10982(true)), 10, y, 0xFFFFFFFF, false);
+            d.method_51439(mc.field_1772,
+                    class_2561.method_43470(name).method_27694(style -> style.method_10982(true)),
+                    10, y, 0xFFFFFFFF, false);
             return y + 14;
         }
     }

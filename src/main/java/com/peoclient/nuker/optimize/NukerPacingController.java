@@ -12,32 +12,18 @@ public final class NukerPacingController {
 
     public void tick() {
         tickCounter++;
-        if (isHalfLoadTick()) totalHalfTicks++;
-        else totalFullTicks++;
     }
 
+    /**
+     * Luôn trả về maxBatch (không giảm tốc độ), chỉ thêm random 0-1 để tránh pattern.
+     */
     public int adjustBatch(int maxBatch) {
-        int cycle = (int)(tickCounter % 7);
-        double factor = switch (cycle) {
-            case 0 -> 1.0;
-            case 1 -> 0.9;
-            case 2 -> 0.75;
-            case 3 -> 0.85;
-            case 4 -> 0.9;
-            case 5 -> 0.95;
-            default -> 1.0;
-        };
-        // Thêm nhiễu ngẫu nhiên
-        double noise = 0.92 + 0.16 * Math.random();
-        int result = (int) Math.round(maxBatch * factor * noise);
-        return Math.max(2, Math.min(maxBatch, result));
+        int noise = (int)(Math.random() * 2); // 0 hoặc 1
+        int result = maxBatch - noise; // có thể giảm 1 block ngẫu nhiên
+        return Math.max(1, result);
     }
 
-    private boolean isHalfLoadTick() {
-        return tickCounter > 0 && ((tickCounter - 1) % 5) == 3;
-    }
-
-    public boolean isHalfLoadMode() { return isHalfLoadTick(); }
+    public boolean isHalfLoadMode() { return false; }
     public long getTickCounter() { return tickCounter; }
     public long getTotalFullTicks() { return totalFullTicks; }
     public long getTotalHalfTicks() { return totalHalfTicks; }
