@@ -41,6 +41,7 @@ public final class PeoJoinModule {
     private static boolean disconnectRecoveryArmed = false;
     private static long lastNukerOnChange = 0L;
     private static int stableHubTicks = 0;
+    private static final long HUB_WAIT_MILLIS = 3000L;
 
     private static String serverName = "Skyblock";
     private static int preJoinDelay = 5;
@@ -156,9 +157,10 @@ public final class PeoJoinModule {
                 }
 
                 case WAITING_FOR_HUB -> {
-                    // A normal kick-to-hub keeps the player connected. If the
-                    // connection is briefly absent, simply wait for it to return.
+                    // The user requested a deliberate 3 second pause after the
+                    // return to Hub before touching the compass.
                     if (!connected) return;
+                    if (elapsedMillis() < HUB_WAIT_MILLIS) return;
                     if (findHotbarItem(COMPASS_ID) >= 0 && mc.field_1755 == null) {
                         currentState = State.OPENING_SERVER_MENU;
                         stateStartTime = System.currentTimeMillis();
@@ -268,7 +270,6 @@ public final class PeoJoinModule {
 
         long activeFor = System.currentTimeMillis() - nukerOnSince;
         if (activeFor < 3000L) {
-            // Give the world/position a few ticks to settle after enabling Nuker.
             lastCompassPresent = findHotbarItem(COMPASS_ID) >= 0;
             return;
         }
@@ -283,9 +284,6 @@ public final class PeoJoinModule {
         if (worldNow != null) lastWorldInstance = worldNow;
         else lastWorldInstance = null;
 
-        // Record the player's position continuously. A server-side hub transfer
-        // often keeps the same ClientWorld object, but teleports the player a
-        // long distance to the hub. This catches that case as well.
         double x = mc.field_1724.method_23317();
         double y = mc.field_1724.method_23318();
         double z = mc.field_1724.method_23321();
@@ -294,7 +292,7 @@ public final class PeoJoinModule {
             double dx = x - lastPlayerX;
             double dy = y - lastPlayerY;
             double dz = z - lastPlayerZ;
-            largeTeleport = (dx * dx + dy * dy + dz * dz) >= (80.0 * 80.0);
+            largeTeleport = (dx * dx + dy * dy + dz * dz) >= (40.0 * 40.0);
         }
         lastPlayerX = x;
         lastPlayerY = y;
@@ -305,18 +303,19 @@ public final class PeoJoinModule {
             sawActiveMiningWorld = true;
         }
 
-        // Primary signals for the requested kick -> hub transition:
-        //   1) ClientWorld replaced/recreated and compass is present;
-        //   2) the connection briefly disappeared and came back with compass;
-        //   3) the server teleported the player a large distance and compass is present.
-        // A compass by itself is deliberately NOT enough, because it can also
-        // exist in the mining world.
-        boolean hubSignal = compassPresent && (worldChanged || worldRecreated
-                || disconnectRecoveryArmed || largeTeleport);
+        // On the user's server, Hub gives the player the compass and the
+        // slimeball utility item. This is the reliable visual/inventory signal
+        // that still works when the server reuses the same ClientWorld object
+        // and does not produce a large teleport.
+        boolean hubHotbarProfile = compassPresent && findHotbarItem("minecraft:slime_ball") >= 0;
 
-        if (compassAppeared && (worldChanged || worldRecreated || disconnectRecoveryArmed)) {
-            hubSignal = true;
-        }
+        // Do not require a world-object replacement. A server-side transfer can
+        // leave ClientWorld unchanged, so any of these confirmed Hub signals is
+        // sufficient once Nuker has actually been running.
+        boolean hubSignal = hubHotbarProfile
+                || (compassPresent && (worldChanged || worldRecreated
+                || disconnectRecoveryArmed || largeTeleport))
+                || (compassAppeared && (disconnectRecoveryArmed || worldChanged || worldRecreated));
 
         if (!hubSignal) {
             stableHubTicks = 0;
@@ -326,8 +325,9 @@ public final class PeoJoinModule {
         stableHubTicks++;
         if (stableHubTicks < 2) return;
 
-        // Use the exact existing module toggle path. This is equivalent to the
-        // configured Nuker key (M/N/etc.) and preserves Nuker's bookkeeping.
+        // This is intentionally the same logical toggle path used by the M/N
+        // Nuker keybind. It updates CFG, session bookkeeping and the HUD just
+        // like a normal key press; the user's configured key remains untouched.
         PeoClient.toggleModuleByName("Nuker [Multi]", mc);
 
         currentState = State.WAITING_FOR_HUB;
@@ -339,7 +339,7 @@ public final class PeoJoinModule {
         stableHubTicks = 0;
         hadNuker = true;
         DiagnosticRecorder.get().record("PeoJoin",
-                "Hub/kick detected (world/transfer/teleport); Nuker auto-OFF, starting compass -> Skyblock recovery");
+                "Hub detected; Nuker auto-OFF via Nuker keybind logic. Waiting 3s before compass right-click");
     }
 
     /**
@@ -420,8 +420,12 @@ public final class PeoJoinModule {
         } catch (Throwable ignored) { }
     }
 
+    private static long elapsedMillis() {
+        return System.currentTimeMillis() - stateStartTime;
+    }
+
     private static long elapsedSeconds() {
-        return (System.currentTimeMillis() - stateStartTime) / 1000L;
+        return elapsedMillis() / 1000L;
     }
 
     private static void sendHome() {

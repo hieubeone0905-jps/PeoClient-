@@ -94,7 +94,7 @@ public final class PeoClient implements ClientModInitializer {
             int defaultCode = switch (module) {
                 case "Fullbright" -> GLFW.GLFW_KEY_F;
                 case "InventoryCleaner" -> GLFW.GLFW_KEY_I;
-                case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
+                case "Nuker [Multi]" -> GLFW.GLFW_KEY_M;
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
                 case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
@@ -124,7 +124,7 @@ public final class PeoClient implements ClientModInitializer {
         return switch (module) {
             case "Fullbright" -> GLFW.GLFW_KEY_F;
             case "InventoryCleaner" -> GLFW.GLFW_KEY_I;
-            case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
+            case "Nuker [Multi]" -> GLFW.GLFW_KEY_M;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
             case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
