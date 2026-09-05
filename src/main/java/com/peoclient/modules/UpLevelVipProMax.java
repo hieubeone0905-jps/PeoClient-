@@ -23,8 +23,8 @@ import java.util.Set;
  *   action ("Chuyển Tất Cả Block"), wait briefly for the server to process it,
  *   then close the handled screen normally.
  *
- * This uses normal client inventory/block interaction APIs. It does not spoof
- * server packets or attempt to bypass anti-cheat.
+ * Uses the normal vanilla-style inventory selection and block interaction
+ * path; placement is delayed so the selected hotbar slot is synchronized first.
  */
 public final class UpLevelVipProMax {
     private static final class_310 mc = class_310.method_1551();
@@ -60,6 +60,10 @@ public final class UpLevelVipProMax {
     private static final int INVENTORY_ACTION_COOLDOWN = 2;
     private static final int FALLBACK_HOTBAR_SLOT = 8;
     private static final int INVENTORY_VERIFY_TICKS = 2;
+    // Let the normal client tick send the hotbar-selection packet and let the
+    // inventory SWAP settle before attempting the block use. This keeps the
+    // placement sequence closer to an actual vanilla right-click.
+    private static final int VANILLA_PLACEMENT_DELAY_TICKS = 2;
 
     private static boolean enabled;
     private static State state = State.IDLE;
@@ -73,6 +77,7 @@ public final class UpLevelVipProMax {
     private enum State {
         IDLE,
         PLACE_LEVEL_BLOCK,
+        PREPARE_VANILLA_PLACEMENT,
         WAIT_FOR_LEVEL_GUI,
         CLICK_HOPPER,
         WAIT_FOR_SERVER,
@@ -156,6 +161,34 @@ public final class UpLevelVipProMax {
 
         switch (state) {
             case IDLE, PLACE_LEVEL_BLOCK -> tryPlaceLevelBlock(client);
+            case PREPARE_VANILLA_PLACEMENT -> {
+                if (--waitTicks > 0) return;
+
+                // The selected slot and any inventory SWAP have now had time to
+                // synchronize through the normal client tick. Use the same
+                // InteractionManager path as a real right-click on the target.
+                var placementInv = client.field_1724.method_31548();
+                if (workingHotbar < 0 || workingHotbar >= 9
+                        || placementInv.field_7545 != workingHotbar
+                        || placementInv.method_5438(workingHotbar).method_7960()
+                        || !LEVEL_BLOCKS.contains(itemId(placementInv.method_5438(workingHotbar)))) {
+                    restoreSelectedHotbar(client);
+                    state = State.IDLE;
+                    return;
+                }
+
+                class_239 placementHit = client.field_1765;
+                if (!(placementHit instanceof class_3965 blockHit)) {
+                    restoreSelectedHotbar(client);
+                    state = State.IDLE;
+                    return;
+                }
+
+                client.field_1761.method_2896(
+                        client.field_1724, class_1268.field_5808, blockHit);
+                state = State.WAIT_FOR_LEVEL_GUI;
+                waitTicks = 0;
+            }
             case WAIT_FOR_LEVEL_GUI -> {
                 // A successful placement should open the server GUI. If it did not,
                 // return to scanning rather than repeatedly placing the same stack.
@@ -259,7 +292,19 @@ public final class UpLevelVipProMax {
         }
 
         selectedHotbar = inv.field_7545;
-        if (selectedHotbar != foundHotbar) inv.field_7545 = foundHotbar;
+        workingHotbar = foundHotbar;
+
+        // Do not write selectedSlot and place in the same tick. A real vanilla
+        // hotbar change is observed by the normal client tick and synchronized
+        // to the server before the following use action. Waiting here also
+        // gives a preceding SWAP (when the block came from the main inventory)
+        // time to settle.
+        if (selectedHotbar != foundHotbar) {
+            inv.method_61496(foundHotbar);
+            state = State.PREPARE_VANILLA_PLACEMENT;
+            waitTicks = VANILLA_PLACEMENT_DELAY_TICKS;
+            return;
+        }
 
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, blockHit);
         state = State.WAIT_FOR_LEVEL_GUI;
