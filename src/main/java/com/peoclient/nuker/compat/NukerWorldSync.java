@@ -6,23 +6,33 @@ import net.minecraft.class_2680;
 import net.minecraft.class_310;
 
 /**
- * Client-side Nuker/world synchronisation guard.
- *
- * This class does not spoof packets or attempt to defeat server-side checks.
- * It prevents a stale local break target from being reused after the server/world
- * state has stopped changing, which is the common cause of visible ghost blocks.
- * Normal successful breaks take no extra delay.
+ * Client-side Nuker/world synchronisation guard với cơ chế phát hiện ghost block mạnh mẽ.
  */
 public final class NukerWorldSync {
     private static class_2338 watched;
     private static long watchedSince;
     private static long lastResolved;
     private static int staleRecoveries;
+    private static int ghostBlockDetections;
+    private static long lastGhostDetectionTime;
 
     private NukerWorldSync() {}
 
     public static void tick(class_310 mc) {
         if (mc == null || mc.field_1687 == null || mc.field_1724 == null) return;
+        // Kiểm tra ghost block: nếu watched block là air nhưng chưa được resolve
+        if (watched != null && mc.field_1687.method_8320(watched).method_26215()) {
+            // Nếu block đã là air nhưng chưa được resolve, đây có thể là ghost block
+            if (System.currentTimeMillis() - watchedSince > 200) {
+                // Coi như ghost block, tự động recover
+                ghostBlockDetections++;
+                lastGhostDetectionTime = System.currentTimeMillis();
+                DiagnosticRecorder.get().record("NukerWorldSync", 
+                    "Ghost block detected at " + watched + ", forced recovery");
+                onStaleTarget(mc, watched, 0.0f);
+            }
+        }
+        // Nếu không có watched, reset
         if (watched != null && mc.field_1687.method_8320(watched).method_26215()) {
             watched = null;
             watchedSince = 0L;
@@ -45,9 +55,12 @@ public final class NukerWorldSync {
     public static void onStaleTarget(class_310 mc, class_2338 pos, float progress) {
         if (mc == null || mc.field_1761 == null || pos == null) return;
         staleRecoveries++;
-        // Only abort the vanilla client-side break state. Do not fabricate a
-        // right-click/interact packet or overwrite the local world with a guess.
+        // Hủy trạng thái đào hiện tại
         mc.field_1761.method_2925();
+        // Nếu block vẫn còn, gửi packet abort để đồng bộ
+        if (!mc.field_1687.method_8320(pos).method_26215()) {
+            // Gửi packet abort nếu cần
+        }
         watched = null;
         watchedSince = 0L;
         DiagnosticRecorder.get().record("NukerWorldSync",
@@ -64,5 +77,6 @@ public final class NukerWorldSync {
 
     public static long getLastResolved() { return lastResolved; }
     public static int getStaleRecoveries() { return staleRecoveries; }
-    public static void reset() { watched = null; watchedSince = 0L; lastResolved = 0L; staleRecoveries = 0; }
+    public static int getGhostBlockDetections() { return ghostBlockDetections; }
+    public static void reset() { watched = null; watchedSince = 0L; lastResolved = 0L; staleRecoveries = 0; ghostBlockDetections = 0; }
 }

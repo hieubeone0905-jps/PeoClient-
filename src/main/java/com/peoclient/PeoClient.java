@@ -624,7 +624,7 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 10; // ĐÃ GIẢM XUỐNG 10
+        private static final int MAX_BLOCKS_PER_TICK = 10; // giảm từ 15 xuống 10 để giảm pattern
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -636,13 +636,13 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
-        private static final Random RANDOM = new Random(); // THÊM RANDOM
+        private static final Random RANDOM = new Random(); // Thêm Random cho fail thực tế
+        private static int skipCounter = 0; // Đếm số block để bỏ qua
 
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
-            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null
-                    ) return;
+            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null) return;
 
             renderBlocks.clear();
             com.peoclient.nuker.compat.NukerWorldSync.tick(mc);
@@ -663,7 +663,7 @@ public final class PeoClient implements ClientModInitializer {
                 return;
             }
 
-            // === THÊM BYPASS PACKET Ở ĐÂY ===
+            // === BYPASS PACKET: gửi packet giả mỗi tick ===
             if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
                 float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.4);
                 float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
@@ -802,6 +802,15 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
+                    // === TẠO FAIL THỰC TẾ: bỏ qua đào ngẫu nhiên 20-25% số block ===
+                    skipCounter++;
+                    if (skipCounter % (4 + RANDOM.nextInt(4)) == 0) {
+                        // Bỏ qua block này, không đào, coi như fail thực tế
+                        queue.remove(0);
+                        com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
+                        continue; // Chuyển sang target tiếp theo
+                    }
+
                     diagnosticTargetTime = System.currentTimeMillis();
                     if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onTargetSelected(target.pos);
@@ -908,10 +917,7 @@ public final class PeoClient implements ClientModInitializer {
                     // current break state without creating duplicate actions.
                     break;
                 }
-
             }
-
-
         }
 
         public static void resetState() {
@@ -926,6 +932,7 @@ public final class PeoClient implements ClientModInitializer {
             stagnantTicks = 0;
             lastBreakingProgress = 0.0f;
             progressPos = null;
+            skipCounter = 0; // reset bộ đếm skip
         }
 
         public static List<class_2338> getRenderBlocks() {
@@ -1100,4 +1107,5 @@ public final class PeoClient implements ClientModInitializer {
                     10, y, 0xFFFFFFFF, false);
             return y + 14;
         }
-    }}
+    }
+}
