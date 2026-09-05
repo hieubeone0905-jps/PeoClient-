@@ -16,10 +16,10 @@ public final class NukerWorldSync {
 
     public static void tick(class_310 mc) {
         if (mc == null || mc.field_1687 == null || mc.field_1724 == null) return;
-        // Kiểm tra ghost block: nếu watched là air nhưng chưa được resolve
+        // Kiểm tra ghost block với ngưỡng thời gian thấp
         if (watched != null && mc.field_1687.method_8320(watched).method_26215()) {
             long age = System.currentTimeMillis() - watchedSince;
-            if (age > 150) {
+            if (age > 100) {
                 ghostBlockDetections++;
                 lastGhostDetectionTime = System.currentTimeMillis();
                 DiagnosticRecorder.get().record("NukerWorldSync", 
@@ -49,9 +49,7 @@ public final class NukerWorldSync {
     public static void onStaleTarget(class_310 mc, class_2338 pos, float progress) {
         if (mc == null || mc.field_1761 == null || pos == null) return;
         staleRecoveries++;
-        // Hủy trạng thái đào hiện tại
         mc.field_1761.method_2925();
-        // Reload chunk để đồng bộ block
         if (mc.field_1769 != null) {
             mc.field_1769.method_3279();
         }

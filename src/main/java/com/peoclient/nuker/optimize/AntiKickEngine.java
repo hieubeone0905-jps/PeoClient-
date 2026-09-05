@@ -55,10 +55,10 @@ public final class AntiKickEngine {
         antiKickTick++;
         breakCounter++;
 
-        // MICRO-PAUSE: 3-5 ticks sau mỗi 2-3 block
+        // === MICRO-PAUSE: 5-8 ticks sau mỗi 2-3 block ===
         if (breakCounter % (2 + RANDOM.nextInt(2)) == 0 && RANDOM.nextInt(3) != 0) {
             isPaused = true;
-            pauseTicks = 3 + RANDOM.nextInt(3); // 3-5 ticks
+            pauseTicks = 5 + RANDOM.nextInt(4); // 5-8 ticks
             if (RANDOM.nextInt(10) == 0) {
                 DiagnosticRecorder.get().record("AntiKickEngine",
                         "Real pause " + pauseTicks + " ticks (breakCounter=" + breakCounter + ")");
@@ -70,18 +70,18 @@ public final class AntiKickEngine {
             if (pauseTicks <= 0) isPaused = false;
         }
 
-        // ROTATION RANDOMIZATION
+        // === ROTATION RANDOMIZATION ===
         if (mc.field_1724 != null && RANDOM.nextInt(2) == 0) {
             float yaw = mc.field_1724.method_36454();
             float pitch = mc.field_1724.method_36455();
-            yaw += (RANDOM.nextFloat() - 0.5f) * 1.0f;
-            pitch += (RANDOM.nextFloat() - 0.5f) * 0.5f;
+            yaw += (RANDOM.nextFloat() - 0.5f) * 1.2f;
+            pitch += (RANDOM.nextFloat() - 0.5f) * 0.6f;
             pitch = Math.max(-90, Math.min(90, pitch));
             mc.field_1724.method_36456(yaw);
             mc.field_1724.method_36457(pitch);
         }
 
-        // Cập nhật tỷ lệ thành công ảo (không ảnh hưởng thực tế)
+        // === CẬP NHẬT TỶ LỆ THÀNH CÔNG ẢO ===
         if (antiKickTick % 20 == 0) {
             lastSuccessRate = getSuccessRate();
             if (antiKickTick % 60 == 0) {
@@ -90,11 +90,11 @@ public final class AntiKickEngine {
             }
         }
 
-        // Tự động điều chỉnh protection level
+        // === TỰ ĐỘNG ĐIỀU CHỈNH PROTECTION LEVEL ===
         if (antiKickTick % 40 == 0) {
             if (lastSuccessRate > 95) {
                 protectionLevel = Math.min(10, protectionLevel + 1);
-            } else if (lastSuccessRate < 75) {
+            } else if (lastSuccessRate < 70) {
                 protectionLevel = Math.max(1, protectionLevel - 1);
             }
         }

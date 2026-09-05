@@ -625,7 +625,8 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 8;
+        // Giảm MAX_BLOCKS xuống 5 để giảm áp lực server, nhưng vẫn giữ tốc độ qua Multi
+        private static final int MAX_BLOCKS_PER_TICK = 5;
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -663,16 +664,16 @@ public final class PeoClient implements ClientModInitializer {
 
             // === BYPASS PACKET ===
             if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
-                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
-                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.3);
+                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.6);
+                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.4);
                 boolean onGround = mc.field_1724.method_24828();
                 BypassPacketManager.sendRotation(yaw, pitch, onGround);
-                if (RANDOM.nextInt(4) == 0) {
+                if (RANDOM.nextInt(3) == 0) {
                     class_243 pos = mc.field_1724.method_19538();
                     BypassPacketManager.sendPosition(
-                        pos.field_1352 + RANDOM.nextDouble() * 0.003 - 0.0015,
-                        pos.field_1351 + RANDOM.nextDouble() * 0.003 - 0.0015,
-                        pos.field_1350 + RANDOM.nextDouble() * 0.003 - 0.0015,
+                        pos.field_1352 + RANDOM.nextDouble() * 0.004 - 0.002,
+                        pos.field_1351 + RANDOM.nextDouble() * 0.004 - 0.002,
+                        pos.field_1350 + RANDOM.nextDouble() * 0.004 - 0.002,
                         onGround
                     );
                 }
@@ -683,20 +684,41 @@ public final class PeoClient implements ClientModInitializer {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
             }
 
-            // === GHOST BLOCK RECOVERY ===
+            // === GHOST BLOCK FIX: gửi packet reload và reset state ===
             if (breakingPos != null && mc.field_1687.method_8320(breakingPos).method_26215()) {
                 ghostRecoveryCounter++;
-                if (ghostRecoveryCounter % 5 == 0) {
-                    DiagnosticRecorder.get().record("NukerLogic", "Ghost block detected at " + breakingPos + ", force reload");
-                    if (mc.field_1769 != null) mc.field_1769.method_3279();
-                    mc.field_1761.method_2925();
-                    breakingPos = null;
-                    breakingSide = null;
-                    queue.clear();
-                    stagnantTicks = 0;
-                    lastBreakingProgress = 0.0f;
-                    progressPos = null;
+                DiagnosticRecorder.get().record("NukerLogic", "Ghost block detected at " + breakingPos + ", sending reload packet");
+                try {
+                    // Gửi packet PlayerActionC2SPacket (ABORT_DESTROY_BLOCK) để đồng bộ
+                    // Sử dụng reflection để tránh lỗi compile mapping
+                    Class<?> packetClass = Class.forName("net.minecraft.class_2846");
+                    Class<?> actionClass = Class.forName("net.minecraft.class_2847");
+                    Object abortAction = actionClass.getEnumConstants()[1]; // ABORT_DESTROY_BLOCK
+                    
+                    for (var ctor : packetClass.getDeclaredConstructors()) {
+                        if (ctor.getParameterCount() == 3) {
+                            ctor.setAccessible(true);
+                            Object packet = ctor.newInstance(abortAction, breakingPos, class_2350.field_11036);
+                            if (mc.field_1687 != null && mc.field_1687.method_8522 != null) {
+                                mc.field_1687.method_8522((net.minecraft.class_2596) packet);
+                            }
+                            break;
+                        }
+                    }
+                } catch (Exception ignored) {
+                    // Fallback: reset local state
                 }
+                
+                if (mc.field_1769 != null) mc.field_1769.method_3279();
+                mc.field_1761.method_2925();
+                breakingPos = null;
+                breakingSide = null;
+                queue.clear();
+                stagnantTicks = 0;
+                lastBreakingProgress = 0.0f;
+                progressPos = null;
+                // Thoát khỏi tick này để không xử lý tiếp
+                return;
             }
 
             // === STALE DETECTION ===
@@ -722,7 +744,7 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 12) {
+                    if (stagnantTicks >= 10) {
                         com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
@@ -802,12 +824,12 @@ public final class PeoClient implements ClientModInitializer {
                 }
 
                 if (breakingPos == null) {
-                    // === FAIL THỰC TẾ: bỏ qua 25-35% ===
+                    // === FAIL THỰC TẾ: skip 35-40% để tỷ lệ success thực tế 60-65% ===
                     skipCounter++;
-                    if (skipCounter % (3 + RANDOM.nextInt(4)) == 0) {
+                    if (skipCounter % (2 + RANDOM.nextInt(3)) == 0) {
                         queue.remove(0);
                         com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
-                        if (RANDOM.nextInt(10) == 0) {
+                        if (RANDOM.nextInt(8) == 0) {
                             DiagnosticRecorder.get().record("NukerLogic", "Real fail skip: " + target.pos);
                         }
                         continue;
@@ -829,8 +851,6 @@ public final class PeoClient implements ClientModInitializer {
 
                     if (NukerBypassUltimateV2.isActive()) {
                         // Bypass V2 active
-                    } else {
-                        // Normal path
                     }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
