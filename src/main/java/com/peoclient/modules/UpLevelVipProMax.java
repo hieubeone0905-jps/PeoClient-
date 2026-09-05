@@ -57,7 +57,7 @@ public final class UpLevelVipProMax {
     private static final String LEVEL_SCREEN_TITLE = "Cấp độ đảo";
     private static final int PROCESS_WAIT_TICKS = 12;
     private static final int CLOSE_WAIT_TICKS = 16;
-    private static final int ACTION_COOLDOWN_TICKS = 12;
+    private static final int ACTION_COOLDOWN_TICKS = 105; // ~5.25s post-cycle; total round targets ~7.5s
     private static final int INVENTORY_ACTION_COOLDOWN = 2;
     private static final int FALLBACK_HOTBAR_SLOT = 8;
     private static final int INVENTORY_VERIFY_TICKS = 2;
