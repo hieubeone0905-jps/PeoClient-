@@ -1,12 +1,15 @@
 package com.peoclient.nuker.optimize;
 
 import com.peoclient.PeoClient;
+import com.peoclient.nuker.bypass.BypassPacketManager;
 import com.peoclient.diagnostic.DiagnosticRecorder;
 import net.minecraft.class_2338;
+import net.minecraft.class_2350;
+import net.minecraft.class_243;
 import net.minecraft.class_310;
 import java.util.Random;
 
-/** Compatibility facade. NukerLogic remains the sole block-break owner. */
+/** Compatibility facade with enhanced packet spoofing. */
 public final class NukerBypassUltimateV2 {
     private static final class_310 mc = class_310.method_1551();
     private static boolean requested;
@@ -29,7 +32,30 @@ public final class NukerBypassUltimateV2 {
         if (!isActive()) { target = null; return; }
         class_2338 current = PeoClient.NukerLogic.getCurrentTarget();
         if (current != null) target = current.method_10062();
+
+        // Gửi packet giả mỗi tick (tần suất cao nhất)
+        if (target != null && mc.field_1724 != null) {
+            float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.5);
+            float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
+            boolean onGround = mc.field_1724.method_24828();
+            BypassPacketManager.sendRotation(yaw, pitch, onGround);
+            // Gửi position giả 2 lần mỗi 5 tick
+            if (RANDOM.nextInt(5) < 2) {
+                class_243 pos = mc.field_1724.method_19538();
+                BypassPacketManager.sendPosition(
+                    pos.field_1352 + RANDOM.nextDouble() * 0.002 - 0.001,
+                    pos.field_1351 + RANDOM.nextDouble() * 0.002 - 0.001,
+                    pos.field_1350 + RANDOM.nextDouble() * 0.002 - 0.001,
+                    onGround
+                );
+            }
+            // Gửi block action giả (abort) để che giấu
+            if (RANDOM.nextInt(10) == 0) {
+                BypassPacketManager.sendBlockAction(target, class_2350.field_11036);
+            }
+        }
     }
+
     public static void setEnabled(boolean enable) { requested = enable && requested; if (!enable) stop(); }
     public static void setGrimMode(boolean enable) { grimMode = enable; }
     public static void setVulcanMode(boolean enable) { vulcanMode = enable; }
@@ -37,7 +63,6 @@ public final class NukerBypassUltimateV2 {
     public static void setIntensity(int level) { intensity = Math.max(1, Math.min(10, level)); }
     public static void setDesyncLevel(int level) { desyncLevel = Math.max(1, Math.min(5, level)); }
 
-    /** Dynamic local pacing value used by compatibility/UI code. */
     private static long calculateDynamicDelay() {
         long base = 12L + RANDOM.nextInt(20);
         if (intensity > 7) base += 3L;

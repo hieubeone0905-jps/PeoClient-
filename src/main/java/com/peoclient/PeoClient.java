@@ -15,6 +15,7 @@ import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import com.peoclient.nuker.optimize.ClientStabilizer;
 import com.peoclient.nuker.optimize.LatencyCompensator;
 import com.peoclient.nuker.optimize.AutoReloadEnhancer;
+import com.peoclient.nuker.bypass.BypassPacketManager;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -129,8 +130,8 @@ public final class PeoClient implements ClientModInitializer {
             case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
-                case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
-                case "PeoJoin" -> GLFW.GLFW_KEY_P;
+            case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
+            case "PeoJoin" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
     }
@@ -635,6 +636,8 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
+        private static final Random RANDOM = new Random(); // For bypass packet spoofing
+
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
@@ -659,6 +662,24 @@ public final class PeoClient implements ClientModInitializer {
                 cooldown--;
                 return;
             }
+
+            // === BYPASS PACKET SPOOFING – gửi packet giả để đánh lừa anti-cheat ===
+            if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
+                float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.3);
+                float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.15);
+                boolean onGround = mc.field_1724.method_24828();
+                BypassPacketManager.sendRotation(yaw, pitch, onGround);
+                if (RANDOM.nextInt(5) == 0) {
+                    class_243 pos = mc.field_1724.method_19538();
+                    BypassPacketManager.sendPosition(
+                        pos.field_1352 + RANDOM.nextDouble() * 0.001 - 0.0005,
+                        pos.field_1351 + RANDOM.nextDouble() * 0.001 - 0.0005,
+                        pos.field_1350 + RANDOM.nextDouble() * 0.001 - 0.0005,
+                        onGround
+                    );
+                }
+            }
+
             // Apply the optional dynamic cooldown from AntiKickEngine without
             // replacing the normal Nuker interaction path.
             int dynamicCooldown = 0;
