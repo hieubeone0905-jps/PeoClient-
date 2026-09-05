@@ -16,14 +16,12 @@ public final class NukerWorldSync {
 
     public static void tick(class_310 mc) {
         if (mc == null || mc.field_1687 == null || mc.field_1724 == null) return;
-        // Kiểm tra ghost block với ngưỡng thời gian thấp
         if (watched != null && mc.field_1687.method_8320(watched).method_26215()) {
             long age = System.currentTimeMillis() - watchedSince;
-            if (age > 100) {
+            if (age > 150) {
                 ghostBlockDetections++;
                 lastGhostDetectionTime = System.currentTimeMillis();
-                DiagnosticRecorder.get().record("NukerWorldSync", 
-                    "Ghost block detected at " + watched + ", forced recovery");
+                DiagnosticRecorder.get().record("NukerWorldSync", "Ghost block detected at " + watched + ", forced recovery");
                 onStaleTarget(mc, watched, 0.0f);
             }
         }
@@ -50,23 +48,14 @@ public final class NukerWorldSync {
         if (mc == null || mc.field_1761 == null || pos == null) return;
         staleRecoveries++;
         mc.field_1761.method_2925();
-        if (mc.field_1769 != null) {
-            mc.field_1769.method_3279();
-        }
+        if (mc.field_1769 != null) mc.field_1769.method_3279();
         watched = null;
         watchedSince = 0L;
-        DiagnosticRecorder.get().record("NukerWorldSync",
-                "Stale target recovered: " + pos + " progress=" + progress);
+        DiagnosticRecorder.get().record("NukerWorldSync", "Stale target recovered: " + pos + " progress=" + progress);
     }
 
-    public static boolean isWatched(class_2338 pos) {
-        return watched != null && watched.equals(pos);
-    }
-
-    public static long getWatchedAgeMs() {
-        return watchedSince <= 0 ? 0L : Math.max(0L, System.currentTimeMillis() - watchedSince);
-    }
-
+    public static boolean isWatched(class_2338 pos) { return watched != null && watched.equals(pos); }
+    public static long getWatchedAgeMs() { return watchedSince <= 0 ? 0L : Math.max(0L, System.currentTimeMillis() - watchedSince); }
     public static long getLastResolved() { return lastResolved; }
     public static int getStaleRecoveries() { return staleRecoveries; }
     public static int getGhostBlockDetections() { return ghostBlockDetections; }
