@@ -107,20 +107,19 @@ public final class KickDiagnostics {
               .append(e.getEventType()).append(" ").append(e.getMessage()).append('\n');
         }
 
-        // === Bổ sung thông tin server/plugin (passive) ===
-        sb.append("\n--- SERVER INFO (PASSIVE) ---\n");
-        sb.append(ServerInfoCollector.get().getSummary()).append("\n");
-        sb.append("Plugin messages (first 20):\n");
-        int count = 0;
-        for (PluginMessage msg : ServerInfoCollector.get().getPluginMessages()) {
-            if (count++ >= 20) {
-                sb.append("  ... and ").append(ServerInfoCollector.get().getPluginMessages().size() - 20).append(" more\n");
-                break;
-            }
-            sb.append("  ").append(msg.displayName())
-              .append(" (").append(msg.channel()).append(") ")
-              .append(msg.dataLength()).append(" bytes\n");
-        }
+        // === Thông tin server (từ các nguồn có sẵn) ===
+        sb.append("\n--- SERVER INFO ---\n");
+        sb.append("Address: ").append(ClientConnectionMonitor.get().getServerAddress()).append('\n');
+        sb.append("Connection duration: ").append((System.currentTimeMillis() - ClientConnectionMonitor.get().getConnectedAt()) / 1000).append("s\n");
+        sb.append("Account: ").append(AccountSessionMetrics.get().getAccountName()).append('\n');
+
+        // Thêm thông tin từ diagnostic khác nếu có
+        sb.append("\n--- DIAGNOSTIC SUMMARY ---\n");
+        sb.append("Total break attempts: ").append(AccountSessionMetrics.get().getBreakAttempts()).append('\n');
+        sb.append("Total successes: ").append(AccountSessionMetrics.get().getBreakSuccesses()).append('\n');
+        sb.append("Total failures: ").append(AccountSessionMetrics.get().getBreakFailures()).append('\n');
+        sb.append("Recoveries: ").append(AccountSessionMetrics.get().getRecoveries()).append('\n');
+        sb.append("Ping (last): ").append(LatencyMetrics.get().getLastPing()).append("ms\n");
 
         sb.append("\n===== END REPORT =====\n");
         return sb.toString();
