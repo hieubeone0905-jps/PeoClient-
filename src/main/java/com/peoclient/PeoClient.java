@@ -295,7 +295,7 @@ public final class PeoClient implements ClientModInitializer {
         public String nukerMode = "Normal";
         public int nukerMulti = 2;
         public int nukerCooldown = 0;
-        public String nukerShape = "Sphere";
+        public String nukerShape = "Cube";
         public double nukerRange = 4.2;
         public String nukerSort = "Closest";
         public boolean nukerFilter = false;
@@ -385,7 +385,7 @@ public final class PeoClient implements ClientModInitializer {
                 xrayFluids = c.xrayFluids;
                 xrayBackgroundOpacity = c.xrayBackgroundOpacity;
                 nukerMode = c.nukerMode; nukerMulti = c.nukerMulti;
-                nukerCooldown = 0; nukerShape = c.nukerShape;
+                nukerCooldown = c.nukerCooldown; nukerShape = c.nukerShape;
                 nukerRange = c.nukerRange; nukerSort = c.nukerSort;
                 nukerFilter = c.nukerFilter; nukerWhitelist = c.nukerWhitelist;
                 nukerFilterIds = c.nukerFilterIds; nukerRaycast = c.nukerRaycast;
@@ -415,9 +415,12 @@ public final class PeoClient implements ClientModInitializer {
                 maxMilkBuckets = c.maxMilkBuckets;
                 itemsBlacklist = c.itemsBlacklist; offHandItem = c.offHandItem;
                 if (keybinds == null) keybinds = new LinkedHashMap<>();
-                if (nukerMode == null) nukerMode = "Normal";
-                if (nukerShape == null) nukerShape = "Cube";
-                if (nukerSort == null) nukerSort = "Closest";
+                if (nukerMode == null || !(nukerMode.equals("Normal") || nukerMode.equals("SurvMulti") || nukerMode.equals("Multi"))) nukerMode = "Normal";
+                if (nukerShape == null || !(nukerShape.equals("Cube") || nukerShape.equals("Sphere"))) nukerShape = "Cube";
+                if (nukerSort == null || !(nukerSort.equals("Closest") || nukerSort.equals("Furthest") || nukerSort.equals("Softest") || nukerSort.equals("Hardest") || nukerSort.equals("None"))) nukerSort = "Closest";
+                nukerMulti = Math.max(1, Math.min(10, nukerMulti));
+                nukerCooldown = Math.max(0, Math.min(4, nukerCooldown));
+                nukerRange = Math.max(1.0, Math.min(6.0, nukerRange));
                 if (nukerFilterIds == null) nukerFilterIds = "";
                 if (nukerHighlightMode == null) nukerHighlightMode = "Opacity";
                 if (nukerHighlightColor == null) nukerHighlightColor = "255,128,128";
@@ -565,173 +568,96 @@ public final class PeoClient implements ClientModInitializer {
     }
 
     // ============================================================
-    // NUKER LOGIC - ĐÃ CHỈNH SỬA (FIX GHOST BLOCK + TANG MULTI LEN 15)
+    // NUKER LOGIC - BLEACHHACK PARITY
     // ============================================================
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 15;
         private static final List<class_2338> renderBlocks = new ArrayList<>();
-        private static final List<Target> queue = new ArrayList<>();
-
-        // Keep one real breaking target alive across ticks, like BleachHack.
-        private static class_2338 breakingPos;
-        private static class_2350 breakingSide;
-        private static float lastBreakingProgress;
-        private static class_2338 progressPos;
-        private static int stagnantTicks;
 
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
-            if (!CFG.nuker || mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null) {
-                return;
-            }
+            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null) return;
 
             renderBlocks.clear();
 
-            /*
-             * Bleach-style core:
-             * 1) Keep the same target while it is still a real block.
-             * 2) Call updateBlockBreakingProgress every tick (no random skips/cooldowns).
-             * 3) Only retarget after the current block is actually resolved/invalid.
-             *
-             * This is deliberately kept inside NukerLogic so no other module is changed.
-             */
-            if (breakingPos != null) {
-                class_2680 state = mc.field_1687.method_8320(breakingPos);
+            double range = class_3532.method_15350(CFG.nukerRange, 1.0, 6.0);
+            class_2338 center = class_2338.method_49638(mc.field_1724.method_33571());
+            List<Target> blocks = new ArrayList<>();
 
-                if (!isActiveBreakTarget(mc, breakingPos, state)) {
-                    resetBreakingState(mc);
-                } else {
-                    if (CFG.nukerRotate) {
-                        rotateTo(mc, breakingPos);
-                    }
+            // BleachHack scans a cube around the eye position and filters by
+            // the selected shape/range before doing any break interaction.
+            for (int x = class_3532.method_15363((float) Math.ceil(range), -6, 6);
+                 x >= Math.floor(-range); x--) {
+                for (int y = class_3532.method_15363((float) Math.ceil(range), -6, 6);
+                     y >= (CFG.nukerFlatten
+                             ? -(mc.field_1724.method_33571().field_1351 - mc.field_1724.method_23318()) + 0.2
+                             : Math.floor(-range)); y--) {
+                    for (int z = class_3532.method_15363((float) Math.ceil(range), -6, 6);
+                         z >= Math.floor(-range); z--) {
+                        class_2338 pos = class_2338.method_10069(center, x, y, z);
 
-                    // This is the important BleachHack behavior: refresh breaking progress every tick.
-                    mc.field_1761.method_2902(breakingPos, breakingSide);
-                    mc.field_1724.method_6104(class_1268.field_5808);
-                    renderBlocks.add(breakingPos);
+                        double distTo = "Cube".equalsIgnoreCase(CFG.nukerShape)
+                                ? Math.max(Math.max(
+                                        Math.abs(mc.field_1724.method_23317() - (pos.method_10263() + 0.5)),
+                                        Math.abs(mc.field_1724.method_33571().field_1351 - (pos.method_10264() + 0.5))),
+                                        Math.abs(mc.field_1724.method_23321() - (pos.method_10260() + 0.5)))
+                                : mc.field_1724.method_33571().method_1022(class_243.method_24953(pos));
 
-                    float progress = getBreakingProgress();
-                    if (!breakingPos.equals(progressPos) || progress > lastBreakingProgress + 0.0005f) {
-                        stagnantTicks = 0;
-                    } else {
-                        stagnantTicks++;
-                    }
-                    progressPos = breakingPos;
-                    lastBreakingProgress = progress;
+                        class_2680 state = mc.field_1687.method_8320(pos);
+                        if (distTo - 0.5 > range || state.method_26215() || state.method_26204() instanceof class_2404)
+                            continue;
 
-                    // If the server/client has actually resolved the block, move to the next target.
-                    if (mc.field_1687.method_8320(breakingPos).method_26215()) {
-                        resetBreakingState(mc);
-                    } else if (stagnantTicks >= 40) {
-                        /*
-                         * Do NOT fabricate a client-side block or spam right-click packets.
-                         * Re-send the normal start-break + progress sequence once, then continue
-                         * the normal Bleach-style per-tick progress updates.
-                         */
-                        mc.field_1761.method_2925();
-                        mc.field_1761.method_2910(breakingPos, breakingSide);
-                        stagnantTicks = 0;
-                        lastBreakingProgress = 0.0f;
-                        progressPos = breakingPos;
+                        if (CFG.nukerFilter && !passesFilter(state.method_26204())) continue;
+
+                        class_2350 side = bestSide(mc, pos);
+                        if (side == null && CFG.nukerRaycast) continue;
+                        if (side == null) side = class_2350.field_11036;
+                        blocks.add(new Target(pos, side));
                     }
                 }
             }
 
-            int batch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
+            if (blocks.isEmpty()) return;
+            blocks.sort(comparator(mc));
 
-            /*
-             * Normal / single-target mode: keep one target alive.
-             * Multi / SurvMulti: after starting the first target, allow up to batch targets
-             * in this same tick, exactly the style Bleach uses.
-             */
-            queue.clear();
-            queue.addAll(collect(mc));
-            queue.sort(comparator(mc));
+            int broken = 0;
+            int multi = class_3532.method_15340(CFG.nukerMulti, 1, 10);
 
-            int processed = 0;
-            for (Target target : queue) {
-                if (processed >= batch) break;
-                if (!isValidTarget(mc, target)) continue;
-
+            for (Target target : blocks) {
                 class_2680 state = mc.field_1687.method_8320(target.pos);
-                float delta = state.method_26165(mc.field_1724, mc.field_1687, target.pos);
-                if (delta <= 0.0f) continue;
+                float breakingDelta = state.method_26165(mc.field_1724, mc.field_1687, target.pos);
 
-                // If another target is already being broken, only the same target is refreshed above.
-                if (breakingPos != null && !breakingPos.equals(target.pos)) {
-                    if ("Normal".equalsIgnoreCase(CFG.nukerMode)
-                            || !("Multi".equalsIgnoreCase(CFG.nukerMode)
-                            || "SurvMulti".equalsIgnoreCase(CFG.nukerMode))) {
-                        break;
-                    }
-                    continue;
+                if (breakingDelta <= 0.0f) continue;
+
+                // Exact BleachHack SurvMulti behaviour:
+                // after the first normal-speed survival break has been issued,
+                // do not stack additional blocks unless the first block is slow.
+                if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode)
+                        && breakingDelta <= 1.0f && broken > 0) {
+                    return;
                 }
 
-                if (breakingPos == null) {
-                    if (CFG.nukerRotate) {
-                        rotateTo(mc, target.pos);
-                    }
+                if (CFG.nukerRotate) rotateTo(mc, target.pos);
 
-                    if (!mc.field_1761.method_2910(target.pos, target.side)) {
-                        continue;
-                    }
+                // BleachHack's important anti-ghost behaviour is to keep using
+                // the real interaction manager update call every client tick;
+                // there is no synthetic right-click/reload packet here.
+                mc.field_1761.method_2902(target.pos, target.side);
+                mc.field_1724.method_6104(class_1268.field_5808);
+                renderBlocks.add(target.pos);
+                broken++;
 
-                    breakingPos = target.pos.method_10062();
-                    breakingSide = target.side;
-                    progressPos = breakingPos;
-                    lastBreakingProgress = 0.0f;
-                    stagnantTicks = 0;
-
-                    // Immediately continue progress on the same tick.
-                    mc.field_1761.method_2902(breakingPos, breakingSide);
-                    mc.field_1724.method_6104(class_1268.field_5808);
-                    renderBlocks.add(breakingPos);
-                    processed++;
-
-                    // SurvMulti follows Bleach's behavior: don't start another slow block after
-                    // a partially-mined block.
-                    if ("Normal".equalsIgnoreCase(CFG.nukerMode)) {
-                        break;
-                    }
-                    if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode) && delta < 1.0f) {
-                        break;
-                    }
-
-                    if (mc.field_1687.method_8320(breakingPos).method_26215()) {
-                        resetBreakingState(mc);
-                    } else {
-                        // One persistent target is enough; subsequent ticks refresh it.
-                        break;
-                    }
-                }
+                if ("Normal".equalsIgnoreCase(CFG.nukerMode)) return;
+                if ("SurvMulti".equalsIgnoreCase(CFG.nukerMode) && breakingDelta <= 1.0f) return;
+                if (("SurvMulti".equalsIgnoreCase(CFG.nukerMode) || "Multi".equalsIgnoreCase(CFG.nukerMode))
+                        && broken >= multi) return;
             }
-        }
-
-        private static boolean isActiveBreakTarget(class_310 mc, class_2338 pos, class_2680 state) {
-            if (state.method_26215()) return false;
-            if (state.method_26204() instanceof class_2404) return false;
-            if (!NukerAreaLimiter.contains(pos)) return false;
-            if (CFG.nukerFlatten && pos.method_10264() < mc.field_1724.method_31478() - 1) return false;
-            return !CFG.nukerFilter || passesFilter(state.method_26204());
-        }
-
-        private static void resetBreakingState(class_310 mc) {
-            if (mc.field_1761 != null) {
-                mc.field_1761.method_2925();
-            }
-            breakingPos = null;
-            breakingSide = null;
-            lastBreakingProgress = 0.0f;
-            progressPos = null;
-            stagnantTicks = 0;
         }
 
         public static void resetState() {
-            class_310 mc = class_310.method_1551();
-            resetBreakingState(mc);
-            queue.clear();
             renderBlocks.clear();
+            class_310 mc = class_310.method_1551();
+            if (mc.field_1761 != null) mc.field_1761.method_2925();
         }
 
         public static List<class_2338> getRenderBlocks() {
@@ -739,63 +665,13 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         public static class_2338 getCurrentTarget() {
-            return breakingPos;
+            return renderBlocks.isEmpty() ? null : renderBlocks.get(renderBlocks.size() - 1);
         }
 
         public static float getBreakingProgress() {
             class_310 mc = class_310.method_1551();
             if (mc.field_1761 == null) return 0.0f;
             return class_3532.method_15363(mc.field_1761.method_51888() / 10.0f, 0.0f, 1.0f);
-        }
-
-        private static boolean activeTargetStillValid(class_310 mc) {
-            if (breakingPos == null) return false;
-            class_2680 state = mc.field_1687.method_8320(breakingPos);
-            return !state.method_26215() && !(state.method_26204() instanceof class_2404)
-                    && NukerAreaLimiter.contains(breakingPos)
-                    && (!CFG.nukerFilter || passesFilter(state.method_26204()));
-        }
-
-        private static boolean isValidTarget(class_310 mc, Target target) {
-            class_2680 state = mc.field_1687.method_8320(target.pos);
-            if (state.method_26215() || state.method_26204() instanceof class_2404) return false;
-            if (CFG.nukerFlatten && target.pos.method_10264() < mc.field_1724.method_31478() - 1) return false;
-            if (CFG.nukerFilter && !passesFilter(state.method_26204())) return false;
-            if (CFG.nukerRaycast && target.side == null) return false;
-            return mc.field_1724.method_33571().method_1022(class_243.method_24953(target.pos))
-                    <= class_3532.method_15350(CFG.nukerRange, 0.0, 15.0) + 0.25;
-        }
-
-        private static List<Target> collect(class_310 mc) {
-            double range = class_3532.method_15350(CFG.nukerRange, 0.0, 15.0);
-            int r = class_3532.method_15384(range);
-            class_2338 center = class_2338.method_49638(mc.field_1724.method_33571());
-            List<Target> out = new ArrayList<>();
-
-            for (int x = -r; x <= r; x++) {
-                for (int y = -r; y <= r; y++) {
-                    for (int z = -r; z <= r; z++) {
-                        class_2338 pos = center.method_10069(x, y, z);
-                        if (!NukerAreaLimiter.contains(pos)) continue;
-                        if (CFG.nukerFlatten && pos.method_10264() < mc.field_1724.method_31478() - 1) continue;
-
-                        double distance = "Cube".equalsIgnoreCase(CFG.nukerShape)
-                                ? Math.max(Math.max(Math.abs(x), Math.abs(y)), Math.abs(z))
-                                : mc.field_1724.method_33571().method_1022(class_243.method_24953(pos));
-                        if (distance > range + 0.25) continue;
-
-                        class_2680 state = mc.field_1687.method_8320(pos);
-                        if (state.method_26215() || state.method_26204() instanceof class_2404) continue;
-                        if (CFG.nukerFilter && !passesFilter(state.method_26204())) continue;
-
-                        class_2350 side = bestSide(mc, pos);
-                        if (CFG.nukerRaycast && side == null) continue;
-                        if (side == null) side = class_2350.field_11036;
-                        out.add(new Target(pos, side));
-                    }
-                }
-            }
-            return out;
         }
 
         private static boolean passesFilter(class_2248 block) {
@@ -810,22 +686,26 @@ public final class PeoClient implements ClientModInitializer {
             }
 
             String blockId = class_7923.field_41175.method_10221(block).toString().toLowerCase(Locale.ROOT);
-            if (filter.isEmpty()) return !CFG.nukerWhitelist;
             boolean contains = filter.contains(blockId);
+            if (filter.isEmpty()) return !CFG.nukerWhitelist;
             return CFG.nukerWhitelist ? contains : !contains;
         }
 
         private static Comparator<Target> comparator(class_310 mc) {
-            Comparator<Target> keepUnder = Comparator.comparing(
-                    t -> t.pos.equals(class_2338.method_49638(mc.field_1724.method_19538()).method_10074()));
+            // Same safety ordering as BleachHack: keep the block directly
+            // under the player last, then use the selected sort criterion.
+            class_2338 under = class_2338.method_49638(mc.field_1724.method_19538()).method_10074();
+            Comparator<Target> keepUnder = Comparator.comparing(t -> t.pos.equals(under));
             Comparator<Target> distance = Comparator.comparingDouble(
                     t -> mc.field_1724.method_33571().method_1022(class_243.method_24953(t.pos)));
             Comparator<Target> hardness = Comparator.comparingDouble(
                     t -> mc.field_1687.method_8320(t.pos).method_26214(mc.field_1687, t.pos));
+
             Comparator<Target> result = switch (CFG.nukerSort) {
                 case "Furthest" -> distance.reversed();
                 case "Softest" -> hardness;
                 case "Hardest" -> hardness.reversed();
+                case "None" -> (a, b) -> 0;
                 default -> distance;
             };
             return keepUnder.thenComparing(result);
@@ -857,17 +737,13 @@ public final class PeoClient implements ClientModInitializer {
             return class_2350.method_10142(toPlayer.field_1352, toPlayer.field_1351, toPlayer.field_1350);
         }
 
-        private static boolean rotateTo(class_310 mc, class_2338 pos) {
+        private static void rotateTo(class_310 mc, class_2338 pos) {
             class_243 v = class_243.method_24953(pos).method_1020(mc.field_1724.method_33571());
             double horizontal = Math.sqrt(v.field_1352 * v.field_1352 + v.field_1350 * v.field_1350);
             float yaw = (float) (Math.toDegrees(Math.atan2(v.field_1350, v.field_1352)) - 90.0);
             float pitch = (float) -Math.toDegrees(Math.atan2(v.field_1351, horizontal));
-            float yawDelta = class_3532.method_15393(yaw - mc.field_1724.method_36454());
-            float pitchDelta = pitch - mc.field_1724.method_36455();
-            boolean changed = Math.abs(yawDelta) > 2.0f || Math.abs(pitchDelta) > 2.0f;
             mc.field_1724.method_36456(yaw);
-            mc.field_1724.method_36457(class_3532.method_15363(pitch, -90, 90));
-            return changed;
+            mc.field_1724.method_36457(class_3532.method_15363(pitch, -90.0f, 90.0f));
         }
 
         private record Target(class_2338 pos, class_2350 side) {}

@@ -217,11 +217,11 @@ public final class PoeScreen extends class_437 {
     private int drawNuker(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Mining");
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerMode);
-        // TANG MULTI LEN 15
-        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 1, 15, "%.0f blocks");
-        y = sliderRow(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown, 0, 20, "%.0f ticks");
+        // BleachHack-compatible limits
+        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 1, 10, "%.0f blocks");
+        y = sliderRow(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown, 0, 4, "%.0f ticks");
         y = rowValue(d, x, y, w, "Shape", PeoClient.CFG.nukerShape);
-        y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 0.0, 15.0, "%.1f");
+        y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 1.0, 6.0, "%.1f");
         y = rowValue(d, x, y, w, "Sort", PeoClient.CFG.nukerSort);
 
         y = section(d, x, y, "Filter");
@@ -704,17 +704,17 @@ public final class PoeScreen extends class_437 {
 
     private void clickNuker(double mx, double my, int x, int w, int y) {
         int p = y + 26;
-        if (hit(my, p)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi", "Instant"); save(); return; } p += 34;
+        if (hit(my, p)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi"); save(); return; } p += 34;
 
-        // TANG MULTI LEN 15
+        // BleachHack-compatible limits
         if (hit(my, p)) {
-            double v = sliderValue(mx, x, w, 0, 15, "Multi");
+            double v = sliderValue(mx, x, w, 1, 10, "Multi");
             PeoClient.CFG.nukerMulti = (int) Math.round(v);
             save(); return;
         } p += 34;
 
         if (hit(my, p)) {
-            double v = sliderValue(mx, x, w, 0, 20, "Cooldown");
+            double v = sliderValue(mx, x, w, 0, 4, "Cooldown");
             PeoClient.CFG.nukerCooldown = (int) Math.round(v);
             save(); return;
         } p += 34;
@@ -722,7 +722,7 @@ public final class PoeScreen extends class_437 {
         if (hit(my, p)) { PeoClient.CFG.nukerShape = cycle(PeoClient.CFG.nukerShape, "Cube", "Sphere"); save(); return; } p += 34;
 
         if (hit(my, p)) {
-            PeoClient.CFG.nukerRange = roundSlider(sliderValue(mx, x, w, 0.0, 15.0, "Range"), 0.0, 15.0, 0.1);
+            PeoClient.CFG.nukerRange = roundSlider(sliderValue(mx, x, w, 1.0, 6.0, "Range"), 1.0, 6.0, 0.1);
             save(); return;
         } p += 34;
 
@@ -872,11 +872,11 @@ public final class PoeScreen extends class_437 {
             int contentY = firstRowsTop + (implemented(selected) ? 68 : 34);
             int p = contentY + 26;
             if ("NukerMulti".equals(draggingSlider)) {
-                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 1, 15, "Multi"));
+                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 1, 10, "Multi"));
             } else if ("NukerCooldown".equals(draggingSlider)) {
-                PeoClient.CFG.nukerCooldown = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 20, "Cooldown"));
+                PeoClient.CFG.nukerCooldown = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 4, "Cooldown"));
             } else if ("NukerRange".equals(draggingSlider)) {
-                PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 0.0, 15.0, "Range"), 0.0, 15.0, 0.1);
+                PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 1.0, 6.0, "Range"), 1.0, 6.0, 0.1);
             } else if ("NukerWidth".equals(draggingSlider)) {
                 PeoClient.CFG.nukerRangeWidth = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 10.0, "Width"), 0.1, 10.0, 0.1);
             }
