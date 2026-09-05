@@ -33,6 +33,10 @@ public final class PeoJoinModule {
     private static boolean lastCompassPresent = false;
     private static long nukerOnSince = 0L;
     private static Object lastWorldInstance = null;
+    private static double lastPlayerX = Double.NaN;
+    private static double lastPlayerY = Double.NaN;
+    private static double lastPlayerZ = Double.NaN;
+    private static boolean hadMiningWorld = false;
     private static boolean sawActiveMiningWorld = false;
     private static boolean disconnectRecoveryArmed = false;
     private static long lastNukerOnChange = 0L;
@@ -80,7 +84,11 @@ public final class PeoJoinModule {
         nukerOnSince = PeoClient.CFG.nuker ? System.currentTimeMillis() : 0L;
         hadNuker = PeoClient.CFG.nuker;
         lastWorldInstance = mc.field_1687;
-        sawActiveMiningWorld = PeoClient.CFG.nuker && mc.field_1687 != null && findHotbarItem(COMPASS_ID) < 0;
+        lastPlayerX = mc.field_1724 != null ? mc.field_1724.method_23317() : Double.NaN;
+        lastPlayerY = mc.field_1724 != null ? mc.field_1724.method_23318() : Double.NaN;
+        lastPlayerZ = mc.field_1724 != null ? mc.field_1724.method_23321() : Double.NaN;
+        hadMiningWorld = PeoClient.CFG.nuker && mc.field_1687 != null;
+        sawActiveMiningWorld = hadMiningWorld;
         disconnectRecoveryArmed = false;
         lastNukerOnChange = System.currentTimeMillis();
         stableHubTicks = 0;
@@ -98,6 +106,8 @@ public final class PeoJoinModule {
         lastCompassPresent = false;
         nukerOnSince = 0L;
         lastWorldInstance = null;
+        lastPlayerX = lastPlayerY = lastPlayerZ = Double.NaN;
+        hadMiningWorld = false;
         sawActiveMiningWorld = false;
         disconnectRecoveryArmed = false;
         stableHubTicks = 0;
@@ -133,7 +143,15 @@ public final class PeoJoinModule {
                     } else if (PeoClient.CFG.nuker) {
                         hadNuker = true;
                         hubReturnArmed = true;
-                        if (nukerOnSince == 0L) nukerOnSince = System.currentTimeMillis();
+                        if (nukerOnSince == 0L) {
+                            nukerOnSince = System.currentTimeMillis();
+                            lastWorldInstance = mc.field_1687;
+                            lastPlayerX = mc.field_1724 != null ? mc.field_1724.method_23317() : Double.NaN;
+                            lastPlayerY = mc.field_1724 != null ? mc.field_1724.method_23318() : Double.NaN;
+                            lastPlayerZ = mc.field_1724 != null ? mc.field_1724.method_23321() : Double.NaN;
+                            hadMiningWorld = mc.field_1687 != null;
+                            sawActiveMiningWorld = hadMiningWorld;
+                        }
                     }
                 }
 
@@ -248,59 +266,69 @@ public final class PeoJoinModule {
         if (!hubReturnArmed || !PeoClient.CFG.nuker || mc.field_1724 == null) return;
         if (nukerOnSince == 0L) nukerOnSince = System.currentTimeMillis();
 
+        long activeFor = System.currentTimeMillis() - nukerOnSince;
+        if (activeFor < 3000L) {
+            // Give the world/position a few ticks to settle after enabling Nuker.
+            lastCompassPresent = findHotbarItem(COMPASS_ID) >= 0;
+            return;
+        }
+
         boolean compassPresent = findHotbarItem(COMPASS_ID) >= 0;
         boolean compassAppeared = compassPresent && !lastCompassPresent;
         lastCompassPresent = compassPresent;
 
         Object worldNow = mc.field_1687;
         boolean worldChanged = worldNow != null && lastWorldInstance != null && worldNow != lastWorldInstance;
-        boolean reconnectedWorld = worldNow != null && lastWorldInstance == null && sawActiveMiningWorld;
+        boolean worldRecreated = worldNow != null && lastWorldInstance == null && hadMiningWorld;
         if (worldNow != null) lastWorldInstance = worldNow;
-        else {
-            lastWorldInstance = null;
-            // Keep the armed state through a short server transfer/reconnect.
-            if (PeoClient.CFG.nuker) disconnectRecoveryArmed = true;
-        }
+        else lastWorldInstance = null;
 
-        if (PeoClient.CFG.nuker && mc.field_1687 != null && !compassPresent) {
+        // Record the player's position continuously. A server-side hub transfer
+        // often keeps the same ClientWorld object, but teleports the player a
+        // long distance to the hub. This catches that case as well.
+        double x = mc.field_1724.method_23317();
+        double y = mc.field_1724.method_23318();
+        double z = mc.field_1724.method_23321();
+        boolean largeTeleport = false;
+        if (!Double.isNaN(lastPlayerX) && !Double.isNaN(lastPlayerY) && !Double.isNaN(lastPlayerZ)) {
+            double dx = x - lastPlayerX;
+            double dy = y - lastPlayerY;
+            double dz = z - lastPlayerZ;
+            largeTeleport = (dx * dx + dy * dy + dz * dz) >= (80.0 * 80.0);
+        }
+        lastPlayerX = x;
+        lastPlayerY = y;
+        lastPlayerZ = z;
+
+        if (worldNow != null) {
+            hadMiningWorld = true;
             sawActiveMiningWorld = true;
         }
 
-        // Primary signal: the hub compass appears after a mining session.
-        boolean compassHubSignal = compassAppeared && sawActiveMiningWorld;
+        // Primary signals for the requested kick -> hub transition:
+        //   1) ClientWorld replaced/recreated and compass is present;
+        //   2) the connection briefly disappeared and came back with compass;
+        //   3) the server teleported the player a large distance and compass is present.
+        // A compass by itself is deliberately NOT enough, because it can also
+        // exist in the mining world.
+        boolean hubSignal = compassPresent && (worldChanged || worldRecreated
+                || disconnectRecoveryArmed || largeTeleport);
 
-        // Secondary signal: the server replaced the client world while the
-        // player was actively mining and the returned world has the hub compass.
-        boolean worldHubSignal = (worldChanged || reconnectedWorld)
-                && sawActiveMiningWorld && compassPresent;
+        if (compassAppeared && (worldChanged || worldRecreated || disconnectRecoveryArmed)) {
+            hubSignal = true;
+        }
 
-        // Third signal: some proxy/server setups keep the same ClientWorld and
-        // keep the compass in the inventory. In that case a short disappearance
-        // of the client world is the only reliable client-side kick/transfer
-        // signal. Once the player is back with the compass, trigger recovery.
-        boolean reconnectHubSignal = disconnectRecoveryArmed && compassPresent;
-
-        // Do not react immediately after enabling Nuker. Give the server/client
-        // time to settle and require the hub signal to be stable for 2 ticks.
-        if (System.currentTimeMillis() - nukerOnSince < 3000L) {
-            if (worldNow != null) disconnectRecoveryArmed = false;
+        if (!hubSignal) {
+            stableHubTicks = 0;
             return;
         }
 
-        if (compassHubSignal || worldHubSignal || reconnectHubSignal) {
-            stableHubTicks++;
-        } else {
-            stableHubTicks = 0;
-        }
-
+        stableHubTicks++;
         if (stableHubTicks < 2) return;
 
-        // This is intentionally the same central toggle used by the configured
-        // Nuker key (M/N/etc.), rather than merely changing PeoJoin's state.
-        // That preserves Nuker's normal session start/stop bookkeeping.
-        if (PeoClient.CFG.nuker) {
-            PeoClient.toggleModuleByName("Nuker [Multi]", mc);
-        }
+        // Use the exact existing module toggle path. This is equivalent to the
+        // configured Nuker key (M/N/etc.) and preserves Nuker's bookkeeping.
+        PeoClient.toggleModuleByName("Nuker [Multi]", mc);
 
         currentState = State.WAITING_FOR_HUB;
         stateStartTime = System.currentTimeMillis();
@@ -311,7 +339,7 @@ public final class PeoJoinModule {
         stableHubTicks = 0;
         hadNuker = true;
         DiagnosticRecorder.get().record("PeoJoin",
-                "Hub/kick detected; Nuker auto-OFF, starting compass -> Skyblock recovery");
+                "Hub/kick detected (world/transfer/teleport); Nuker auto-OFF, starting compass -> Skyblock recovery");
     }
 
     /**
@@ -323,6 +351,8 @@ public final class PeoJoinModule {
         if (!enabled || !PeoClient.CFG.nuker) return;
         disconnectRecoveryArmed = true;
         lastWorldInstance = null;
+        lastPlayerX = lastPlayerY = lastPlayerZ = Double.NaN;
+        hadMiningWorld = true;
         sawActiveMiningWorld = true;
         DiagnosticRecorder.get().record("PeoJoin",
                 "Disconnect/transfer observed while Nuker ON; waiting for hub return");
