@@ -217,7 +217,8 @@ public final class PoeScreen extends class_437 {
     private int drawNuker(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Mining");
         y = rowValue(d, x, y, w, "Mode", PeoClient.CFG.nukerMode);
-        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 1, 10, "%.0f blocks");
+        // TANG MULTI LEN 15
+        y = sliderRow(d, x, y, w, "Multi", PeoClient.CFG.nukerMulti, 1, 15, "%.0f blocks");
         y = sliderRow(d, x, y, w, "Cooldown", PeoClient.CFG.nukerCooldown, 0, 20, "%.0f ticks");
         y = rowValue(d, x, y, w, "Shape", PeoClient.CFG.nukerShape);
         y = sliderRow(d, x, y, w, "Range", PeoClient.CFG.nukerRange, 0.0, 15.0, "%.1f");
@@ -355,8 +356,6 @@ public final class PoeScreen extends class_437 {
         d.method_49601(x, y, w, 28, 0xFF294354);
         drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
 
-        // Keep long setting values inside the panel. This is especially important
-        // for block-filter lists, long proxy/account values, and translated names.
         int labelReserve = Math.max(150, field_22793.method_1727(label) + 22);
         int valueLeft = x + labelReserve;
         int valueRight = x + w - 10;
@@ -428,9 +427,7 @@ public final class PoeScreen extends class_437 {
         y = sliderRow(d, x, y, w, "Intensity", AntiVipProMaxModule.getIntensity(), 1, 10, "%.0f");
         y = rowToggle(d, x, y, w, "Auto Adjust", AntiVipProMaxModule.isAutoAdjust());
         y = rowToggle(d, x, y, w, "Auto Recovery", AntiVipProMaxModule.isAutoRecovery());
-        // === THÊM: Anti-Kick Engine ===
         y = rowToggle(d, x, y, w, "Anti-Kick Engine", com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled());
-        // === END ===
         y = section(d, x, y, "Bypass V2");
         y = rowToggle(d, x, y, w, "Bypass V2", com.peoclient.nuker.optimize.NukerBypassUltimateV2.isActive());
         y = sliderRow(d, x, y, w, "Intensity", com.peoclient.nuker.optimize.NukerBypassUltimateV2.getIntensity(), 1, 10, "%.0f");
@@ -499,8 +496,6 @@ public final class PoeScreen extends class_437 {
     }
 
     private int[] layout() {
-        // Wurst-like two-column layout: both panels always remain fully inside
-        // the viewport, with the settings panel getting the remaining space.
         int margin = Math.max(18, Math.min(32, field_22789 / 40));
         int gap = Math.max(14, Math.min(20, field_22789 / 90));
         int top = 92;
@@ -519,7 +514,6 @@ public final class PoeScreen extends class_437 {
 
         int leftX = margin;
         int settingsX = leftX + leftW + gap;
-        // Final safety clamp so neither border can ever be drawn beyond the screen.
         settingsW = Math.max(1, Math.min(settingsW, field_22789 - margin - settingsX));
         return new int[]{leftX, leftW, settingsX, settingsW, top, bottom};
     }
@@ -712,8 +706,9 @@ public final class PoeScreen extends class_437 {
         int p = y + 26;
         if (hit(my, p)) { PeoClient.CFG.nukerMode = cycle(PeoClient.CFG.nukerMode, "Normal", "SurvMulti", "Multi", "Instant"); save(); return; } p += 34;
 
+        // TANG MULTI LEN 15
         if (hit(my, p)) {
-            double v = sliderValue(mx, x, w, 0, 10, "Multi");
+            double v = sliderValue(mx, x, w, 0, 15, "Multi");
             PeoClient.CFG.nukerMulti = (int) Math.round(v);
             save(); return;
         } p += 34;
@@ -877,7 +872,7 @@ public final class PoeScreen extends class_437 {
             int contentY = firstRowsTop + (implemented(selected) ? 68 : 34);
             int p = contentY + 26;
             if ("NukerMulti".equals(draggingSlider)) {
-                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 1, 10, "Multi"));
+                PeoClient.CFG.nukerMulti = (int)Math.round(sliderValue(mouseX, sx, sw, 1, 15, "Multi"));
             } else if ("NukerCooldown".equals(draggingSlider)) {
                 PeoClient.CFG.nukerCooldown = (int)Math.round(sliderValue(mouseX, sx, sw, 0, 20, "Cooldown"));
             } else if ("NukerRange".equals(draggingSlider)) {
@@ -937,8 +932,6 @@ public final class PoeScreen extends class_437 {
             hackScroll = clamp(hackScroll - verticalAmount * 26, 0, max);
         } else if (mouseX >= settingsX && mouseX <= settingsX + settingsW) {
             double max = Math.max(0, settingsContentHeight() - viewport);
-            // Larger movement makes the lower Nuker settings reachable even on
-            // short screens, while retaining the same panel/layout.
             settingsScroll = clamp(settingsScroll - verticalAmount * 36, 0, max);
         }
         return true;
@@ -975,6 +968,7 @@ public final class PoeScreen extends class_437 {
         }
         return super.method_25404(keyCode, scanCode, modifiers);
     }
+
     /** Item-only picker for InventoryCleaner's explicit drop filter. */
     private final class CleanerItemPickerScreen extends class_437 {
         private final PoeScreen parent;
@@ -1177,8 +1171,7 @@ public final class PoeScreen extends class_437 {
         private record ItemEntry(class_2960 id, String name, class_1799 stack) {}
     }
 
-    /** Dedicated item/block picker for Nuker Filter. Search by translated item name or registry id,
-     * show the actual item icon, and toggle block ids without requiring manual id entry. */
+    /** Dedicated item/block picker for Nuker Filter. */
     private static final class BlockPickerScreen extends class_437 {
         private final PoeScreen parent;
         private class_342 search;
@@ -1378,5 +1371,4 @@ public final class PoeScreen extends class_437 {
 
         private record Entry(class_2960 id, String name, class_1799 stack) {}
     }
-
 }

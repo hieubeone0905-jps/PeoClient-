@@ -487,8 +487,8 @@ public final class PeoClient implements ClientModInitializer {
             String entry = CFG.proxyList.get(java.util.concurrent.ThreadLocalRandom.current().nextInt(CFG.proxyList.size()));
             try {
                 String value = entry.trim();
-                boolean socks = value.toLowerCase(java.util.Locale.ROOT).startsWith("socks5://")
-                        || value.toLowerCase(java.util.Locale.ROOT).startsWith("socks4://");
+                boolean socks = value.toLowerCase(Locale.ROOT).startsWith("socks5://")
+                        || value.toLowerCase(Locale.ROOT).startsWith("socks4://");
                 int protoEnd = value.indexOf("://");
                 if (protoEnd >= 0) value = value.substring(protoEnd + 3);
                 int colon = value.lastIndexOf(':');
@@ -564,8 +564,11 @@ public final class PeoClient implements ClientModInitializer {
         }
     }
 
+    // ============================================================
+    // NUKER LOGIC - ĐÃ CHỈNH SỬA (FIX GHOST BLOCK + TANG MULTI LEN 15)
+    // ============================================================
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 15; // giữ nguyên tốc độ tối đa
+        private static final int MAX_BLOCKS_PER_TICK = 15; // Tăng lên 15
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -623,20 +626,23 @@ public final class PeoClient implements ClientModInitializer {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
             }
 
-            // === GHOST BLOCK RECOVERY ===
+            // === FIX GHOST BLOCK ===
             if (breakingPos != null && mc.field_1687.method_8320(breakingPos).method_26215()) {
+                // Block đã trở thành air trên client → ghost block
                 ghostRecoveryCounter++;
-                if (ghostRecoveryCounter % 5 == 0) {
-                    DiagnosticRecorder.get().record("NukerLogic", "Ghost block detected at " + breakingPos + ", force reload");
-                    if (mc.field_1769 != null) mc.field_1769.method_3279();
-                    mc.field_1761.method_2925();
-                    breakingPos = null;
-                    breakingSide = null;
-                    queue.clear();
-                    stagnantTicks = 0;
-                    lastBreakingProgress = 0.0f;
-                    progressPos = null;
-                }
+                // Gửi packet tương tác (right-click) để server gửi lại state đúng
+                BypassPacketManager.sendInteractPacket(breakingPos, breakingSide);
+                // Reset trạng thái break
+                mc.field_1761.method_2925();
+                breakingPos = null;
+                breakingSide = null;
+                queue.clear();
+                stagnantTicks = 0;
+                lastBreakingProgress = 0.0f;
+                progressPos = null;
+                // Reload chunk để cập nhật hiển thị
+                if (mc.field_1769 != null) mc.field_1769.method_3279();
+                DiagnosticRecorder.get().record("NukerLogic", "Ghost block fixed via interact packet at " + breakingPos);
             }
 
             // === STALE DETECTION ===
@@ -647,6 +653,8 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.nuker.bypass.NukerBypassEngine.onBreakProgress(progress, breakingPos);
                 }
                 if (activeState.method_26215()) {
+                    // Nếu vẫn là air (có thể do ghost chưa được fix), gọi lại sendInteractPacket
+                    BypassPacketManager.sendInteractPacket(breakingPos, breakingSide);
                     mc.field_1761.method_2925();
                     breakingPos = null;
                     breakingSide = null;
@@ -673,6 +681,8 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
+                        // Thêm gửi interact packet khi recovery
+                        BypassPacketManager.sendInteractPacket(breakingPos, breakingSide);
                         breakingPos = null;
                         breakingSide = null;
                         queue.clear();
@@ -745,11 +755,8 @@ public final class PeoClient implements ClientModInitializer {
                     // === TẠO FAIL THỰC TẾ: dùng abort packet ===
                     skipCounter++;
                     if (skipCounter % (3 + RANDOM.nextInt(3)) == 0) {
-                        // Thực hiện đào giả nhưng sau đó gửi abort packet để tạo failure thực tế
                         if (RANDOM.nextInt(2) == 0) {
-                            // Gửi gói tin đào bắt đầu
                             if (mc.field_1761.method_2910(target.pos, target.side)) {
-                                // Ngay lập tức gửi abort để hủy đào
                                 BypassPacketManager.sendBlockAction(target.pos, target.side);
                                 mc.field_1761.method_2925();
                                 com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
@@ -757,11 +764,9 @@ public final class PeoClient implements ClientModInitializer {
                                     DiagnosticRecorder.get().record("NukerLogic", "Real fail (abort) at " + target.pos);
                                 }
                             } else {
-                                // Nếu không thể bắt đầu đào, coi như fail
                                 com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
                             }
                         } else {
-                            // Đơn giản là skip target này
                             com.peoclient.diagnostic.AccountSessionMetrics.get().recordBreakFailure();
                         }
                         queue.remove(0);
