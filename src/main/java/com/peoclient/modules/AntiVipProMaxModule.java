@@ -9,9 +9,12 @@ import com.peoclient.nuker.optimize.NukerBypassUltimateV2;
 import com.peoclient.nuker.optimize.AntiKickEngine;
 import net.minecraft.class_2338;
 
-/** AntiVipProMax compatibility, diagnostics and recovery controller. */
+/** AntiVipProMax - Tự động điều chỉnh chống kick. */
 public final class AntiVipProMaxModule {
     private AntiVipProMaxModule() {}
+
+    private static int lastLoggedSuspicion = -1;
+    private static long lastAutoAdjustLogMs = 0;
 
     public static void toggle() {
         PeoClient.CFG.antiVipProMax = !PeoClient.CFG.antiVipProMax;
@@ -30,7 +33,6 @@ public final class AntiVipProMaxModule {
     public static boolean isAntiKickEnabled() {
         return com.peoclient.nuker.bypass.NukerAntiKickEngine.isEnabled();
     }
-
 
     public static void setBypassV2(boolean enable) {
         if (enable) {
@@ -131,9 +133,6 @@ public final class AntiVipProMaxModule {
     public static int getPing() { return LatencyMetrics.get().getLastPing(); }
     public static double getAverageTickMs() { return NukerBypassEngine.getAvgTickMs(); }
 
-    private static int lastLoggedSuspicion = -1;
-    private static long lastAutoAdjustLogMs;
-
     private static void updateEngine() {
         boolean enable = isEnabled();
         NukerBypassEngine.setEnabled(enable);
@@ -142,8 +141,6 @@ public final class AntiVipProMaxModule {
             NukerBypassEngine.setVulcanMode(isVulcanMode());
             NukerBypassEngine.setIntensity(getIntensity());
             NukerBypassEngine.setAutoRecovery(isAutoRecovery());
-            // Compatibility engines are monitors/facades only. NukerLogic remains
-            // the single owner of the real block-breaking interaction state.
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setEnabled(true);
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setGrimMode(isGrimMode());
             com.peoclient.nuker.bypass.NukerAntiKickEngine.setVulcanMode(isVulcanMode());
@@ -161,41 +158,48 @@ public final class AntiVipProMaxModule {
     }
 
     public static void tick() {
-    if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
-    if (isEnabled()) {
-        NukerBypassEngine.tick();
-        NukerBypassUltimateV2.tick();
-    }
-    if (isEnabled()) {
-        if (PeoClient.CFG.bypassV2Enabled) {
-            if (!NukerBypassUltimateV2.isActive()) setBypassV2(true);
-        } else if (NukerBypassUltimateV2.isActive()) {
-            setBypassV2(false);
+        if (isEnabled() && !NukerBypassEngine.isEnabled()) updateEngine();
+        if (isEnabled()) {
+            NukerBypassEngine.tick();
+            NukerBypassUltimateV2.tick();
         }
-    }
-    // AutoAdjust nâng cấp
-    if (isEnabled() && isAutoAdjust()) {
-        int susp = getSuspicionLevel();
-        int ping = getPing();
-        // Tăng cường nếu ping cao hoặc suspicion cao
-        if (susp > 5 || ping > 200) {
-            // Tăng cường độ bypass (gửi nhiều packet giả hơn)
-            NukerBypassUltimateV2.setIntensity(Math.min(10, PeoClient.CFG.bypassV2Intensity + 1));
-            // Tăng tần suất gửi packet giả trong AntiKickEngine
-            AntiKickEngine.setProtectionLevel(Math.min(10, AntiKickEngine.getProtectionLevel() + 1));
-        } else if (susp < 3 && ping < 100) {
-            // Giảm cường độ để tiết kiệm tài nguyên
-            NukerBypassUltimateV2.setIntensity(Math.max(1, PeoClient.CFG.bypassV2Intensity - 1));
-            AntiKickEngine.setProtectionLevel(Math.max(1, AntiKickEngine.getProtectionLevel() - 1));
+        if (isEnabled()) {
+            if (PeoClient.CFG.bypassV2Enabled) {
+                if (!NukerBypassUltimateV2.isActive()) setBypassV2(true);
+            } else if (NukerBypassUltimateV2.isActive()) {
+                setBypassV2(false);
+            }
         }
-        // Ghi log mỗi 30 giây
-        if (System.currentTimeMillis() - lastAutoAdjustLogMs > 30000) {
-            lastAutoAdjustLogMs = System.currentTimeMillis();
-            DiagnosticRecorder.get().record("AutoAdjust", "susp=" + susp + " ping=" + ping +
-                " v2I=" + NukerBypassUltimateV2.getIntensity() +
-                " akeL=" + AntiKickEngine.getProtectionLevel());
-        }
-    }
-}
 
+        // AutoAdjust: Tự động điều chỉnh dựa trên ping và suspicion
+        if (isEnabled() && isAutoAdjust()) {
+            int susp = getSuspicionLevel();
+            int ping = getPing();
+
+            // Nếu suspicion > 5 hoặc ping > 100, tăng cường bảo vệ
+            if (susp > 5 || ping > 100) {
+                int newV2 = Math.min(10, PeoClient.CFG.bypassV2Intensity + 1);
+                NukerBypassUltimateV2.setIntensity(newV2);
+                AntiKickEngine.setProtectionLevel(Math.min(10, AntiKickEngine.getProtectionLevel() + 1));
+            } else if (susp < 3 && ping < 60) {
+                // Giảm cường độ khi an toàn
+                int newV2 = Math.max(1, PeoClient.CFG.bypassV2Intensity - 1);
+                NukerBypassUltimateV2.setIntensity(newV2);
+                AntiKickEngine.setProtectionLevel(Math.max(1, AntiKickEngine.getProtectionLevel() - 1));
+            }
+
+            // Ghi log mỗi 30 giây
+            if (System.currentTimeMillis() - lastAutoAdjustLogMs > 30000) {
+                lastAutoAdjustLogMs = System.currentTimeMillis();
+                DiagnosticRecorder.get().record("AutoAdjust",
+                    String.format("susp=%d ping=%d v2I=%d akeL=%d successRate=%d%%",
+                        susp, ping,
+                        NukerBypassUltimateV2.getIntensity(),
+                        AntiKickEngine.getProtectionLevel(),
+                        AntiKickEngine.getLastSuccessRate()
+                    )
+                );
+            }
+        }
+    }
 }

@@ -1,19 +1,15 @@
 package com.peoclient.nuker.optimize;
 
+import java.util.Random;
+
 /**
- * Load-smoothing controller for Nuker.
- *
- * Keeps the configured maximum batch as the normal operating level and
- * periodically uses half of that batch for one tick. This is intended to
- * smooth client/server workload without changing the configured range, target
- * selection, rotation or the maximum Nuker capability.
+ * Load-smoothing và tạo ngẫu nhiên cho Nuker.
+ * Không làm giảm tốc độ trung bình, nhưng phá vỡ pattern đều đặn.
  */
 public final class NukerPacingController {
     private static final NukerPacingController INSTANCE = new NukerPacingController();
+    private static final Random RANDOM = new Random();
 
-    // Four full-load ticks, then one half-load tick.
-    private static final int FULL_TICKS = 4;
-    private static final int CYCLE_TICKS = 5;
     private long tickCounter;
     private long totalFullTicks;
     private long totalHalfTicks;
@@ -22,36 +18,41 @@ public final class NukerPacingController {
 
     public static NukerPacingController get() { return INSTANCE; }
 
-    /**
-     * Kept for compatibility with existing call sites. Load smoothing is
-     * applied to the batch size rather than denying a break start.
-     */
-    public boolean allowBreakStart() {
-        return true;
-    }
-
-    /** Record one Nuker processing tick. */
     public void tick() {
         tickCounter++;
-        if (isHalfLoadTick()) totalHalfTicks++;
-        else totalFullTicks++;
     }
 
     /**
-     * Returns the batch to process for this tick. The maximum returned value is
-     * exactly the caller's configured maximum.
+     * Điều chỉnh batch để tạo ngẫu nhiên:
+     * - 40% số tick: batch = 100%
+     * - 30% số tick: batch = 80-95%
+     * - 20% số tick: batch = 60-80%
+     * - 10% số tick: batch = 40-60% (pause giả)
+     * Trung bình vẫn giữ ~85-90% hiệu suất.
      */
     public int adjustBatch(int maxBatch) {
         int safeMax = Math.max(1, maxBatch);
-        if (isHalfLoadTick()) return Math.max(1, (safeMax + 1) / 2);
-        return safeMax;
+        double roll = RANDOM.nextDouble();
+
+        double factor;
+        if (roll < 0.40) {
+            factor = 1.0; // 100% - đào mạnh
+        } else if (roll < 0.70) {
+            factor = 0.80 + RANDOM.nextDouble() * 0.15; // 80-95%
+        } else if (roll < 0.90) {
+            factor = 0.60 + RANDOM.nextDouble() * 0.20; // 60-80%
+        } else {
+            factor = 0.40 + RANDOM.nextDouble() * 0.20; // 40-60% (pause nhẹ)
+        }
+
+        int result = (int) Math.round(safeMax * factor);
+        return Math.max(1, Math.min(safeMax, result));
     }
 
-    private boolean isHalfLoadTick() {
-        return tickCounter > 0 && ((tickCounter - 1) % CYCLE_TICKS) == FULL_TICKS;
+    public boolean isHalfLoadMode() {
+        return RANDOM.nextDouble() < 0.15; // 15% số tick coi như "half load"
     }
 
-    public boolean isHalfLoadMode() { return isHalfLoadTick(); }
     public long getTickCounter() { return tickCounter; }
     public long getTotalFullTicks() { return totalFullTicks; }
     public long getTotalHalfTicks() { return totalHalfTicks; }
