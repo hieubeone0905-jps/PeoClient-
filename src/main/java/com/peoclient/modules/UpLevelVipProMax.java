@@ -207,7 +207,7 @@ public final class UpLevelVipProMax {
                 }
 
                 log("PLACE delayed block=" + itemId(placementInv.method_5438(workingHotbar))
-                        + " hotbar=" + workingHotbar + " hit=" + blockHit.getBlockPos());
+                        + " hotbar=" + workingHotbar + " hit=" + blockHit.method_17777());
                 client.field_1761.method_2896(
                         client.field_1724, class_1268.field_5808, blockHit);
                 state = State.WAIT_FOR_LEVEL_GUI;
@@ -338,7 +338,7 @@ public final class UpLevelVipProMax {
         }
 
         log("PLACE immediate block=" + itemId(inv.method_5438(foundHotbar))
-                + " hotbar=" + foundHotbar + " hit=" + blockHit.getBlockPos());
+                + " hotbar=" + foundHotbar + " hit=" + blockHit.method_17777());
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, blockHit);
         state = State.WAIT_FOR_LEVEL_GUI;
         waitTicks = 0;
