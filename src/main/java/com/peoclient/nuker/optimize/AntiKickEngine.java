@@ -26,7 +26,7 @@ public final class AntiKickEngine {
     public static void start() {
         active.set(true);
         reset();
-        DiagnosticRecorder.get().record("AntiKickEngine", "Started (bypass mode)");
+        DiagnosticRecorder.get().record("AntiKickEngine", "Started (real bypass mode)");
     }
 
     public static void stop() {
@@ -49,28 +49,37 @@ public final class AntiKickEngine {
         lastSuccessRate = 100;
     }
 
+    /**
+     * Gọi mỗi tick để quyết định xem có tạm dừng đào hay không.
+     * Trả về true nên tạm dừng (không đào), false nếu đào bình thường.
+     */
+    public static boolean shouldPause() {
+        if (!isActive()) return false;
+        if (isPaused) {
+            pauseTicks--;
+            if (pauseTicks <= 0) isPaused = false;
+            return true;
+        }
+        return false;
+    }
+
     public static void tick(class_310 mc) {
         if (!isActive() || mc.field_1724 == null || mc.field_1687 == null) return;
 
         antiKickTick++;
         breakCounter++;
 
-        // === MICRO-PAUSE: sau mỗi 2-4 lần đào, pause 1-3 ticks ===
+        // === MICRO-PAUSE THỰC TẾ: sau mỗi 2-4 lần đào, pause 2-4 ticks ===
         if (breakCounter % (2 + RANDOM.nextInt(3)) == 0 && RANDOM.nextInt(3) != 0) {
             isPaused = true;
-            pauseTicks = 1 + RANDOM.nextInt(3); // 1-3 ticks
+            pauseTicks = 2 + RANDOM.nextInt(3); // 2-4 ticks
             if (RANDOM.nextInt(10) == 0) {
                 DiagnosticRecorder.get().record("AntiKickEngine",
-                        "Micro-pause " + pauseTicks + " ticks (breakCounter=" + breakCounter + ")");
+                        "Real pause " + pauseTicks + " ticks (breakCounter=" + breakCounter + ")");
             }
         }
 
-        if (isPaused) {
-            pauseTicks--;
-            if (pauseTicks <= 0) isPaused = false;
-        }
-
-        // === ROTATION RANDOMIZATION: thay đổi góc nhìn liên tục ===
+        // === ROTATION RANDOMIZATION (thay đổi góc nhìn thực tế) ===
         if (mc.field_1724 != null && RANDOM.nextInt(2) == 0) {
             float yaw = mc.field_1724.method_36454();
             float pitch = mc.field_1724.method_36455();
@@ -81,7 +90,7 @@ public final class AntiKickEngine {
             mc.field_1724.method_36457(pitch);
         }
 
-        // === GIẢ LẬP FAILURE: cứ 7-12 khối thành công, tạo 1 lần fail giả ===
+        // === GIẢ LẬP FAILURE (chỉ để log, không ảnh hưởng đào) ===
         if (breakCounter % (7 + RANDOM.nextInt(6)) == 0 && breakCounter > 10) {
             failCount++;
             if (RANDOM.nextInt(5) == 0) {
@@ -118,12 +127,8 @@ public final class AntiKickEngine {
     }
 
     // === PHƯƠNG THỨC CHO UI/AUTOADJUST ===
-    public static boolean shouldPause() {
-        return isPaused;
-    }
-
     public static int getDynamicCooldown() {
-        return isPaused ? 0 : 0;
+        return 0; // không thêm cooldown
     }
 
     public static int getProtectionLevel() {

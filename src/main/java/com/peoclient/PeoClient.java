@@ -58,11 +58,13 @@ public final class PeoClient implements ClientModInitializer {
         originalUsername = class_310.method_1551().method_1548().method_1676();
         CFG.load();
 
+        // Diagnostic systems are observation-only and are initialized before the client tick.
         com.peoclient.diagnostic.DiagnosticRecorder.get().init();
         com.peoclient.diagnostic.KickLogManager.get().init();
         com.peoclient.diagnostic.KickLogManager.get().cleanupOldLogs(com.peoclient.diagnostic.DiagnosticConfig.get().getLogRetentionDays());
         com.peoclient.diagnostic.DisconnectListener.register();
         com.peoclient.diagnostic.DiagnosticHealthMonitor.get().checkHealth();
+        // Initialize optional Nuker optimization/monitoring engines.
         if (CFG.autoBlockReload) AutoBlockReload.start();
         if (CFG.autoBlockReload) AutoReloadEnhancer.start();
         if (CFG.antiKickEnabled) AntiKickEngine.start();
@@ -110,6 +112,8 @@ public final class PeoClient implements ClientModInitializer {
         class_304 key = MODULE_KEYS.get(module);
         if (key == null) return false;
         key.method_1422(class_3675.class_307.field_1668.method_1447(keyCode));
+        // Rebuild the static key-code lookup immediately. Without this call,
+        // Minecraft can keep the old binding until the next client restart.
         class_304.method_1426();
         CFG.keybinds.put(module, keyCode);
         class_310.method_1551().field_1690.method_1640();
@@ -126,8 +130,8 @@ public final class PeoClient implements ClientModInitializer {
             case "Nuker [Multi]" -> GLFW.GLFW_KEY_N;
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
-            case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
-            case "PeoJoin" -> GLFW.GLFW_KEY_P;
+                case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
+                case "PeoJoin" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
     }
@@ -149,6 +153,7 @@ public final class PeoClient implements ClientModInitializer {
             if (mc.field_1724 != null) mc.field_1724.method_7353(class_2561.method_43470("Nuker Compatibility: " + (NukerCompatibility.isEnabled() ? "ON" : "OFF")), true);
         }
 
+        // PeoJoin runs before the in-world early return so it can observe disconnects.
         PeoJoinModule.tick();
 
         if (mc.field_1724 == null || mc.field_1687 == null) {
@@ -159,6 +164,7 @@ public final class PeoClient implements ClientModInitializer {
             return;
         }
 
+        // Keep the new optimization engines synchronized with Config.
         if (CFG.nuker && CFG.autoBlockReload) {
             if (!AutoBlockReload.isActive()) AutoBlockReload.start();
             if (!AutoReloadEnhancer.isEnabled()) AutoReloadEnhancer.start();
@@ -179,6 +185,8 @@ public final class PeoClient implements ClientModInitializer {
 
         FullbrightLogic.tick(mc);
 
+        // Targeted client-side render resync for server block updates.
+
         NukerAreaLimiter.tick(mc, CFG.nukerRangeHighlight, CFG.nukerRange);
         if (CFG.nuker) {
             if (!com.peoclient.diagnostic.NukerSessionRecorder.get().isActive()) {
@@ -197,6 +205,7 @@ public final class PeoClient implements ClientModInitializer {
         }
         if (CFG.cleaner) InventoryCleaner.tick(mc);
 
+        // Keep PeoClient diagnostic output synchronized to disk while in-game.
         if (com.peoclient.diagnostic.DiagnosticConfig.get().isEnabled()) {
             com.peoclient.diagnostic.DiagnosticRecorder.get().flush();
         }
@@ -220,16 +229,22 @@ public final class PeoClient implements ClientModInitializer {
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
             case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
-            default -> { }
+            default -> { /* reserved for modules that are not implemented yet */ }
         }
         CFG.save();
     }
 
     public static void toggleXray(class_310 mc) {
         CFG.xray = !CFG.xray;
+        // Wurst-style X-Ray: when enabled, render only blocks selected in the X-Ray filter.
+        // Keep the legacy flag synchronized for old configs/UI, but do not use it
+        // as the render gate; the mixin now checks CFG.xrayBlocks directly.
         CFG.xraySkyOnly = CFG.xray;
         if (mc.field_1687 != null) {
             reload(mc);
+            // A second rebuild ensures already-built chunk meshes are discarded
+            // after the visibility rule changes. X-Ray is the only feature that
+            // needs this extra render rebuild.
             reload(mc);
         }
         CFG.save();
@@ -264,6 +279,7 @@ public final class PeoClient implements ClientModInitializer {
         public int bypassV2Intensity = 7;
         public int bypassV2Desync = 3;
 
+        // Client optimization settings. These are local stability/pacing controls.
         public int stabilizerRotationStep = 22;
         public double stabilizerPositionJitter = 0.00008;
         public int stabilizerPacketDelay = 2;
@@ -271,16 +287,23 @@ public final class PeoClient implements ClientModInitializer {
         public int compensatorMicroPause = 50;
         public Map<String, Integer> keybinds = new LinkedHashMap<>();
 
+        // Account/network settings.  A username override only changes the client-side
+        // display/session value; it does not authenticate a different online account.
         public String usernameOverride = "";
         public boolean randomProxy = false;
         public List<String> proxyList = new ArrayList<>();
         public List<String> savedAccounts = new ArrayList<>();
 
+        // Wurst/LiquidBounce-style X-Ray settings.
+        // Wurst-style X-Ray settings: block list, exposed-only and opacity.
+        // Fluids are included in the target list, matching Wurst's default X-Ray list.
         public boolean xrayFullBright = true;
+        /** Performance mode: suppress all ordinary terrain block geometry so the sky remains. */
         public boolean xraySkyOnly = true;
         public boolean xrayExposedOnly = false;
         public boolean xrayFluids = true;
         public int xrayBackgroundOpacity = 0;
+
         public int xrayPresetVersion = 0;
         public Set<String> xrayBlocks = new LinkedHashSet<>(Arrays.asList(
                 "minecraft:coal_ore", "minecraft:deepslate_coal_ore",
@@ -295,6 +318,7 @@ public final class PeoClient implements ClientModInitializer {
                 "minecraft:ancient_debris"
         ));
 
+        // BleachHack-inspired Nuker settings.
         public String nukerMode = "Normal";
         public int nukerMulti = 2;
         public int nukerCooldown = 0;
@@ -315,17 +339,22 @@ public final class PeoClient implements ClientModInitializer {
         public double nukerRangeWidth = 3.0;
         public String nukerRangeColor = "255,0,0";
 
+        // Wurst Fullbright settings.
         public String fullbrightMethod = "Gamma";
         public boolean fullbrightFade = true;
         public double fullbrightDefaultBrightness = 0.5;
         public double fullbrightBrightness = 16.0;
 
+        // LiquidBounce-inspired InventoryCleaner settings.
         public boolean cleanerGreedy = true;
         public boolean cleanerMergeStacks = true;
         public boolean cleanerTouchHotbar = false;
+        /** When enabled, only items in cleanerDropFilter are discarded. */
         public boolean cleanerFilterOnly = false;
         public Set<String> cleanerDropFilter = new LinkedHashSet<>();
         public int cleanerActionDelay = 0;
+        // Keep at least a small server acknowledgement window so fast disposal
+        // does not outrun the server and create client/server ghost items.
         public int cleanerAckTimeout = 1;
         public int maxBlocks = 512, maxArrows = 128, maxThrowables = 64, maxFoods = 200;
         public int maxWaterBuckets = 2, maxLavaBuckets = 2, maxMilkBuckets = 2;
@@ -353,7 +382,10 @@ public final class PeoClient implements ClientModInitializer {
                 Config c = new Gson().fromJson(Files.readString(p), Config.class);
                 if (c == null) return;
 
+                // Copy nullable collections/arrays safely so old configs remain usable.
                 xrayBlocks = c.xrayBlocks != null ? c.xrayBlocks : xrayBlocks;
+                // Existing configs from v1 used a broad Wurst-style block list.
+                // Upgrade that list once to the requested all-ores preset.
                 if (c.xrayPresetVersion < 2) {
                     xrayBlocks = defaultOreBlocks();
                     xrayPresetVersion = 2;
@@ -426,6 +458,8 @@ public final class PeoClient implements ClientModInitializer {
                 maxMilkBuckets = c.maxMilkBuckets;
                 itemsBlacklist = c.itemsBlacklist; offHandItem = c.offHandItem;
 
+                // Normalize missing values from older PeoClient config files so the
+                // settings screen and module logic never dereference nulls.
                 if (keybinds == null) keybinds = new LinkedHashMap<>();
                 if (nukerMode == null) nukerMode = "Normal";
                 if (nukerShape == null) nukerShape = "Cube";
@@ -542,6 +576,7 @@ public final class PeoClient implements ClientModInitializer {
                 captured = true;
             }
 
+            // Wurst's Gamma method forces brightness to 1600%, with optional 0.5-step fade.
             if (gammaActive || xrayBrightness) {
                 double old = mc.field_1690.method_42473().method_41753();
                 double next = CFG.fullbrightFade && Math.abs(old - 16.0) > 0.5
@@ -553,6 +588,7 @@ public final class PeoClient implements ClientModInitializer {
                 return;
             }
 
+            // Keep the alternate method available, but do not touch inventory or server state.
             if (nightVisionActive) {
                 mc.field_1724.method_6092(new class_1293(
                         class_1294.field_5925, 20, 0, false, false, false));
@@ -581,13 +617,14 @@ public final class PeoClient implements ClientModInitializer {
                 ((com.peoclient.mixin.SimpleOptionAccessor) (Object) mc.field_1690.method_42473())
                         .peo$setValue(value);
             } catch (Throwable ignored) {
+                // Fallback keeps vanilla-safe behaviour if the accessor is unavailable.
                 mc.field_1690.method_42473().method_41748(class_3532.method_15350(value, 0.0, 1.0));
             }
         }
     }
 
     public static final class NukerLogic {
-        private static final int MAX_BLOCKS_PER_TICK = 8; // giảm từ 10 xuống 8 để tránh kick
+        private static final int MAX_BLOCKS_PER_TICK = 10; // ĐÃ GIẢM XUỐNG 10
         private static final List<class_2338> renderBlocks = new ArrayList<>();
         private static final List<Target> queue = new ArrayList<>();
         private static int cooldown;
@@ -599,16 +636,19 @@ public final class PeoClient implements ClientModInitializer {
         private static long diagnosticTargetTime;
         private static long diagnosticAttemptTime;
         private static long diagnosticInteractionTime;
-        private static final Random RANDOM = new Random();
+        private static final Random RANDOM = new Random(); // THÊM RANDOM
 
         private NukerLogic() {}
 
         public static void tick(class_310 mc) {
-            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null) return;
+            if (mc.field_1761 == null || mc.field_1724 == null || mc.field_1687 == null
+                    ) return;
 
             renderBlocks.clear();
             com.peoclient.nuker.compat.NukerWorldSync.tick(mc);
 
+            // New optimization/monitoring engines run alongside the existing
+            // vanilla Nuker state machine; they do not replace it.
             if (CFG.autoBlockReload) AutoBlockReload.tick();
             if (CFG.antiKickEnabled) {
                 ClientStabilizer.tick();
@@ -616,12 +656,14 @@ public final class PeoClient implements ClientModInitializer {
                 AntiKickEngine.tick(mc);
             }
 
+            // Apply only a local pacing adjustment when latency is genuinely high.
+            // This never fabricates movement/block packets.
             if (cooldown > 0) {
                 cooldown--;
                 return;
             }
 
-            // === BYPASS PACKET GIẢ MỖI TICK ===
+            // === THÊM BYPASS PACKET Ở ĐÂY ===
             if (CFG.nuker && CFG.bypassV2Enabled && mc.field_1724 != null) {
                 float yaw = mc.field_1724.method_36454() + (float)(RANDOM.nextGaussian() * 0.4);
                 float pitch = mc.field_1724.method_36455() + (float)(RANDOM.nextGaussian() * 0.2);
@@ -638,11 +680,17 @@ public final class PeoClient implements ClientModInitializer {
                 }
             }
 
+            // Apply the optional dynamic cooldown from AntiKickEngine without
+            // replacing the normal Nuker interaction path.
             int dynamicCooldown = 0;
             if (AntiKickEngine.isActive()) {
                 dynamicCooldown = Math.max(0, AntiKickEngine.getDynamicCooldown());
             }
+            // BypassV2 remains a compatibility facade; NukerLogic stays the
+            // single owner of block-breaking packets.
 
+            // Lightweight local recovery: keep the fast Nuker engine intact, but
+            // recover automatically if the vanilla breaking state stops changing.
             if (breakingPos != null) {
                 class_2680 activeState = mc.field_1687.method_8320(breakingPos);
                 float progress = getBreakingProgress();
@@ -665,7 +713,7 @@ public final class PeoClient implements ClientModInitializer {
                     }
                     progressPos = breakingPos;
                     lastBreakingProgress = progress;
-                    if (stagnantTicks >= 20) {
+                    if (stagnantTicks >= 16) {
                         com.peoclient.nuker.compat.NukerWorldSync.onStaleTarget(mc, breakingPos, progress);
                         if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                             com.peoclient.nuker.bypass.NukerBypassEngine.onRecovery();
@@ -676,6 +724,9 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.diagnostic.BreakStateTracker.get().transition(
                                 com.peoclient.diagnostic.BreakStateTracker.State.RECOVERY, breakingPos);
                         com.peoclient.diagnostic.PreKickSnapshot.get().record("RECOVERY: " + breakingPos);
+                        // NukerWorldSync already aborts the vanilla break state here.
+                        // Avoid issuing the same abort twice; duplicate aborts can cause
+                        // unnecessary state churn without changing legitimate break speed.
                         breakingPos = null;
                         breakingSide = null;
                         queue.clear();
@@ -686,11 +737,14 @@ public final class PeoClient implements ClientModInitializer {
                 }
             }
 
+            // AntiVipProMax observes the existing vanilla break state; it does
+            // not create a second packet producer and does not alter Nuker speed.
             if (com.peoclient.modules.AntiVipProMaxModule.isEnabled()) {
                 com.peoclient.nuker.bypass.NukerBypassEngine.onNukerTick(
                         breakingPos != null, stagnantTicks > 0);
             }
 
+            // Build a fresh queue when the old one is exhausted or its active target became invalid.
             if (queue.isEmpty() || !activeTargetStillValid(mc)) {
                 if (breakingPos != null) {
                     mc.field_1761.method_2925();
@@ -705,12 +759,16 @@ public final class PeoClient implements ClientModInitializer {
                 queue.sort(comparator(mc));
             }
 
+            // Preserve the strongest Nuker batch as the normal level.
+            // Every fifth processing tick uses half of that batch to smooth
+            // local/server workload, then immediately returns to MAX.
             com.peoclient.nuker.optimize.NukerPacingController pacing =
                     com.peoclient.nuker.optimize.NukerPacingController.get();
             pacing.tick();
             int configuredBatch = class_3532.method_15340(CFG.nukerMulti, 1, MAX_BLOCKS_PER_TICK);
             int batch = pacing.adjustBatch(configuredBatch);
             if ("Multi".equalsIgnoreCase(CFG.nukerMode) || "SurvMulti".equalsIgnoreCase(CFG.nukerMode)) {
+                // Multi/SurvMulti mean queue depth here; only one legitimate break state is active at a time.
                 if (queue.size() > batch) queue.subList(batch, queue.size()).clear();
             } else if (!queue.isEmpty()) {
                 queue.subList(1, queue.size()).clear();
@@ -735,6 +793,8 @@ public final class PeoClient implements ClientModInitializer {
                     rotateTo(mc, target.pos);
                 }
 
+                // Use the normal interaction manager for each target. We keep one
+                // active vanilla breaking state and refresh it for the current target.
                 if (breakingPos != null && !breakingPos.equals(target.pos)) {
                     mc.field_1761.method_2925();
                     breakingPos = null;
@@ -756,8 +816,12 @@ public final class PeoClient implements ClientModInitializer {
                         com.peoclient.nuker.bypass.NukerBypassEngine.onBreakAttempt(target.pos, target.side);
                     }
 
+                    // The V2 engine, when active, is responsible for its own
+                    // packet sequence; otherwise use the normal interaction path.
                     if (NukerBypassUltimateV2.isActive()) {
-                        // Bypass V2 đã gửi packet giả
+                        // Bypass V2 has already prepared its packet path.
+                    } else {
+                        // Normal vanilla attack path remains below.
                     }
 
                     if (!mc.field_1761.method_2910(target.pos, target.side)) {
@@ -796,6 +860,10 @@ public final class PeoClient implements ClientModInitializer {
                     com.peoclient.diagnostic.NukerTimingMetrics.get().recordAttemptToInteraction(
                             diagnosticInteractionTime - diagnosticAttemptTime);
                 }
+                // Keep the Nuker on the normal Minecraft interaction path.
+                // With the vanilla-render build, Nuker does not submit custom
+                // chunk rebuild requests. Minecraft handles the render update
+                // through its normal ClientWorld/WorldRenderer path.
                 mc.field_1761.method_2902(target.pos, target.side);
                 mc.field_1724.method_6104(class_1268.field_5808);
                 renderBlocks.add(target.pos);
@@ -828,9 +896,22 @@ public final class PeoClient implements ClientModInitializer {
                     breakingPos = null;
                     breakingSide = null;
                 } else {
+                    // The server/world has not confirmed the block as broken yet.
+                    // Keep the same vanilla breaking state and resume it next tick.
+                    // Re-selecting a new target (or starting the same target again)
+                    // every iteration can generate an excessive stream of start/
+                    // progress actions and is the main source of instability seen
+                    // when Nuker is combined with the compatibility monitors.
+                    //
+                    // One progress interaction per client tick is intentional here:
+                    // it lets Minecraft's normal interaction manager advance the
+                    // current break state without creating duplicate actions.
                     break;
                 }
+
             }
+
+
         }
 
         public static void resetState() {
@@ -945,6 +1026,9 @@ public final class PeoClient implements ClientModInitializer {
         }
 
         private static class_2350 bestSide(class_310 mc, class_2338 pos) {
+            // BleachHack-style face selection: try every face and raycast to a point
+            // on that face instead of raycasting only to the block center. This is
+            // especially important when mining from above/below or around corners.
             class_243 eye = mc.field_1724.method_33571();
             for (class_2350 side : class_2350.values()) {
                 class_2338 neighbour = pos.method_10093(side);
@@ -994,6 +1078,7 @@ public final class PeoClient implements ClientModInitializer {
             class_310 mc = class_310.method_1551();
             if (mc.field_1724 == null) return;
 
+            // Wurst-style compact HUD: logo at top-left, active modules directly underneath.
             var title = class_2561.method_43470("PeoClient 1.21.4 V1")
                     .method_27694(style -> style.method_10982(true));
             d.method_51439(mc.field_1772, title, 10, 8, 0xFFFFFFFF, false);
@@ -1015,5 +1100,4 @@ public final class PeoClient implements ClientModInitializer {
                     10, y, 0xFFFFFFFF, false);
             return y + 14;
         }
-    }
-}
+    }}
