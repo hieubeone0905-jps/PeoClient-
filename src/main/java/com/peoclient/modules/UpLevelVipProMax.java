@@ -41,6 +41,10 @@ public final class UpLevelVipProMax {
     );
 
     private static final int DROP_STACKS_PER_TICK = 1;
+    /** Minimum number of inventory slots occupied by level-value blocks before opening the level GUI. */
+    private static final int MIN_VALUE_BLOCK_SLOTS = 20;
+    /** Preferred upper target; the scan never needs to wait beyond this if 20 is already reached. */
+    private static final int MAX_VALUE_BLOCK_SLOTS = 25;
     // Keep inventory THROW traffic deliberately low: one or two actions per tick.
     // This avoids bursty inventory traffic that can trigger server-side rate checks.
     private static final int DROP_FULL_TICKS = 8;
@@ -170,19 +174,27 @@ public final class UpLevelVipProMax {
             lastContainerSyncId = -1;
         }
 
-        // Dispose matching blocks in a bounded batch. This keeps the normal
-        // inventory THROW action while allowing up to 31 stacks/actions per tick.
-        if (dropCycleTick > 0) {
-            dropCycleTick--;
-        } else {
-            int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
-            if (dropped > 0) {
-                // Leave a quiet window between inventory actions.
-                dropCycleTick = DROP_CYCLE_TICKS;
-                return;
+        // Before every level-up attempt, scan the COMPLETE inventory.
+        // Do not open/place anything until at least 20 slots contain valuable
+        // level blocks. While below the threshold, only discard the configured
+        // zero-value blocks, one THROW at a time, until the inventory is clean
+        // enough to keep collecting valuable blocks.
+        if (!hasEnoughValueBlocks(client)) {
+            if (dropCycleTick > 0) {
+                dropCycleTick--;
+            } else {
+                int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
+                if (dropped > 0) {
+                    dropCycleTick = DROP_CYCLE_TICKS;
+                    return;
+                }
             }
+            return;
         }
 
+        // 20 slots is enough to start. If the player already has 25 or more,
+        // the next cycle may proceed immediately; we never force extra GUI
+        // traffic just to reach an exact count.
         switch (state) {
             case IDLE, PLACE_LEVEL_BLOCK -> tryPlaceLevelBlock(client);
             case PREPARE_VANILLA_PLACEMENT -> {
@@ -311,8 +323,39 @@ public final class UpLevelVipProMax {
         return -1;
     }
 
+    /**
+     * Count inventory slots that currently contain configured level-value blocks.
+     * This is intentionally slot-based (20..25 slots), not item-count based: a full
+     * stack still occupies one slot, matching the requested inventory-space rule.
+     */
+    private static int countValueBlockSlots(class_310 client) {
+        var inv = client.field_1724.method_31548();
+        int count = 0;
+        for (int slot = 0; slot < 36; slot++) {
+            class_1799 stack = inv.method_5438(slot);
+            if (!stack.method_7960() && LEVEL_BLOCKS.contains(itemId(stack))) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private static boolean hasEnoughValueBlocks(class_310 client) {
+        int count = countValueBlockSlots(client);
+        if (count >= MIN_VALUE_BLOCK_SLOTS) {
+            return true;
+        }
+        return false;
+    }
+
     private static void tryPlaceLevelBlock(class_310 client) {
         var inv = client.field_1724.method_31548();
+        int valueSlots = countValueBlockSlots(client);
+        if (valueSlots < MIN_VALUE_BLOCK_SLOTS) {
+            return;
+        }
+        log("VALUE_BLOCK_THRESHOLD reached=" + valueSlots + " slots (target "
+                + MIN_VALUE_BLOCK_SLOTS + "-" + MAX_VALUE_BLOCK_SLOTS + ")");
         int foundHotbar = findAndPrepareValuableBlock(client);
 
         if (foundHotbar < 0) {
