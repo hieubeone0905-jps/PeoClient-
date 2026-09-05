@@ -25,7 +25,18 @@ public final class KickReasonRecorder {
         lastKickReason = reason == null || reason.isBlank() ? "Unknown reason" : reason;
         kickTimestamp = System.currentTimeMillis();
         wasKicked = true;
-        DiagnosticRecorder.get().record("DISCONNECT", lastKickReason);
+        String account = "unknown";
+        String server = "unknown";
+        try {
+            net.minecraft.class_310 client = net.minecraft.class_310.method_1551();
+            if (client.method_1548() != null) account = client.method_1548().method_1676();
+            if (client.method_1562() != null && client.method_1562().method_45734() != null) {
+                server = client.method_1562().method_45734().toString();
+            }
+        } catch (Throwable ignored) {}
+        String detail = "ACCOUNT=" + account + " SERVER=" + server + " REASON=" + lastKickReason;
+        DiagnosticRecorder.get().record("DISCONNECT", detail);
+        DiagnosticRecorder.get().record("ACCOUNT_KICK", detail);
         ServerResponseMonitor.get().recordDisconnect(lastKickReason);
     }
 

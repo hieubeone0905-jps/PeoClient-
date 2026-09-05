@@ -1,6 +1,7 @@
 package com.peoclient.modules;
 
 import com.peoclient.PeoClient;
+import com.peoclient.diagnostic.DiagnosticRecorder;
 import net.minecraft.class_1268;
 import net.minecraft.class_1713;
 import net.minecraft.class_1799;
@@ -39,9 +40,9 @@ public final class UpLevelVipProMax {
             "minecraft:gold_block"
     );
 
-    private static final int DROP_STACKS_PER_TICK = 18;
-    // Keep the configured 16-action ceiling, but smooth inventory THROW bursts.
-    // Four full ticks followed by one half-load tick.
+    private static final int DROP_STACKS_PER_TICK = 2;
+    // Keep inventory THROW traffic deliberately low: one or two actions per tick.
+    // This avoids bursty inventory traffic that can trigger server-side rate checks.
     private static final int DROP_FULL_TICKS = 4;
     private static final int DROP_CYCLE_TICKS = 5;
     private static int dropCycleTick;
@@ -73,6 +74,8 @@ public final class UpLevelVipProMax {
     private static int selectedHotbar = -1;
     private static int workingHotbar = -1;
     private static boolean configInitialized;
+    private static boolean playerWasPresent;
+    private static String lastLoggedState = "";
 
     private enum State {
         IDLE,
@@ -96,11 +99,14 @@ public final class UpLevelVipProMax {
     public static void setEnabled(boolean value) {
         enabled = value;
         if (!enabled) {
+            log("Disabled; state=" + state);
             reset();
         } else {
             state = State.IDLE;
             waitTicks = 0;
             cooldown = 0;
+            playerWasPresent = mc.field_1724 != null;
+            log("Enabled; account=" + accountName() + ", server=" + serverName());
         }
         PeoClient.CFG.upLevelVipProMax = enabled;
         PeoClient.CFG.save();
@@ -116,8 +122,24 @@ public final class UpLevelVipProMax {
             configInitialized = true;
         }
 
-        if (!enabled || client.field_1724 == null || client.field_1761 == null
-                || client.field_1687 == null) return;
+        if (!enabled) return;
+
+        if (client.field_1724 == null) {
+            if (playerWasPresent) {
+                log("PLAYER_LOST: possible disconnect/kick while state=" + state
+                        + ", account=" + accountName() + ", server=" + serverName());
+                playerWasPresent = false;
+            }
+            return;
+        }
+        playerWasPresent = true;
+        if (client.field_1761 == null || client.field_1687 == null) return;
+
+        String stateName = state.name();
+        if (!stateName.equals(lastLoggedState)) {
+            log("STATE -> " + stateName + " account=" + accountName());
+            lastLoggedState = stateName;
+        }
 
         if (cooldown > 0) {
             cooldown--;
@@ -184,6 +206,8 @@ public final class UpLevelVipProMax {
                     return;
                 }
 
+                log("PLACE delayed block=" + itemId(placementInv.method_5438(workingHotbar))
+                        + " hotbar=" + workingHotbar + " hit=" + blockHit.getBlockPos());
                 client.field_1761.method_2896(
                         client.field_1724, class_1268.field_5808, blockHit);
                 state = State.WAIT_FOR_LEVEL_GUI;
@@ -226,6 +250,8 @@ public final class UpLevelVipProMax {
                         class_1713.field_7795,
                         client.field_1724
                 );
+                log("DROP block=" + itemId(stack) + " inventorySlot=" + slot
+                        + " screenSlot=" + screenSlot + " syncId=" + client.field_1724.field_7512.field_7763);
                 dropped++;
                 found = true;
             }
@@ -263,13 +289,16 @@ public final class UpLevelVipProMax {
                 }
             }
 
+            int screenSlot = playerInventoryScreenSlot(slot);
             client.field_1761.method_2906(
                     client.field_1724.field_7512.field_7763,
-                    playerInventoryScreenSlot(slot),
+                    screenSlot,
                     targetHotbar,
                     class_1713.field_7791,
                     client.field_1724
             );
+            log("SWAP valuable block=" + itemId(stack) + " inventorySlot=" + slot
+                    + " -> hotbar=" + targetHotbar + " screenSlot=" + screenSlot);
             workingHotbar = targetHotbar;
             return targetHotbar;
         }
@@ -301,11 +330,15 @@ public final class UpLevelVipProMax {
         // time to settle.
         if (selectedHotbar != foundHotbar) {
             inv.method_61496(foundHotbar);
+            log("SELECT hotbar=" + foundHotbar + " previous=" + selectedHotbar
+                    + " block=" + itemId(inv.method_5438(foundHotbar)));
             state = State.PREPARE_VANILLA_PLACEMENT;
             waitTicks = VANILLA_PLACEMENT_DELAY_TICKS;
             return;
         }
 
+        log("PLACE immediate block=" + itemId(inv.method_5438(foundHotbar))
+                + " hotbar=" + foundHotbar + " hit=" + blockHit.getBlockPos());
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, blockHit);
         state = State.WAIT_FOR_LEVEL_GUI;
         waitTicks = 0;
@@ -346,6 +379,8 @@ public final class UpLevelVipProMax {
             }
 
             // Normal PICKUP click on the server-provided hopper/action item.
+            log("GUI_CLICK hopperSlot=" + hopperSlot + " syncId=" + syncId
+                    + " title=" + client.field_1755.method_25440().getString());
             client.field_1761.method_2906(
                     syncId, hopperSlot, 0, class_1713.field_7790, client.field_1724);
             state = State.WAIT_FOR_SERVER;
@@ -367,6 +402,7 @@ public final class UpLevelVipProMax {
             } catch (Throwable ignored) {
                 client.method_1507(null);
             }
+            log("GUI_CLOSE syncId=" + syncId + " account=" + accountName());
             restoreSelectedHotbar(client);
             workingHotbar = -1;
             // Give the server a normal post-close acknowledgement window.
@@ -444,10 +480,31 @@ public final class UpLevelVipProMax {
 
     private static void restoreSelectedHotbar(class_310 client) {
         if (selectedHotbar >= 0 && selectedHotbar < 9) {
-            client.field_1724.method_31548().field_7545 = selectedHotbar;
+            client.field_1724.method_31548().method_61496(selectedHotbar);
         }
         selectedHotbar = -1;
         workingHotbar = -1;
+    }
+
+    private static String accountName() {
+        try {
+            return mc.method_1548() != null ? mc.method_1548().method_1676() : "unknown";
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
+    }
+
+    private static String serverName() {
+        try {
+            return mc.method_1562() != null && mc.method_1562().method_45734() != null
+                    ? mc.method_1562().method_45734().toString() : "unknown";
+        } catch (Throwable ignored) {
+            return "unknown";
+        }
+    }
+
+    private static void log(String message) {
+        DiagnosticRecorder.get().record("UpLevelVipProMax", message);
     }
 
     private static String itemId(class_1799 stack) {
@@ -462,6 +519,8 @@ public final class UpLevelVipProMax {
         lastContainerSyncId = -1;
         selectedHotbar = -1;
         workingHotbar = -1;
+        playerWasPresent = false;
+        lastLoggedState = "";
     }
 
     /** Exposed for the GUI/diagnostics without exposing mutable collections. */
