@@ -597,19 +597,22 @@ public final class PoeScreen extends class_437 {
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
                 case "AntiVipProMax" -> clickAntiVipProMax(mouseX, mouseY, settingsX, settingsW, contentY);
                 case "UpLevelVipProMax" -> {
-                        int p = contentY + 20 + 26 + 34; // slider 1: threshold
-                        int p2 = p + 34; // slider 2: drop stacks/tick
-                        if (hit(mouseY, p)) {
-                            UpLevelVipProMax.setValueBlockThreshold((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 10, 36, "Stack threshold")));
-                            save();
-                        } else if (hit(mouseY, p2)) {
-                            UpLevelVipProMax.setDropStacksPerTick((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 36, "Drop stack/tick")));
-                            save();
-                        } else {
-                            UpLevelVipProMax.toggle();
-                            save();
-                        }
+                    // drawUpLevelVipProMax: section (+26), Status (+34), then the two sliders.
+                    // Only the actual slider rows should consume the click; Enable is handled above.
+                    int thresholdY = contentY + 60;
+                    int dropY = thresholdY + 34;
+                    if (hit(mouseY, thresholdY)) {
+                        UpLevelVipProMax.setValueBlockThreshold((int)Math.round(
+                                sliderValue(mouseX, settingsX, settingsW, 10, 36, "Stack threshold")));
+                        save();
+                        draggingSlider = "UpLevelThreshold";
+                    } else if (hit(mouseY, dropY)) {
+                        UpLevelVipProMax.setDropStacksPerTick((int)Math.round(
+                                sliderValue(mouseX, settingsX, settingsW, 1, 36, "Drop stack/tick")));
+                        save();
+                        draggingSlider = "UpLevelDrop";
                     }
+                }
             }
             return true;
         }
@@ -894,6 +897,12 @@ public final class PoeScreen extends class_437 {
                 PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 1.0, 6.0, "Range"), 1.0, 6.0, 0.1);
             } else if ("NukerWidth".equals(draggingSlider)) {
                 PeoClient.CFG.nukerRangeWidth = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 10.0, "Width"), 0.1, 10.0, 0.1);
+            } else if ("UpLevelThreshold".equals(draggingSlider)) {
+                UpLevelVipProMax.setValueBlockThreshold((int)Math.round(
+                        sliderValue(mouseX, sx, sw, 10, 36, "Stack threshold")));
+            } else if ("UpLevelDrop".equals(draggingSlider)) {
+                UpLevelVipProMax.setDropStacksPerTick((int)Math.round(
+                        sliderValue(mouseX, sx, sw, 1, 36, "Drop stack/tick")));
             }
             PeoClient.CFG.save();
             return true;
