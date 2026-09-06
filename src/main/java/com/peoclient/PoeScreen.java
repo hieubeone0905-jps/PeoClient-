@@ -454,9 +454,11 @@ public final class PoeScreen extends class_437 {
     private int drawUpLevelVipProMax(class_332 d, int x, int y, int w) {
         y = section(d, x, y, "Island Level");
         y = rowValue(d, x, y, w, "Status", UpLevelVipProMax.getStatus());
+        y = sliderRow(d, x, y, w, "Stack threshold", UpLevelVipProMax.getValueBlockThreshold(), 10, 36, "%.0f stacks");
+        y = sliderRow(d, x, y, w, "Drop stack/tick", UpLevelVipProMax.getDropStacksPerTick(), 1, 36, "%.0f stacks/tick");
         y = rowValue(d, x, y, w, "Scan", "All 36 inventory slots");
         y = rowValue(d, x, y, w, "Valuable", "Diamond / Emerald / Lapis / Coal / Redstone / Iron / Gold");
-        y = rowValue(d, x, y, w, "Submit", "Click hopper, wait for server, close GUI");
+        y = rowValue(d, x, y, w, "Submit", "Only after threshold is reached");
         return y;
     }
 
@@ -594,7 +596,20 @@ public final class PoeScreen extends class_437 {
                 case "X-Ray" -> clickXray(mouseY, contentY);
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
                 case "AntiVipProMax" -> clickAntiVipProMax(mouseX, mouseY, settingsX, settingsW, contentY);
-                case "UpLevelVipProMax" -> { UpLevelVipProMax.toggle(); save(); }
+                case "UpLevelVipProMax" -> {
+                        int p = contentY + 20 + 26 + 34; // slider 1: threshold
+                        int p2 = p + 34; // slider 2: drop stacks/tick
+                        if (hit(mouseY, p)) {
+                            UpLevelVipProMax.setValueBlockThreshold((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 10, 36, "Stack threshold")));
+                            save();
+                        } else if (hit(mouseY, p2)) {
+                            UpLevelVipProMax.setDropStacksPerTick((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 36, "Drop stack/tick")));
+                            save();
+                        } else {
+                            UpLevelVipProMax.toggle();
+                            save();
+                        }
+                    }
             }
             return true;
         }
@@ -944,7 +959,7 @@ public final class PoeScreen extends class_437 {
             case "X-Ray" -> 340;
             case "Fullbright" -> 220;
             case "AntiVipProMax" -> 300;
-            case "UpLevelVipProMax" -> 220;
+            case "UpLevelVipProMax" -> 300;
             default -> 120;
         };
     }

@@ -254,6 +254,10 @@ public final class PeoClient implements ClientModInitializer {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
         public boolean antiVipProMax = false;
         public boolean upLevelVipProMax = false;
+        /** Number of inventory stacks containing configured level blocks required before submission. */
+        public int upLevelVipProMaxThreshold = 10;
+        /** Maximum number of zero-value stacks to THROW during one tick. */
+        public int upLevelVipProMaxDropStacksPerTick = 1;
         public boolean antiVipProMaxGrim = true;
         public boolean antiVipProMaxVulcan = true;
         public int antiVipProMaxIntensity = 5;
@@ -359,6 +363,8 @@ public final class PeoClient implements ClientModInitializer {
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
                 antiVipProMax = c.antiVipProMax;
                 upLevelVipProMax = c.upLevelVipProMax;
+                upLevelVipProMaxThreshold = Math.max(10, Math.min(36, c.upLevelVipProMaxThreshold));
+                upLevelVipProMaxDropStacksPerTick = Math.max(1, Math.min(36, c.upLevelVipProMaxDropStacksPerTick));
                 antiVipProMaxGrim = c.antiVipProMaxGrim;
                 antiVipProMaxVulcan = c.antiVipProMaxVulcan;
                 antiVipProMaxIntensity = Math.max(1, Math.min(10, c.antiVipProMaxIntensity));

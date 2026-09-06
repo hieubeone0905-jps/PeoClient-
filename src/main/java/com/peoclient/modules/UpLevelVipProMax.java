@@ -40,16 +40,20 @@ public final class UpLevelVipProMax {
             "minecraft:gold_block"
     );
 
-    private static final int DROP_STACKS_PER_TICK = 20;
+    private static final int DEFAULT_DROP_STACKS_PER_TICK = 1;
     /** Minimum number of inventory slots occupied by level-value blocks before opening the level GUI. */
-    private static final int MIN_VALUE_BLOCK_SLOTS = 15;
-    /** Preferred upper target; the scan never needs to wait beyond this if 20 is already reached. */
-    private static final int MAX_VALUE_BLOCK_SLOTS = 25;
+    private static final int DEFAULT_VALUE_BLOCK_THRESHOLD = 10;
+    private static final int MIN_VALUE_BLOCK_SLOTS = 10;
+    private static final int MAX_VALUE_BLOCK_SLOTS = 36;
+    private static final int MIN_DROP_STACKS_PER_TICK = 1;
+    private static final int MAX_DROP_STACKS_PER_TICK = 36;
     // Keep inventory THROW traffic deliberately low: one or two actions per tick.
     // This avoids bursty inventory traffic that can trigger server-side rate checks.
     private static final int DROP_FULL_TICKS = 8;
     private static final int DROP_CYCLE_TICKS = 8;
     private static int dropCycleTick;
+    private static int valueBlockThreshold = DEFAULT_VALUE_BLOCK_THRESHOLD;
+    private static int dropStacksPerTick = DEFAULT_DROP_STACKS_PER_TICK;
 
     private static final Set<String> DROP_BLOCKS = Set.of(
             "minecraft:stone",
@@ -123,6 +127,8 @@ public final class UpLevelVipProMax {
     public static void tick(class_310 client) {
         if (!configInitialized) {
             enabled = PeoClient.CFG.upLevelVipProMax;
+            valueBlockThreshold = clampThreshold(PeoClient.CFG.upLevelVipProMaxThreshold);
+            dropStacksPerTick = clampDropStacks(PeoClient.CFG.upLevelVipProMaxDropStacksPerTick);
             configInitialized = true;
         }
 
@@ -183,7 +189,7 @@ public final class UpLevelVipProMax {
             if (dropCycleTick > 0) {
                 dropCycleTick--;
             } else {
-                int dropped = dropInvalidBlocksBatch(client, DROP_STACKS_PER_TICK);
+                int dropped = dropInvalidBlocksBatch(client, dropStacksPerTick);
                 if (dropped > 0) {
                     dropCycleTick = DROP_CYCLE_TICKS;
                     return;
@@ -246,11 +252,11 @@ public final class UpLevelVipProMax {
     private static int dropInvalidBlocksBatch(class_310 client, int maxActions) {
         var inv = client.field_1724.method_31548();
 
-        // Deliberately perform at most ONE THROW per invocation. The previous
-        // implementation could send several THROW actions in the same tick,
-        // which produced bursty inventory traffic and, on the target server,
-        // could result in the player being returned to the Hub.
-        for (int slot = 0; slot < 36; slot++) {
+        // The slider controls the maximum number of stacks thrown in one tick.
+        // Default remains conservative (1), while advanced users can raise it
+        // all the way to 36.
+        int actions = 0;
+        for (int slot = 0; slot < 36 && actions < maxActions; slot++) {
             class_1799 stack = inv.method_5438(slot);
             if (stack.method_7960()) continue;
             if (!DROP_BLOCKS.contains(itemId(stack))) continue;
@@ -273,9 +279,9 @@ public final class UpLevelVipProMax {
             );
             log("DROP block=" + id + " inventorySlot=" + slot
                     + " screenSlot=" + screenSlot + " syncId=" + client.field_1724.field_7512.field_7763);
-            return 1;
+            actions++;
         }
-        return 0;
+        return actions;
     }
 
     /**
@@ -342,20 +348,50 @@ public final class UpLevelVipProMax {
 
     private static boolean hasEnoughValueBlocks(class_310 client) {
         int count = countValueBlockSlots(client);
-        if (count >= MIN_VALUE_BLOCK_SLOTS) {
+        if (count >= valueBlockThreshold) {
             return true;
         }
         return false;
     }
 
+    private static int clampThreshold(int value) {
+        return Math.max(MIN_VALUE_BLOCK_SLOTS, Math.min(MAX_VALUE_BLOCK_SLOTS, value));
+    }
+
+    private static int clampDropStacks(int value) {
+        return Math.max(MIN_DROP_STACKS_PER_TICK, Math.min(MAX_DROP_STACKS_PER_TICK, value));
+    }
+
+    public static int getValueBlockThreshold() {
+        return valueBlockThreshold;
+    }
+
+    public static void setValueBlockThreshold(int value) {
+        valueBlockThreshold = clampThreshold(value);
+        PeoClient.CFG.upLevelVipProMaxThreshold = valueBlockThreshold;
+        PeoClient.CFG.save();
+        log("VALUE_BLOCK_THRESHOLD set=" + valueBlockThreshold + " stacks");
+    }
+
+    public static int getDropStacksPerTick() {
+        return dropStacksPerTick;
+    }
+
+    public static void setDropStacksPerTick(int value) {
+        dropStacksPerTick = clampDropStacks(value);
+        PeoClient.CFG.upLevelVipProMaxDropStacksPerTick = dropStacksPerTick;
+        PeoClient.CFG.save();
+        log("DROP_STACKS_PER_TICK set=" + dropStacksPerTick + " stacks/tick");
+    }
+
     private static void tryPlaceLevelBlock(class_310 client) {
         var inv = client.field_1724.method_31548();
         int valueSlots = countValueBlockSlots(client);
-        if (valueSlots < MIN_VALUE_BLOCK_SLOTS) {
+        if (valueSlots < valueBlockThreshold) {
             return;
         }
-        log("VALUE_BLOCK_THRESHOLD reached=" + valueSlots + " slots (target "
-                + MIN_VALUE_BLOCK_SLOTS + "-" + MAX_VALUE_BLOCK_SLOTS + ")");
+        log("VALUE_BLOCK_THRESHOLD reached=" + valueSlots + " stacks (target "
+                + valueBlockThreshold + " stacks)");
         int foundHotbar = findAndPrepareValuableBlock(client);
 
         if (foundHotbar < 0) {
