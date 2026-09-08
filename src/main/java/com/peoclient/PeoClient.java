@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.UpLevelVipProMax;
+import com.peoclient.modules.AutoCraftMaxSpeed;
 import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
@@ -98,6 +99,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "X-Ray" -> GLFW.GLFW_KEY_X;
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
                 case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
+                case "AutoCraftMaxSpeed" -> GLFW.GLFW_KEY_K;
                 case "PeoJoin" -> GLFW.GLFW_KEY_P;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
@@ -128,6 +130,7 @@ public final class PeoClient implements ClientModInitializer {
             case "X-Ray" -> GLFW.GLFW_KEY_X;
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
             case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
+                case "AutoCraftMaxSpeed" -> GLFW.GLFW_KEY_K;
             case "PeoJoin" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
@@ -192,6 +195,7 @@ public final class PeoClient implements ClientModInitializer {
         SafeCompatibilityDiagnostics.tick();
         AntiVipProMaxModule.tick();
         UpLevelVipProMax.tick(mc);
+        AutoCraftMaxSpeed.tick(mc);
         if (com.peoclient.diagnostic.DiagnosticUtil.clientTick() % 20 == 0) {
             com.peoclient.diagnostic.PreDisconnectSnapshot.get().record(mc);
             com.peoclient.diagnostic.LatencyMetrics.get().updatePing();
@@ -220,6 +224,7 @@ public final class PeoClient implements ClientModInitializer {
             case "InventoryCleaner" -> CFG.cleaner = !CFG.cleaner;
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
             case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
+            case "AutoCraftMaxSpeed" -> AutoCraftMaxSpeed.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
             default -> {}
         }
@@ -254,6 +259,10 @@ public final class PeoClient implements ClientModInitializer {
         public boolean xray = false, nuker = false, fullbright = false, cleaner = false;
         public boolean antiVipProMax = false;
         public boolean upLevelVipProMax = false;
+        public boolean autoCraftMaxSpeed = false;
+        public int autoCraftMaxSpeedCraftSpeed = 1;
+        public int autoCraftMaxSpeedDropSpeed = 1;
+        public int autoCraftMaxSpeedThreshold = 10;
         /** Number of inventory stacks containing configured level blocks required before submission. */
         public int upLevelVipProMaxThreshold = 10;
         /** Maximum number of zero-value stacks to THROW during one tick. */
@@ -363,6 +372,10 @@ public final class PeoClient implements ClientModInitializer {
                 xray = c.xray; nuker = c.nuker; fullbright = c.fullbright; cleaner = c.cleaner;
                 antiVipProMax = c.antiVipProMax;
                 upLevelVipProMax = c.upLevelVipProMax;
+                autoCraftMaxSpeed = c.autoCraftMaxSpeed;
+                autoCraftMaxSpeedCraftSpeed = Math.max(1, Math.min(36, c.autoCraftMaxSpeedCraftSpeed));
+                autoCraftMaxSpeedDropSpeed = Math.max(1, Math.min(36, c.autoCraftMaxSpeedDropSpeed));
+                autoCraftMaxSpeedThreshold = c.autoCraftMaxSpeedThreshold <= 0 ? 10 : Math.max(1, Math.min(36, c.autoCraftMaxSpeedThreshold));
                 upLevelVipProMaxThreshold = Math.max(10, Math.min(36, c.upLevelVipProMaxThreshold));
                 upLevelVipProMaxDropStacksPerTick = Math.max(1, Math.min(36, c.upLevelVipProMaxDropStacksPerTick));
                 antiVipProMaxGrim = c.antiVipProMaxGrim;

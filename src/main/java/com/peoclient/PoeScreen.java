@@ -3,6 +3,7 @@ package com.peoclient;
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.modules.UpLevelVipProMax;
+import com.peoclient.modules.AutoCraftMaxSpeed;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -39,7 +40,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "UpLevelVipProMax", "PeoJoin",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "UpLevelVipProMax", "AutoCraftMaxSpeed", "PeoJoin",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
@@ -70,7 +71,8 @@ public final class PoeScreen extends class_437 {
     private boolean implemented(String name) {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
                 || name.equals("Nuker [Multi]") || name.equals("X-Ray")
-                || name.equals("AntiVipProMax") || name.equals("UpLevelVipProMax") || name.equals("PeoJoin");
+                || name.equals("AntiVipProMax") || name.equals("UpLevelVipProMax")
+                || name.equals("AutoCraftMaxSpeed") || name.equals("PeoJoin");
     }
 
     private boolean enabled(String name) {
@@ -81,6 +83,7 @@ public final class PoeScreen extends class_437 {
             case "X-Ray" -> PeoClient.CFG.xray;
             case "AntiVipProMax" -> AntiVipProMaxModule.isEnabled();
             case "UpLevelVipProMax" -> UpLevelVipProMax.isEnabled();
+            case "AutoCraftMaxSpeed" -> AutoCraftMaxSpeed.isEnabled();
             case "PeoJoin" -> PeoJoinModule.isEnabled();
             default -> false;
         };
@@ -94,6 +97,7 @@ public final class PoeScreen extends class_437 {
             case "X-Ray" -> PeoClient.toggleXray(field_22787);
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
             case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
+            case "AutoCraftMaxSpeed" -> AutoCraftMaxSpeed.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
         }
         PeoClient.CFG.save();
@@ -207,6 +211,7 @@ public final class PoeScreen extends class_437 {
                 case "Fullbright" -> drawFullbright(d, x, yy, w);
                 case "AntiVipProMax" -> drawAntiVipProMax(d, x, yy, w);
                 case "UpLevelVipProMax" -> drawUpLevelVipProMax(d, x, yy, w);
+                case "AutoCraftMaxSpeed" -> drawAutoCraftMaxSpeed(d, x, yy, w);
                 case "PeoJoin" -> drawPeoJoin(d, x, yy, w);
             }
         } else {
@@ -414,6 +419,7 @@ public final class PoeScreen extends class_437 {
             case "X-Ray" -> "Shows selected blocks through the world.";
             case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
             case "UpLevelVipProMax" -> "Scans your inventory for valuable blocks, submits them to Island Level, then closes the level screen.";
+            case "AutoCraftMaxSpeed" -> "Opens /craft, crafts mineral blocks, drops configured low-value blocks, then submits rare blocks through the server combine GUI.";
             case "PeoJoin" -> "Automatic local recovery after disconnect; reconnects and sends /home.";
             default -> "";
         };
@@ -459,6 +465,18 @@ public final class PoeScreen extends class_437 {
         y = rowValue(d, x, y, w, "Scan", "All 36 inventory slots");
         y = rowValue(d, x, y, w, "Valuable", "Diamond / Emerald / Lapis / Coal / Redstone / Iron / Gold");
         y = rowValue(d, x, y, w, "Submit", "Only after threshold is reached");
+        return y;
+    }
+
+    private int drawAutoCraftMaxSpeed(class_332 d, int x, int y, int w) {
+        y = section(d, x, y, "Auto Craft");
+        y = rowValue(d, x, y, w, "Status", AutoCraftMaxSpeed.getStatus());
+        y = sliderRow(d, x, y, w, "Craft speed", AutoCraftMaxSpeed.getCraftSpeed(), 1, 36, "%.0f stacks/tick");
+        y = sliderRow(d, x, y, w, "Drop speed", AutoCraftMaxSpeed.getDropSpeed(), 1, 36, "%.0f stacks/tick");
+        y = sliderRow(d, x, y, w, "Rare threshold", AutoCraftMaxSpeed.getThreshold(), 1, 36, "%.0f stacks");
+        y = rowValue(d, x, y, w, "Craft list", "Coal / Redstone / Lapis / Raw+Gold / Raw+Iron / Emerald / Diamond");
+        y = rowValue(d, x, y, w, "Drop list", "Cobblestone / Stone / Raw Gold / Raw Iron");
+        y = rowValue(d, x, y, w, "Submit", "Right-click rare block → hopper → close → repeat");
         return y;
     }
 
@@ -596,6 +614,24 @@ public final class PoeScreen extends class_437 {
                 case "X-Ray" -> clickXray(mouseY, contentY);
                 case "Fullbright" -> clickFullbright(mouseY, contentY);
                 case "AntiVipProMax" -> clickAntiVipProMax(mouseX, mouseY, settingsX, settingsW, contentY);
+                case "AutoCraftMaxSpeed" -> {
+                    int craftY = contentY + 60;
+                    int dropY = craftY + 34;
+                    int thresholdY = dropY + 34;
+                    if (hit(mouseY, craftY)) {
+                        AutoCraftMaxSpeed.setCraftSpeed((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 36, "Craft speed")));
+                        save();
+                        draggingSlider = "AutoCraftCraft";
+                    } else if (hit(mouseY, dropY)) {
+                        AutoCraftMaxSpeed.setDropSpeed((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 36, "Drop speed")));
+                        save();
+                        draggingSlider = "AutoCraftDrop";
+                    } else if (hit(mouseY, thresholdY)) {
+                        AutoCraftMaxSpeed.setThreshold((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 36, "Rare threshold")));
+                        save();
+                        draggingSlider = "AutoCraftThreshold";
+                    }
+                }
                 case "UpLevelVipProMax" -> {
                     // drawUpLevelVipProMax: section (+26), Status (+34), then the two sliders.
                     // Only the actual slider rows should consume the click; Enable is handled above.
@@ -897,6 +933,15 @@ public final class PoeScreen extends class_437 {
                 PeoClient.CFG.nukerRange = roundSlider(sliderValue(mouseX, sx, sw, 1.0, 6.0, "Range"), 1.0, 6.0, 0.1);
             } else if ("NukerWidth".equals(draggingSlider)) {
                 PeoClient.CFG.nukerRangeWidth = roundSlider(sliderValue(mouseX, sx, sw, 0.1, 10.0, "Width"), 0.1, 10.0, 0.1);
+            } else if ("AutoCraftCraft".equals(draggingSlider)) {
+                AutoCraftMaxSpeed.setCraftSpeed((int)Math.round(
+                        sliderValue(mouseX, sx, sw, 1, 36, "Craft speed")));
+            } else if ("AutoCraftDrop".equals(draggingSlider)) {
+                AutoCraftMaxSpeed.setDropSpeed((int)Math.round(
+                        sliderValue(mouseX, sx, sw, 1, 36, "Drop speed")));
+            } else if ("AutoCraftThreshold".equals(draggingSlider)) {
+                AutoCraftMaxSpeed.setThreshold((int)Math.round(
+                        sliderValue(mouseX, sx, sw, 1, 36, "Rare threshold")));
             } else if ("UpLevelThreshold".equals(draggingSlider)) {
                 UpLevelVipProMax.setValueBlockThreshold((int)Math.round(
                         sliderValue(mouseX, sx, sw, 10, 36, "Stack threshold")));
@@ -969,6 +1014,7 @@ public final class PoeScreen extends class_437 {
             case "Fullbright" -> 220;
             case "AntiVipProMax" -> 300;
             case "UpLevelVipProMax" -> 300;
+            case "AutoCraftMaxSpeed" -> 360;
             default -> 120;
         };
     }
