@@ -317,7 +317,7 @@ public final class AutoCraftMaxSpeed {
 
                 // CraftingScreenHandler output is slot 0. QUICK_MOVE immediately
                 // returns the result to the player inventory, matching BleachHack.
-                client.field_1761.method_2906(handler.field_7763, 0, 0,
+                client.field_1761.method_2906(handler.field_7763, 0, 1,
                         class_1713.field_7791, client.field_1724);
                 craftedOps++;
             } catch (Throwable t) {
