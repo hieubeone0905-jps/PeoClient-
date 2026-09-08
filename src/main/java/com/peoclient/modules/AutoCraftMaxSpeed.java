@@ -68,7 +68,8 @@ public final class AutoCraftMaxSpeed {
             new Recipe("minecraft:diamond", "minecraft:diamond_block")
     );
 
-    private static final int OPEN_WAIT = 3;
+    private static final int OPEN_WAIT = 2;
+    private static final int OPEN_RETRY_TICKS = 12;
     private static final int ACTION_RETRY_WAIT = 1;
     private static final int SUBMIT_WAIT = 6;
     private static final int POST_CLOSE_WAIT = 8;
@@ -124,6 +125,17 @@ public final class AutoCraftMaxSpeed {
         actionBudget = 0;
         recipeIndex = 0;
         currentIngredient = null;
+        selectedHotbar = -1;
+        workingHotbar = -1;
+        lastSyncId = -1;
+        postCloseTicks = 0;
+        // Keybind/GUI activation should immediately start the server workflow.
+        // The actual GUI may arrive a few ticks later, so keep OPEN_CRAFT until it does.
+        if (MC.field_1724 != null && MC.method_1562() != null) {
+            sendCraftCommand(MC);
+            state = State.OPEN_CRAFT;
+            waitTicks = OPEN_WAIT;
+        }
         log("Enabled craftSpeed=" + craftSpeed + " dropSpeed=" + dropSpeed + " threshold=" + threshold);
     }
 
@@ -155,8 +167,12 @@ public final class AutoCraftMaxSpeed {
             return;
         }
         if (state == State.OPEN_CRAFT && !isCraftingScreen(client)) {
-            if (++waitTicks <= 12) return;
-            state = State.IDLE;
+            // The server may take several ticks to create its custom /craft GUI.
+            // Do not silently abandon the module; resend the command periodically.
+            if (++waitTicks >= OPEN_RETRY_TICKS) {
+                sendCraftCommand(client);
+            }
+            return;
         }
         if (state == State.WAIT_COMBINE_GUI && !hasCombineAction(client)) {
             if (++waitTicks <= 12) return;
@@ -214,11 +230,17 @@ public final class AutoCraftMaxSpeed {
     }
 
     private static void openCraft(class_310 client) {
-        if (client.method_1562() == null) return;
-        client.method_1562().method_45730("craft");
+        if (client.method_1562() == null || client.field_1724 == null) return;
+        sendCraftCommand(client);
         state = State.OPEN_CRAFT;
         waitTicks = OPEN_WAIT;
-        log("OPEN /craft");
+    }
+
+    private static void sendCraftCommand(class_310 client) {
+        if (client.method_1562() == null || client.field_1724 == null) return;
+        client.method_1562().method_45730("craft");
+        waitTicks = 0;
+        log("OPEN /craft command sent");
     }
 
     private static void runCrafting(class_310 client) {
