@@ -339,7 +339,7 @@ public final class AutoCraftMaxSpeed {
     }
 
     private static int findIngredientScreenSlot(class_1714 handler, class_310 client, String ingredient) {
-        for (class_1735 slot : handler.slots) {
+        for (class_1735 slot : handler.field_7761) {
             if (slot == null || slot.field_7871 != client.field_1724.method_31548()) continue;
             if (!slot.method_7677().method_7960() && ingredient.equals(itemId(slot.method_7677()))) {
                 return slot.field_7874;
@@ -355,7 +355,7 @@ public final class AutoCraftMaxSpeed {
     private static void dropConfiguredBlocks(class_310 client, int maxActions) {
         if (!(client.field_1724.field_7512 instanceof class_1714 handler)) return;
         int actions = 0;
-        for (class_1735 slot : handler.slots) {
+        for (class_1735 slot : handler.field_7761) {
             if (actions >= maxActions) break;
             if (slot == null || slot.field_7871 != client.field_1724.method_31548()) continue;
             class_1799 stack = slot.method_7677();
@@ -478,9 +478,9 @@ public final class AutoCraftMaxSpeed {
     }
 
     private static int findHopperActionSlot(net.minecraft.class_1703 handler) {
-        int limit = Math.min(handler.slots.size(), 100);
+        int limit = Math.min(handler.field_7761.size(), 100);
         for (int i = 0; i < limit; i++) {
-            class_1735 slot = handler.slots.get(i);
+            class_1735 slot = handler.field_7761.get(i);
             if (slot == null || slot.field_7871 == MC.field_1724.method_31548()) continue;
             class_1799 stack = slot.method_7677();
             if (stack.method_7960()) continue;
