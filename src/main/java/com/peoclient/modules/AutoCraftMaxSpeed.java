@@ -89,6 +89,9 @@ public final class AutoCraftMaxSpeed {
     private static int selectedHotbar = -1;
     private static int workingHotbar = -1;
     private static int postCloseTicks;
+    private static int craftSourceSlot = -1;
+    private static boolean craftCursorActive;
+    private static int craftOutputWait;
 
     private enum State {
         IDLE,
@@ -129,6 +132,9 @@ public final class AutoCraftMaxSpeed {
         workingHotbar = -1;
         lastSyncId = -1;
         postCloseTicks = 0;
+        craftSourceSlot = -1;
+        craftCursorActive = false;
+        craftOutputWait = 0;
         // Keybind/GUI activation should immediately start the server workflow.
         // The actual GUI may arrive a few ticks later, so keep OPEN_CRAFT until it does.
         if (MC.field_1724 != null && MC.method_1562() != null) {
@@ -252,21 +258,27 @@ public final class AutoCraftMaxSpeed {
             return;
         }
 
-        int actions = 0;
-        // Rotate through all nine requested recipes. A recipe is skipped if no
-        // ingredient remains. This avoids spending ticks on empty recipes.
-        for (int tries = 0; tries < RECIPES.size() && actions < craftSpeed; tries++) {
-            Recipe recipe = RECIPES.get(recipeIndex);
+        // Keep one recipe active until its grid is completed and its output has
+        // actually been quick-moved. The old implementation rotated recipes on
+        // every tick, which could change the ingredient while the 3x3 grid was
+        // still being filled and caused the GUI to visibly fight the server.
+        Recipe recipe = RECIPES.get(recipeIndex);
+        int made = craftRecipeBatch(client, recipe, 1);
+
+        if (made == 0 && craftSourceSlot < 0 && !hasAnyCraftingInput((class_1714) client.field_1724.field_7512)) {
             recipeIndex = (recipeIndex + 1) % RECIPES.size();
-            int made = craftRecipeBatch(client, recipe, Math.min(craftSpeed - actions, MAX_FILL_ACTIONS_PER_TICK));
-            actions += made;
         }
 
-        if (actions == 0) {
-            // Nothing craftable in the current inventory. Keep the GUI open so
-            // newly arriving resources can be processed without reopening it.
-            waitTicks = ACTION_RETRY_WAIT;
+        // Keep the low-value drop operation independent, but it is also paced to
+        // one server inventory action per tick by dropConfiguredBlocks().
+        dropConfiguredBlocks(client, dropSpeed);
+    }
+
+    private static boolean hasAnyCraftingInput(class_1714 handler) {
+        for (class_1735 slot : handler.method_61628()) {
+            if (slot != null && !slot.method_7677().method_7960()) return true;
         }
+        return false;
     }
 
     /**
@@ -276,73 +288,74 @@ public final class AutoCraftMaxSpeed {
      */
     private static int craftRecipeBatch(class_310 client, Recipe recipe, int budget) {
         class_1714 handler = (class_1714) client.field_1724.field_7512;
-        int filled = fillCraftingGrid(client, handler, recipe.ingredient, budget);
-        if (filled > 0) return filled;
 
-        if (!gridReady(handler, recipe.ingredient)) return 0;
-
-        class_1735 output = handler.method_61627();
-        if (output == null || output.method_7677().method_7960()) return 0;
-
-        int crafted = Math.min(budget, Math.max(1, craftSpeed));
-        int actions = 0;
-        int sync = handler.field_7763;
-        for (int i = 0; i < crafted; i++) {
-            if (handler.method_7611(output.field_7874).method_7677().method_7960()) break;
-            client.field_1761.method_2906(sync, output.field_7874, 0, class_1713.field_7791, client.field_1724);
-            actions++;
+        // Server-backed crafting must be paced. Sending a whole pickup/split/return
+        // sequence in one tick makes the server send inventory corrections, which
+        // is the source of the visible "jitter" and failed output transfers.
+        // Perform at most one inventory click per tick and wait for the next tick
+        // before issuing the following click.
+        if (craftOutputWait > 0) {
+            craftOutputWait--;
+            return 0;
         }
-        if (actions > 0) log("CRAFT ingredient=" + recipe.ingredient + " output=" + recipe.output + " actions=" + actions);
-        return actions;
-    }
 
-    private static int fillCraftingGrid(class_310 client, class_1714 handler, String ingredient, int budget) {
-        int actions = 0;
         List<class_1735> inputs = handler.method_61628();
+        class_1735 output = handler.method_61627();
 
-        // First use complete inventory stacks. Shift-clicking each stack into
-        // the crafting handler is equivalent to a normal quick-move and avoids
-        // cursor manipulation for the common case.
-        for (int slot = 0; slot < handler.field_7761.size() && actions < budget; slot++) {
-            class_1735 screenSlot = handler.method_7611(slot);
-            if (screenSlot == null || screenSlot.field_7871 != client.field_1724.method_31548()) continue;
-            if (screenSlot.method_7677().method_7960()) continue;
-            if (!ingredient.equals(itemId(screenSlot.method_7677()))) continue;
-            if (isInventorySourceSlot(screenSlot)) {
-                int emptyInput = firstEmptyInput(inputs);
-                if (emptyInput < 0) break;
-                client.field_1761.method_2906(handler.field_7763, screenSlot.field_7874, 0,
-                        class_1713.field_7791, client.field_1724);
-                actions++;
-                // Re-evaluate on the next tick/action; server sync is authoritative.
-                if (actions >= budget) break;
-                if (gridReady(handler, ingredient)) break;
-            }
+        if (gridReady(handler, recipe.ingredient)) {
+            if (output == null || output.method_7677().method_7960()) return 0;
+
+            // QUICK_MOVE is the normal shift-click path for moving a crafting
+            // result back into the player's inventory. It is deliberately issued
+            // only once, then we wait for the server to update the handler.
+            client.field_1761.method_2906(handler.field_7763, output.field_7874, 0,
+                    class_1713.field_7791, client.field_1724);
+            craftOutputWait = 2;
+            craftSourceSlot = -1;
+            craftCursorActive = false;
+            recipeIndex = (recipeIndex + 1) % RECIPES.size();
+            log("CRAFT output quick-moved ingredient=" + recipe.ingredient + " output=" + recipe.output);
+            return 1;
         }
 
-        // If fewer than nine source stacks exist, use right-click splitting from
-        // one remaining stack to put one ingredient in each empty input slot.
-        if (actions < budget && !gridReady(handler, ingredient)) {
-            int source = findIngredientScreenSlot(handler, client, ingredient);
+        class_1799 cursor = handler.method_34255();
+        if (cursor != null && !cursor.method_7960()) {
+            // Cursor contains the source stack after the initial left-click.
+            // Put exactly one item into the next empty crafting slot.
             int empty = firstEmptyInput(inputs);
-            if (source >= 0 && empty >= 0 && actions + 2 <= budget) {
-                client.field_1761.method_2906(handler.field_7763, source, 1,
+            if (empty >= 0) {
+                client.field_1761.method_2906(handler.field_7763, empty, 1,
                         class_1713.field_7790, client.field_1724);
-                actions++;
-                for (class_1735 input : inputs) {
-                    if (!input.method_7677().method_7960()) continue;
-                    client.field_1761.method_2906(handler.field_7763, input.field_7874, 1,
-                            class_1713.field_7790, client.field_1724);
-                    actions++;
-                    if (actions >= budget) break;
-                }
-                // Return any remaining cursor stack to the original source slot.
-                client.field_1761.method_2906(handler.field_7763, source, 0,
-                        class_1713.field_7790, client.field_1724);
-                actions++;
+                craftCursorActive = true;
+                craftOutputWait = 1;
+                return 1;
             }
+
+            // Nine ingredients are now in the grid. Return the remaining cursor
+            // stack to the original inventory slot with a normal left click.
+            if (craftSourceSlot >= 0) {
+                client.field_1761.method_2906(handler.field_7763, craftSourceSlot, 0,
+                        class_1713.field_7790, client.field_1724);
+                craftCursorActive = false;
+                craftOutputWait = 1;
+                return 1;
+            }
+            return 0;
         }
-        return actions;
+
+        // Cursor is empty: pick up one source stack. The following ticks will
+        // distribute one item at a time into the 3x3 grid.
+        int source = findIngredientScreenSlot(handler, client, recipe.ingredient);
+        if (source < 0) return 0;
+        class_1735 sourceSlot = handler.method_7611(source);
+        if (sourceSlot == null || sourceSlot.method_7677().method_7960()) return 0;
+
+        craftSourceSlot = source;
+        client.field_1761.method_2906(handler.field_7763, source, 0,
+                class_1713.field_7790, client.field_1724);
+        craftCursorActive = true;
+        craftOutputWait = 1;
+        return 1;
     }
 
     private static boolean gridReady(class_1714 handler, String ingredient) {
@@ -376,15 +389,19 @@ public final class AutoCraftMaxSpeed {
 
     private static void dropConfiguredBlocks(class_310 client, int maxActions) {
         if (!(client.field_1724.field_7512 instanceof class_1714 handler)) return;
-        int actions = 0;
+        if (maxActions <= 0) return;
+
+        // Do not burst dozens of drop packets into a server-backed inventory.
+        // One drop action per tick is intentionally used here; the configured
+        // speed remains the user's target rate, while server corrections cannot
+        // cause the inventory to visibly snap back and forth.
         for (class_1735 slot : handler.field_7761) {
-            if (actions >= maxActions) break;
             if (slot == null || slot.field_7871 != client.field_1724.method_31548()) continue;
             class_1799 stack = slot.method_7677();
             if (stack.method_7960() || !DROP_BLOCKS.contains(itemId(stack))) continue;
             client.field_1761.method_2906(handler.field_7763, slot.field_7874, 1,
                     class_1713.field_7795, client.field_1724);
-            actions++;
+            return;
         }
     }
 
@@ -600,6 +617,9 @@ public final class AutoCraftMaxSpeed {
         workingHotbar = -1;
         lastSyncId = -1;
         postCloseTicks = 0;
+        craftSourceSlot = -1;
+        craftCursorActive = false;
+        craftOutputWait = 0;
     }
 
     private static String itemId(class_1799 stack) {
