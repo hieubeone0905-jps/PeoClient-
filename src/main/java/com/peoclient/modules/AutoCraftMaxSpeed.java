@@ -9,6 +9,11 @@ import net.minecraft.class_1735;
 import net.minecraft.class_1799;
 import net.minecraft.class_310;
 import net.minecraft.class_7923;
+import net.minecraft.class_299;
+import net.minecraft.class_10297;
+import net.minecraft.class_10352;
+
+import java.util.Collections;
 
 import java.util.List;
 import java.util.Locale;
@@ -249,8 +254,21 @@ public final class AutoCraftMaxSpeed {
         log("OPEN /craft command sent");
     }
 
+    /**
+     * BleachHack-style recipe-book crafting engine.
+     *
+     * Important difference from the previous implementation: we do NOT pick up
+     * individual ingredient stacks and distribute them into the 3x3 grid.  The
+     * vanilla client already exposes clickRecipe(syncId, recipeId, craftAll),
+     * which is exactly what the recipe-book uses for shift-click/craft-all.
+     *
+     * craftSpeed is treated as the maximum number of recipe operations attempted
+     * in this client tick.  Each operation uses craftAll=true, so one operation
+     * can consume many stacks from the inventory.  The output is immediately
+     * quick-moved just like BleachHack's AutoCraft implementation.
+     */
     private static void runCrafting(class_310 client) {
-        if (!(client.field_1724.field_7512 instanceof class_1714)) return;
+        if (!(client.field_1724.field_7512 instanceof class_1714 handler)) return;
 
         int rare = countRareStacks(client);
         if (rare >= threshold) {
@@ -258,133 +276,115 @@ public final class AutoCraftMaxSpeed {
             return;
         }
 
-        // Keep one recipe active until its grid is completed and its output has
-        // actually been quick-moved. The old implementation rotated recipes on
-        // every tick, which could change the ingredient while the 3x3 grid was
-        // still being filled and caused the GUI to visibly fight the server.
-        Recipe recipe = RECIPES.get(recipeIndex);
-        int made = craftRecipeBatch(client, recipe, 1);
-
-        if (made == 0 && craftSourceSlot < 0 && !hasAnyCraftingInput((class_1714) client.field_1724.field_7512)) {
-            recipeIndex = (recipeIndex + 1) % RECIPES.size();
+        // Keep the recipe-book state open, matching the vanilla/BleachHack path.
+        try {
+            class_299 recipeBook = client.field_1724.method_3130();
+            recipeBook.method_14884(handler.method_30264(), true);
+        } catch (Throwable ignored) {
+            // A custom server GUI can still be a CraftingScreenHandler even if
+            // the client-side recipe-book state is unavailable for a tick.
         }
 
-        // Keep the low-value drop operation independent, but it is also paced to
-        // one server inventory action per tick by dropConfiguredBlocks().
-        dropConfiguredBlocks(client, dropSpeed);
+        int operations = Math.max(1, Math.min(MAX_SPEED, craftSpeed));
+        int craftedOps = 0;
+        java.util.Set<String> attemptedOutputs = new java.util.HashSet<>();
+
+        for (int i = 0; i < operations; i++) {
+            if (countRareStacks(client) >= threshold) {
+                state = State.SUBMIT_PREPARE;
+                break;
+            }
+
+            class_10297 entry = findCraftableTarget(client, attemptedOutputs);
+            if (entry == null) {
+                // There is no additional target available from the current
+                // inventory. Incoming farm items will be picked up on the next
+                // tick. A target is attempted at most once per output type per
+                // tick, because craftAll=true already consumes the maximum
+                // possible amount of that recipe in one operation.
+                break;
+            }
+
+            String outputId = itemId(entry.comp_3263().method_64742(new class_10352(Collections.emptyMap())));
+            attemptedOutputs.add(outputId);
+
+            try {
+                // This is the key BleachHack-style operation: craftAll=true.
+                // One operation can consume all currently craftable input stacks
+                // for this recipe; there is intentionally no artificial delay.
+                client.field_1761.method_2912(handler.field_7763, entry.comp_3262(), true);
+
+                // CraftingScreenHandler output is slot 0. QUICK_MOVE immediately
+                // returns the result to the player inventory, matching BleachHack.
+                client.field_1761.method_2906(handler.field_7763, 0, 0,
+                        class_1713.field_7791, client.field_1724);
+                craftedOps++;
+            } catch (Throwable t) {
+                log("CRAFT operation failed: " + t.getClass().getSimpleName());
+                break;
+            }
+        }
+
+        if (craftedOps > 0) {
+            log("CRAFT batch operations=" + craftedOps + " speed=" + craftSpeed);
+        }
     }
 
-    private static boolean hasAnyCraftingInput(class_1714 handler) {
-        for (class_1735 slot : handler.method_61628()) {
-            if (slot != null && !slot.method_7677().method_7960()) return true;
+    /**
+     * Find one of our nine target block recipes in the player's synced recipe
+     * book.  RecipeDisplayEntry.id() is the runtime NetworkRecipeId required by
+     * ClientPlayerInteractionManager.clickRecipe().
+     */
+    private static class_10297 findCraftableTarget(class_310 client, java.util.Set<String> attemptedOutputs) {
+        class_299 book = client.field_1724.method_3130();
+        class_10352 emptyContext = new class_10352(Collections.emptyMap());
+
+        for (var collection : book.method_1393()) {
+            for (class_10297 entry : collection.method_2650()) {
+                try {
+                    var result = entry.comp_3263().method_64742(emptyContext);
+                    if (result == null || result.method_7960()) continue;
+                    String outputId = itemId(result);
+                    if (!isTargetOutput(outputId) || attemptedOutputs.contains(outputId)) continue;
+
+                    // Only return recipes that currently have at least one of
+                    // their required inputs in the inventory. This prevents a
+                    // tight loop on a known recipe while farm items are arriving.
+                    if (!hasRecipeIngredient(entry, client)) continue;
+                    return entry;
+                } catch (Throwable ignored) {
+                    // Some custom recipe displays can require context values.
+                    // Skip them and continue scanning the remaining entries.
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean hasRecipeIngredient(class_10297 entry, class_310 client) {
+        // For this module every target recipe is the standard 9-identical-item
+        // mineral-block recipe. The target output is therefore enough to select
+        // the corresponding ingredient from our fixed table.
+        String output = itemId(entry.comp_3263().method_64742(new class_10352(Collections.emptyMap())));
+        for (Recipe recipe : RECIPES) {
+            if (!recipe.output.equals(output)) continue;
+            return hasInventoryItem(client, recipe.ingredient);
         }
         return false;
     }
 
-    /**
-     * Fill the 3x3 input with the requested ingredient, then quick-move the
-     * result. The slot ids are discovered from the CraftingScreenHandler itself,
-     * rather than guessed from screen coordinates.
-     */
-    private static int craftRecipeBatch(class_310 client, Recipe recipe, int budget) {
-        class_1714 handler = (class_1714) client.field_1724.field_7512;
-
-        // Server-backed crafting must be paced. Sending a whole pickup/split/return
-        // sequence in one tick makes the server send inventory corrections, which
-        // is the source of the visible "jitter" and failed output transfers.
-        // Perform at most one inventory click per tick and wait for the next tick
-        // before issuing the following click.
-        if (craftOutputWait > 0) {
-            craftOutputWait--;
-            return 0;
+    private static boolean hasInventoryItem(class_310 client, String id) {
+        var inv = client.field_1724.method_31548();
+        for (int i = 0; i < 36; i++) {
+            class_1799 stack = inv.method_5438(i);
+            if (!stack.method_7960() && id.equals(itemId(stack))) return true;
         }
-
-        List<class_1735> inputs = handler.method_61628();
-        class_1735 output = handler.method_61627();
-
-        if (gridReady(handler, recipe.ingredient)) {
-            if (output == null || output.method_7677().method_7960()) return 0;
-
-            // QUICK_MOVE is the normal shift-click path for moving a crafting
-            // result back into the player's inventory. It is deliberately issued
-            // only once, then we wait for the server to update the handler.
-            client.field_1761.method_2906(handler.field_7763, output.field_7874, 0,
-                    class_1713.field_7791, client.field_1724);
-            craftOutputWait = 2;
-            craftSourceSlot = -1;
-            craftCursorActive = false;
-            recipeIndex = (recipeIndex + 1) % RECIPES.size();
-            log("CRAFT output quick-moved ingredient=" + recipe.ingredient + " output=" + recipe.output);
-            return 1;
-        }
-
-        class_1799 cursor = handler.method_34255();
-        if (cursor != null && !cursor.method_7960()) {
-            // Cursor contains the source stack after the initial left-click.
-            // Put exactly one item into the next empty crafting slot.
-            int empty = firstEmptyInput(inputs);
-            if (empty >= 0) {
-                client.field_1761.method_2906(handler.field_7763, empty, 1,
-                        class_1713.field_7790, client.field_1724);
-                craftCursorActive = true;
-                craftOutputWait = 1;
-                return 1;
-            }
-
-            // Nine ingredients are now in the grid. Return the remaining cursor
-            // stack to the original inventory slot with a normal left click.
-            if (craftSourceSlot >= 0) {
-                client.field_1761.method_2906(handler.field_7763, craftSourceSlot, 0,
-                        class_1713.field_7790, client.field_1724);
-                craftCursorActive = false;
-                craftOutputWait = 1;
-                return 1;
-            }
-            return 0;
-        }
-
-        // Cursor is empty: pick up one source stack. The following ticks will
-        // distribute one item at a time into the 3x3 grid.
-        int source = findIngredientScreenSlot(handler, client, recipe.ingredient);
-        if (source < 0) return 0;
-        class_1735 sourceSlot = handler.method_7611(source);
-        if (sourceSlot == null || sourceSlot.method_7677().method_7960()) return 0;
-
-        craftSourceSlot = source;
-        client.field_1761.method_2906(handler.field_7763, source, 0,
-                class_1713.field_7790, client.field_1724);
-        craftCursorActive = true;
-        craftOutputWait = 1;
-        return 1;
+        return false;
     }
 
-    private static boolean gridReady(class_1714 handler, String ingredient) {
-        for (class_1735 input : handler.method_61628()) {
-            if (input == null || input.method_7677().method_7960()
-                    || !ingredient.equals(itemId(input.method_7677()))) return false;
-        }
-        return true;
-    }
-
-    private static int firstEmptyInput(List<class_1735> inputs) {
-        for (class_1735 slot : inputs) {
-            if (slot.method_7677().method_7960()) return slot.field_7874;
-        }
-        return -1;
-    }
-
-    private static int findIngredientScreenSlot(class_1714 handler, class_310 client, String ingredient) {
-        for (class_1735 slot : handler.field_7761) {
-            if (slot == null || slot.field_7871 != client.field_1724.method_31548()) continue;
-            if (!slot.method_7677().method_7960() && ingredient.equals(itemId(slot.method_7677()))) {
-                return slot.field_7874;
-            }
-        }
-        return -1;
-    }
-
-    private static boolean isInventorySourceSlot(class_1735 slot) {
-        return slot.field_7874 >= 10;
+    private static boolean isTargetOutput(String id) {
+        for (Recipe recipe : RECIPES) if (recipe.output.equals(id)) return true;
+        return false;
     }
 
     private static void dropConfiguredBlocks(class_310 client, int maxActions) {
