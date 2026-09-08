@@ -12,6 +12,7 @@ import net.minecraft.class_7923;
 import net.minecraft.class_299;
 import net.minecraft.class_10297;
 import net.minecraft.class_10352;
+import net.minecraft.class_173;
 
 import java.util.Collections;
 
@@ -305,7 +306,7 @@ public final class AutoCraftMaxSpeed {
                 break;
             }
 
-            String outputId = itemId(entry.comp_3263().method_64742(new class_10352(Collections.emptyMap())));
+            String outputId = itemId(entry.comp_3263().comp_3258().method_64742(new class_10352.class_10353().method_64971(class_173.field_1175)));
             attemptedOutputs.add(outputId);
 
             try {
@@ -337,12 +338,12 @@ public final class AutoCraftMaxSpeed {
      */
     private static class_10297 findCraftableTarget(class_310 client, java.util.Set<String> attemptedOutputs) {
         class_299 book = client.field_1724.method_3130();
-        class_10352 emptyContext = new class_10352(Collections.emptyMap());
+        class_10352 emptyContext = new class_10352.class_10353().method_64971(class_173.field_1175);
 
         for (var collection : book.method_1393()) {
             for (class_10297 entry : collection.method_2650()) {
                 try {
-                    var result = entry.comp_3263().method_64742(emptyContext);
+                    var result = entry.comp_3263().comp_3258().method_64742(emptyContext);
                     if (result == null || result.method_7960()) continue;
                     String outputId = itemId(result);
                     if (!isTargetOutput(outputId) || attemptedOutputs.contains(outputId)) continue;
@@ -365,7 +366,7 @@ public final class AutoCraftMaxSpeed {
         // For this module every target recipe is the standard 9-identical-item
         // mineral-block recipe. The target output is therefore enough to select
         // the corresponding ingredient from our fixed table.
-        String output = itemId(entry.comp_3263().method_64742(new class_10352(Collections.emptyMap())));
+        String output = itemId(entry.comp_3263().comp_3258().method_64742(new class_10352.class_10353().method_64971(class_173.field_1175)));
         for (Recipe recipe : RECIPES) {
             if (!recipe.output.equals(output)) continue;
             return hasInventoryItem(client, recipe.ingredient);
