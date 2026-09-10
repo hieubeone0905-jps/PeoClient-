@@ -201,7 +201,15 @@ public final class AutoCraftMaxSpeed {
             }
             if (state == State.OPEN_CRAFT || state == State.IDLE || state == State.CRAFTING) {
                 state = State.CRAFTING;
+                // Always drain a server-confirmed crafting result BEFORE starting
+                // another craft batch. The old implementation clicked slot 0 in
+                // the same tick as clickRecipe(), which can race the server sync
+                // and therefore leave the crafted item sitting in the result slot.
+                drainCraftOutput(client);
                 runCrafting(client);
+                // A successful craft is server-synchronised on a later tick, so
+                // drain again on the next tick before allowing ground drops to
+                // fill the now-available inventory slots.
                 dropConfiguredBlocks(client, dropSpeed);
                 return;
             }
@@ -315,10 +323,10 @@ public final class AutoCraftMaxSpeed {
                 // for this recipe; there is intentionally no artificial delay.
                 client.field_1761.method_2912(handler.field_7763, entry.comp_3262(), true);
 
-                // CraftingScreenHandler output is slot 0. QUICK_MOVE immediately
-                // returns the result to the player inventory, matching BleachHack.
-                client.field_1761.method_2906(handler.field_7763, 0, 1,
-                        class_1713.field_7791, client.field_1724);
+                // Do NOT click the result immediately here. clickRecipe() sends a
+                // packet and the server may not have populated slot 0 yet.
+                // The result is drained at the beginning of the next client tick
+                // after the server synchronises the handler.
                 craftedOps++;
             } catch (Throwable t) {
                 log("CRAFT operation failed: " + t.getClass().getSimpleName());
@@ -328,6 +336,32 @@ public final class AutoCraftMaxSpeed {
 
         if (craftedOps > 0) {
             log("CRAFT batch operations=" + craftedOps + " speed=" + craftSpeed);
+        }
+    }
+
+    /**
+     * Move every server-confirmed crafting result out of the result slot as fast
+     * as the server will accept it. This is deliberately separated from
+     * clickRecipe(): the result slot is authoritative server state, so attempting
+     * QUICK_MOVE in the same tick as clickRecipe() can hit an empty slot.
+     */
+    private static void drainCraftOutput(class_310 client) {
+        if (!(client.field_1724.field_7512 instanceof class_1714 handler)) return;
+
+        try {
+            // Vanilla CraftingScreenHandler uses slot 0 for the crafting result.
+            // Only click when the synced slot actually contains an item.
+            if (handler.field_7761.size() > 0) {
+                class_1735 output = handler.field_7761.get(0);
+                if (output != null && !output.method_7677().method_7960()) {
+                    int before = output.method_7677().method_7947();
+                    client.field_1761.method_2906(handler.field_7763, 0, 0,
+                            class_1713.field_7791, client.field_1724);
+                    log("CRAFT output quick-moved count=" + before);
+                }
+            }
+        } catch (Throwable t) {
+            log("CRAFT output move failed: " + t.getClass().getSimpleName());
         }
     }
 
