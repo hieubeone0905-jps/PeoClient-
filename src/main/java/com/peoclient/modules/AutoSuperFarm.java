@@ -10,6 +10,7 @@ import net.minecraft.class_243;
 import net.minecraft.class_2680;
 import net.minecraft.class_310;
 import net.minecraft.class_3965;
+import net.minecraft.class_304;
 import net.minecraft.class_7923;
 
 import java.util.Locale;
@@ -137,8 +138,11 @@ public final class AutoSuperFarm {
 
         if (rescanWait > 0) rescanWait--;
 
-        if (target == null || rescanWait == 0 || isInvalidTarget(client, target)) {
-            target = findNearestTarget(client);
+        if (target == null || isInvalidTarget(client, target) || rescanWait == 0) {
+            Target next = findNearestTarget(client);
+            if (target == null || next == null || next.pos().equals(target.pos()) || next.distanceSq() + 1.0D < target.distanceSq()) {
+                target = next;
+            }
             rescanWait = TARGET_RESCAN;
         }
 
@@ -254,16 +258,22 @@ public final class AutoSuperFarm {
             return;
         }
 
-        // Preserve vertical velocity and only control horizontal motion. A
-        // modest acceleration keeps the walk stable instead of teleport-like
-        // velocity changes every tick.
-        double desiredX = dx / len * moveSpeed;
-        double desiredZ = dz / len * moveSpeed;
-        class_243 old = client.field_1724.method_18798();
-        double vx = old.field_1352 + (desiredX - old.field_1352) * 0.45D;
-        double vz = old.field_1350 + (desiredZ - old.field_1350) * 0.45D;
-        client.field_1724.method_18799(new class_243(vx, old.field_1351, vz));
-        faceSmooth(client, pos);
+        // Do not fight ClientPlayerEntity's normal movement by writing velocity.
+        // Instead, steer the normal W input toward the target. This is much more
+        // stable on multiplayer servers because vanilla movement and movement
+        // packets remain in control of the player's horizontal motion.
+        float desiredYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+        float yaw = approachAngle(client.field_1724.method_36454(), desiredYaw, 18.0F);
+        client.field_1724.method_36456(yaw);
+
+        class_304 forward = client.field_1690.field_1894;
+        class_304 back = client.field_1690.field_1881;
+        class_304 left = client.field_1690.field_1913;
+        class_304 right = client.field_1690.field_1849;
+        back.method_23481(false);
+        left.method_23481(false);
+        right.method_23481(false);
+        forward.method_23481(true);
     }
 
     private static void searchPatrol(class_310 client) {
@@ -379,6 +389,15 @@ public final class AutoSuperFarm {
 
     private static void stopMovement() {
         if (MC.field_1724 == null) return;
+        class_304 forward = MC.field_1690.field_1894;
+        class_304 back = MC.field_1690.field_1881;
+        class_304 left = MC.field_1690.field_1913;
+        class_304 right = MC.field_1690.field_1849;
+        forward.method_23481(false);
+        back.method_23481(false);
+        left.method_23481(false);
+        right.method_23481(false);
+        class_304.method_1424();
         class_243 v = MC.field_1724.method_18798();
         MC.field_1724.method_18799(new class_243(0.0D, v.field_1351, 0.0D));
         MC.field_1724.method_24830(false);
