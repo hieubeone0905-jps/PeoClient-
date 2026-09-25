@@ -12,6 +12,7 @@ import net.minecraft.class_310;
 import net.minecraft.class_3965;
 import net.minecraft.class_304;
 import net.minecraft.class_7923;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import java.util.Locale;
 
@@ -63,6 +64,14 @@ public final class AutoSuperFarm {
     private static boolean harvestPotato = true;
     private static int previousHotbar = -1;
     private static int workingHotbar = -1;
+    private static boolean wantsForward;
+    private static boolean wantsBack;
+    private static boolean wantsLeft;
+    private static boolean wantsRight;
+
+    static {
+        ClientTickEvents.START_CLIENT_TICK.register(AutoSuperFarm::applyMovementInput);
+    }
 
     private AutoSuperFarm() {}
 
@@ -192,11 +201,8 @@ public final class AutoSuperFarm {
     private static Target findNearestTarget(class_310 client) {
         // Use the player's FEET block, not the eye block. The eye is ~1.6 blocks
         // higher and the old implementation therefore scanned the wrong Y plane.
-        class_243 playerPos = client.field_1724.method_19538();
-        int playerX = (int) Math.floor(playerPos.field_1352);
-        int playerY = (int) Math.floor(playerPos.field_1351);
-        int playerZ = (int) Math.floor(playerPos.field_1350);
-        class_2338 center = new class_2338(playerX, playerY, playerZ);
+        class_2338 center = client.field_1724.method_24515();
+        int playerY = center.method_10264();
         Target best = null;
         int r = radius;
         // The player stands on the farmland block; the crop itself is one block above.
@@ -268,14 +274,10 @@ public final class AutoSuperFarm {
         float yaw = approachAngle(client.field_1724.method_36454(), desiredYaw, 18.0F);
         client.field_1724.method_36456(yaw);
 
-        class_304 forward = client.field_1690.field_1894;
-        class_304 back = client.field_1690.field_1881;
-        class_304 left = client.field_1690.field_1913;
-        class_304 right = client.field_1690.field_1849;
-        back.method_23481(false);
-        left.method_23481(false);
-        right.method_23481(false);
-        forward.method_23481(true);
+        wantsForward = true;
+        wantsBack = false;
+        wantsLeft = false;
+        wantsRight = false;
     }
 
     private static void searchPatrol(class_310 client) {
@@ -407,17 +409,24 @@ public final class AutoSuperFarm {
         workingHotbar = -1;
     }
 
+    private static void applyMovementInput(class_310 client) {
+        if (client.field_1724 == null) return;
+        class_304 forward = client.field_1690.field_1894;
+        class_304 back = client.field_1690.field_1881;
+        class_304 left = client.field_1690.field_1913;
+        class_304 right = client.field_1690.field_1849;
+        forward.method_23481(wantsForward);
+        back.method_23481(wantsBack);
+        left.method_23481(wantsLeft);
+        right.method_23481(wantsRight);
+    }
+
     private static void stopMovement() {
         if (MC.field_1724 == null) return;
-        class_304 forward = MC.field_1690.field_1894;
-        class_304 back = MC.field_1690.field_1881;
-        class_304 left = MC.field_1690.field_1913;
-        class_304 right = MC.field_1690.field_1849;
-        forward.method_23481(false);
-        back.method_23481(false);
-        left.method_23481(false);
-        right.method_23481(false);
-        class_304.method_1424();
+        wantsForward = false;
+        wantsBack = false;
+        wantsLeft = false;
+        wantsRight = false;
         class_243 v = MC.field_1724.method_18798();
         MC.field_1724.method_18799(new class_243(0.0D, v.field_1351, 0.0D));
         MC.field_1724.method_24830(false);
