@@ -166,7 +166,7 @@ public final class AutoSuperFarm {
         // Normal attackBlock call; this is the same client interaction path used
         // by ordinary Minecraft controls rather than a packet-spam shortcut.
         boolean ok = client.field_1761.method_2902(target.pos, class_2350.field_11036);
-        if (ok && swingHand) client.field_1724.method_7350(class_1268.field_5808);
+        if (ok && swingHand) client.field_1724.method_7350();
         return ok;
     }
 
@@ -178,7 +178,7 @@ public final class AutoSuperFarm {
             return false;
         }
 
-        if (isMatureOrFreshCrop(client.field_1687.method_8320(pending.pos), pending.crop, 0)) {
+        if (isMatureOrFresh(client.field_1687.method_8320(pending.pos), pending.crop, 0)) {
             pendingReplant = null;
             restoreHotbar(client);
             return false;
@@ -192,10 +192,10 @@ public final class AutoSuperFarm {
             return false;
         }
 
-        if (previousHotbar < 0) previousHotbar = client.field_1724.field_7514.field_7545;
+        if (previousHotbar < 0) previousHotbar = client.field_1724.method_31548().field_7545;
         workingHotbar = seedSlot;
-        if (client.field_1724.field_7514.field_7545 != seedSlot) {
-            client.field_1724.field_7514.method_61496(seedSlot);
+        if (client.field_1724.method_31548().field_7545 != seedSlot) {
+            client.field_1724.method_31548().method_61496(seedSlot);
             replantWait = Math.max(1, speedToTicks(replantSpeed));
             stopMovement();
             return true;
@@ -217,7 +217,7 @@ public final class AutoSuperFarm {
                 farmland,
                 false);
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
-        if (swingHand) client.field_1724.method_7350(class_1268.field_5808);
+        if (swingHand) client.field_1724.method_7350();
         replantRetries++;
         replantWait = Math.max(1, speedToTicks(replantSpeed));
         stopMovement();
@@ -276,7 +276,7 @@ public final class AutoSuperFarm {
     }
 
     private static boolean isTopColumnSegment(class_310 client, class_2338 pos, CropSpec spec) {
-        class_2680 above = client.field_1687.method_8320(pos.method_10086());
+        class_2680 above = client.field_1687.method_8320(pos.method_10086(1));
         return !spec.blockId.equals(blockId(above));
     }
 
@@ -320,7 +320,7 @@ public final class AutoSuperFarm {
         try {
             class_3965 hit = client.field_1687.method_17742(new class_3959(
                     eye, center, class_3959.class_3960.field_17559,
-                    class_239.class_242.field_1348, client.field_1724));
+                    class_3959.class_242.field_1348, client.field_1724));
             return hit.method_17783() == class_239.class_240.field_1332 && pos.equals(hit.method_17777());
         } catch (Throwable ignored) { return true; }
     }
@@ -370,7 +370,7 @@ public final class AutoSuperFarm {
     private static int findHotbarItem(class_310 client, String wantedId) {
         if (wantedId == null) return -1;
         for (int slot = 0; slot < 9; slot++) {
-            class_1799 stack = client.field_1724.field_7514.method_5438(slot);
+            class_1799 stack = client.field_1724.method_31548().method_5438(slot);
             if (!stack.method_7960() && wantedId.equals(itemId(stack))) return slot;
         }
         return -1;
@@ -378,7 +378,7 @@ public final class AutoSuperFarm {
 
     private static void restoreHotbar(class_310 client) {
         if (previousHotbar >= 0 && client.field_1724 != null) {
-            client.field_1724.field_7514.method_61496(previousHotbar);
+            client.field_1724.method_31548().method_61496(previousHotbar);
         }
         previousHotbar = -1;
         workingHotbar = -1;
