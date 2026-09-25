@@ -37,8 +37,12 @@ public final class AutoSuperFarm {
     private static final int MAX_RADIUS = 32;
     private static final int DEFAULT_RADIUS = 14;
     private static final double DEFAULT_SPEED = 0.115D;
-    private static final int REPLANT_TIMEOUT = 8;
-    private static final int BREAK_COOLDOWN = 2;
+    private static final int REPLANT_TIMEOUT = 10;
+    private static final int BREAK_COOLDOWN = 1;
+    // One normal client tick gives a hotbar selection/inventory swap time to
+    // synchronize before the following right-click. This is intentionally the
+    // smallest non-burst delay rather than packet-spamming placement.
+    private static final int REPLANT_SELECT_DELAY = 1;
     private static final int TARGET_RESCAN = 3;
     private static final int MIN_HARVEST_PER_TICK = 1;
     private static final int MAX_HARVEST_PER_TICK = 8;
@@ -63,6 +67,8 @@ public final class AutoSuperFarm {
     private static boolean harvestPotato = true;
     private static int previousHotbar = -1;
     private static int workingHotbar = -1;
+    private static int restoreAfterReplant = 0;
+    private static int replantPlaceDelay = 0;
 
     private AutoSuperFarm() {}
 
@@ -89,6 +95,8 @@ public final class AutoSuperFarm {
             breakWait = 0;
             rescanWait = 0;
             restoreHotbar();
+            restoreAfterReplant = 0;
+            replantPlaceDelay = 0;
         }
     }
 
@@ -120,6 +128,16 @@ public final class AutoSuperFarm {
         if (client.field_1755 != null) {
             stopMovement();
             return;
+        }
+
+        // Do not restore the previous slot in the same tick as a seed placement.
+        // The interaction manager needs the seed to remain selected for the
+        // normal client tick/network path. One tick later we restore it.
+        if (restoreAfterReplant > 0) {
+            restoreAfterReplant--;
+            if (restoreAfterReplant == 0) {
+                restoreHotbar();
+            }
         }
 
         if (breakWait > 0) breakWait--;
@@ -329,43 +347,69 @@ public final class AutoSuperFarm {
 
     private static boolean tryReplant(class_310 client) {
         if (replantPos == null) return false;
+
         class_2338 farmland = replantPos.method_10074();
         class_2680 below = client.field_1687.method_8320(farmland);
-        String belowId = blockId(below);
-        if (!"minecraft:farmland".equals(belowId)) {
+        if (!"minecraft:farmland".equals(blockId(below))) {
             restoreHotbar();
             replantPos = null;
             replantKind = null;
+            replantPlaceDelay = 0;
             return false;
         }
 
         int seed = findReplantSlot(client, replantKind);
-        if (seed < 0) {
-            // No seed currently available. Do not substitute another item and do
-            // not break immature wheat; leave the farm block alone.
-            return false;
-        }
+        if (seed < 0) return false;
 
         int hotbar = ensureHotbar(client, seed);
         if (hotbar < 0) return false;
-        if (previousHotbar < 0) previousHotbar = client.field_1724.method_31548().field_7545;
-        workingHotbar = hotbar;
-        client.field_1724.method_31548().method_61496(hotbar);
-        faceSmooth(client, replantPos);
 
+        var inv = client.field_1724.method_31548();
+        if (previousHotbar < 0) previousHotbar = inv.field_7545;
+        workingHotbar = hotbar;
+
+        // If the seed is not currently selected, select it and wait exactly one
+        // client tick. This is the fast vanilla-style path: no packet burst and
+        // no same-tick slot-change + place combination.
+        if (inv.field_7545 != hotbar) {
+            inv.method_61496(hotbar);
+            replantPlaceDelay = REPLANT_SELECT_DELAY;
+            stopMovement();
+            return false;
+        }
+
+        if (replantPlaceDelay > 0) {
+            replantPlaceDelay--;
+            stopMovement();
+            return false;
+        }
+
+        // Make sure the crop is still gone before placing. This avoids placing
+        // into a block that the server has not acknowledged as broken yet.
+        if (!"minecraft:air".equals(blockId(client.field_1687.method_8320(replantPos)))) {
+            stopMovement();
+            return false;
+        }
+
+        faceSmooth(client, replantPos);
         class_3965 hit = new class_3965(
                 class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
                 class_2350.field_11036,
                 farmland,
                 false);
+
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
 
-        // One normal interaction packet is enough to plant the seed. Restore the
-        // player's original hotbar selection immediately after issuing it so the
-        // module does not leave the seed selected.
-        restoreHotbar();
+        // Keep the seed selected for one more normal client tick so the server
+        // receives the use action with the correct selected slot. Restoring it in
+        // the same tick can race the interaction on some servers.
+        restoreAfterReplant = 1;
         replantPos = null;
+        replantKind = null;
         replantWait = 0;
+        replantPlaceDelay = 0;
+        target = null;
+        stopMovement();
         return true;
     }
 
