@@ -12,7 +12,6 @@ import net.minecraft.class_310;
 import net.minecraft.class_3965;
 import net.minecraft.class_304;
 import net.minecraft.class_7923;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 
 import java.util.Locale;
 
@@ -64,14 +63,6 @@ public final class AutoSuperFarm {
     private static boolean harvestPotato = true;
     private static int previousHotbar = -1;
     private static int workingHotbar = -1;
-    private static boolean wantsForward;
-    private static boolean wantsBack;
-    private static boolean wantsLeft;
-    private static boolean wantsRight;
-
-    static {
-        ClientTickEvents.START_CLIENT_TICK.register(AutoSuperFarm::applyMovementInput);
-    }
 
     private AutoSuperFarm() {}
 
@@ -201,13 +192,33 @@ public final class AutoSuperFarm {
     private static Target findNearestTarget(class_310 client) {
         // Use the player's FEET block, not the eye block. The eye is ~1.6 blocks
         // higher and the old implementation therefore scanned the wrong Y plane.
-        class_2338 center = client.field_1724.method_24515();
-        int playerY = center.method_10264();
+        class_243 playerPos = client.field_1724.method_19538();
+        int playerX = (int) Math.floor(playerPos.field_1352);
+        int playerY = (int) Math.floor(playerPos.field_1351);
+        int playerZ = (int) Math.floor(playerPos.field_1350);
+        class_2338 playerBlock = new class_2338(playerX, playerY, playerZ);
         Target best = null;
         int r = radius;
-        // The player stands on the farmland block; the crop itself is one block above.
-        // Example from the farm layout: player block Y=3, wheat block Y=4.
-        int farmY = playerY + 1;
+
+        // The player can stand directly on the farmland (for example Y=3.9375
+        // while the farmland block is Y=3), or one block above it.  The crop is
+        // therefore determined from the farmland/support block instead of
+        // blindly requiring cropY == playerY.  This preserves the old elevated
+        // case while making the normal in-farm position work correctly.
+        int farmY;
+        class_2680 currentState = client.field_1687.method_8320(playerBlock);
+        class_2680 belowState = client.field_1687.method_8320(playerBlock.method_10074());
+        if ("minecraft:farmland".equals(blockId(currentState))) {
+            farmY = playerY;
+        } else if ("minecraft:farmland".equals(blockId(belowState))) {
+            farmY = playerY - 1;
+        } else {
+            // No visible farmland directly supporting the player. Keep the
+            // previous same-level behavior as a fallback.
+            farmY = playerY - 1;
+        }
+        int cropY = farmY + 1;
+        class_2338 center = new class_2338(playerX, cropY, playerZ);
         for (int x = -r; x <= r; x++) {
             for (int z = -r; z <= r; z++) {
                 if (x * x + z * z > r * r) continue;
@@ -216,7 +227,7 @@ public final class AutoSuperFarm {
                     Kind kind = classify(state);
                     if (kind == null) continue;
 
-                if (pos.method_10264() != farmY) continue;
+                if (pos.method_10264() != cropY) continue;
                 double d = client.field_1724.method_33571().method_1022(class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D));
                 double maxDistanceSq = (double) r * r + 1.0D;
                 if (d > maxDistanceSq || (best != null && d >= best.distanceSq())) continue;
@@ -274,10 +285,14 @@ public final class AutoSuperFarm {
         float yaw = approachAngle(client.field_1724.method_36454(), desiredYaw, 18.0F);
         client.field_1724.method_36456(yaw);
 
-        wantsForward = true;
-        wantsBack = false;
-        wantsLeft = false;
-        wantsRight = false;
+        class_304 forward = client.field_1690.field_1894;
+        class_304 back = client.field_1690.field_1881;
+        class_304 left = client.field_1690.field_1913;
+        class_304 right = client.field_1690.field_1849;
+        back.method_23481(false);
+        left.method_23481(false);
+        right.method_23481(false);
+        forward.method_23481(true);
     }
 
     private static void searchPatrol(class_310 client) {
@@ -336,11 +351,8 @@ public final class AutoSuperFarm {
         if (previousHotbar < 0) previousHotbar = client.field_1724.method_31548().field_7545;
         workingHotbar = hotbar;
         client.field_1724.method_31548().method_61496(hotbar);
+        faceSmooth(client, replantPos);
 
-        // Plant through the normal vanilla interaction manager. Do NOT rotate the
-        // camera here: the player should keep a stable view while replanting.
-        // A normal use-on-block interaction is issued once per ready farmland
-        // state, just like a real player placing a seed. There is no packet spam.
         class_3965 hit = new class_3965(
                 class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
                 class_2350.field_11036,
@@ -348,27 +360,12 @@ public final class AutoSuperFarm {
                 false);
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
 
-        // Keep the replant state for one short verification tick. This prevents
-        // the next harvest from starting before the server has accepted the
-        // planting interaction, while still making replant effectively immediate.
-        class_2680 planted = client.field_1687.method_8320(replantPos);
-        if (classify(planted) == replantKind) {
-            restoreHotbar();
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-            return true;
-        }
-
-        // If the client has not received the planted state yet, leave the seed
-        // selected and retry on the next tick. This is still normal interaction,
-        // not accelerated packet injection.
-        if (++replantWait >= REPLANT_TIMEOUT) {
-            restoreHotbar();
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-        }
+        // One normal interaction packet is enough to plant the seed. Restore the
+        // player's original hotbar selection immediately after issuing it so the
+        // module does not leave the seed selected.
+        restoreHotbar();
+        replantPos = null;
+        replantWait = 0;
         return true;
     }
 
@@ -409,24 +406,17 @@ public final class AutoSuperFarm {
         workingHotbar = -1;
     }
 
-    private static void applyMovementInput(class_310 client) {
-        if (client.field_1724 == null) return;
-        class_304 forward = client.field_1690.field_1894;
-        class_304 back = client.field_1690.field_1881;
-        class_304 left = client.field_1690.field_1913;
-        class_304 right = client.field_1690.field_1849;
-        forward.method_23481(wantsForward);
-        back.method_23481(wantsBack);
-        left.method_23481(wantsLeft);
-        right.method_23481(wantsRight);
-    }
-
     private static void stopMovement() {
         if (MC.field_1724 == null) return;
-        wantsForward = false;
-        wantsBack = false;
-        wantsLeft = false;
-        wantsRight = false;
+        class_304 forward = MC.field_1690.field_1894;
+        class_304 back = MC.field_1690.field_1881;
+        class_304 left = MC.field_1690.field_1913;
+        class_304 right = MC.field_1690.field_1849;
+        forward.method_23481(false);
+        back.method_23481(false);
+        left.method_23481(false);
+        right.method_23481(false);
+        class_304.method_1424();
         class_243 v = MC.field_1724.method_18798();
         MC.field_1724.method_18799(new class_243(0.0D, v.field_1351, 0.0D));
         MC.field_1724.method_24830(false);
