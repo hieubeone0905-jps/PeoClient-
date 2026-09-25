@@ -235,7 +235,7 @@ public final class AutoSuperFarm {
 
     private static void steerTo(class_310 client, class_2338 pos) {
         class_243 here = client.field_1724.method_33571();
-        class_243 there = class_243.method_24953(pos).add(0.0D, 0.35D, 0.0D);
+        class_243 there = class_243.method_24953(pos).method_1031(0.0D, 0.35D, 0.0D);
         double dx = there.field_1352 - here.field_1352;
         double dz = there.field_1350 - here.field_1350;
         double len = Math.sqrt(dx * dx + dz * dz);
@@ -258,7 +258,7 @@ public final class AutoSuperFarm {
 
     private static void face(class_310 client, class_2338 pos) {
         class_243 eye = client.field_1724.method_33571();
-        class_243 dst = class_243.method_24953(pos).add(0.5D, 0.5D, 0.5D);
+        class_243 dst = class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D);
         double dx = dst.field_1352 - eye.field_1352;
         double dy = dst.field_1351 - eye.field_1351;
         double dz = dst.field_1350 - eye.field_1350;
@@ -272,7 +272,7 @@ public final class AutoSuperFarm {
 
     private static boolean tryReplant(class_310 client) {
         if (replantPos == null) return false;
-        class_2338 farmland = replantPos.method_10084();
+        class_2338 farmland = replantPos.method_10074();
         class_2680 below = client.field_1687.method_8320(farmland);
         String belowId = blockId(below);
         if (!"minecraft:farmland".equals(belowId)) {
@@ -297,7 +297,7 @@ public final class AutoSuperFarm {
         face(client, replantPos);
 
         class_3965 hit = new class_3965(
-                class_243.method_24953(farmland).add(0.5D, 1.0D, 0.5D),
+                class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
                 class_2350.field_11036,
                 farmland,
                 false);
@@ -361,7 +361,7 @@ public final class AutoSuperFarm {
     }
 
     private static String itemId(class_1799 stack) {
-        return class_7923.field_7924.method_10221(stack.method_7909()).toString().toLowerCase(Locale.ROOT);
+        return class_7923.field_41178.method_10221(stack.method_7909()).toString().toLowerCase(Locale.ROOT);
     }
 
     public static int getHarvestSpeed() { return harvestPerTick; }
