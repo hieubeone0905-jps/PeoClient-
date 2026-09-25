@@ -52,6 +52,7 @@ public final class AutoSuperFarm {
     private static class_2338 replantPos;
     private static Kind replantKind;
     private static int replantWait;
+    private static int replantAttempts;
     private static int breakWait;
     private static int rescanWait;
     private static int harvestPerTick = DEFAULT_HARVEST_PER_TICK;
@@ -86,6 +87,7 @@ public final class AutoSuperFarm {
             replantPos = null;
             replantKind = null;
             replantWait = 0;
+            replantAttempts = 0;
             breakWait = 0;
             rescanWait = 0;
             restoreHotbar();
@@ -130,6 +132,7 @@ public final class AutoSuperFarm {
                 restoreHotbar();
                 replantPos = null;
                 replantWait = 0;
+                replantAttempts = 0;
             } else {
                 stopMovement();
             }
@@ -181,6 +184,7 @@ public final class AutoSuperFarm {
                 replantPos = current.pos;
                 replantKind = current.kind;
                 replantWait = 0;
+                replantAttempts = 0;
                 target = null;
                 break;
             }
@@ -338,11 +342,57 @@ public final class AutoSuperFarm {
             replantPos = null;
             replantKind = null;
             replantWait = 0;
+            replantAttempts = 0;
             return false;
         }
 
+        // IMPORTANT: keep the seed selected until the server/client state shows
+        // that the crop was actually replanted.  The old implementation restored
+        // the previous slot immediately after interactBlock(), which could make
+        // the first few placements work and then silently lose later placements.
+        // One normal interaction is issued, then we verify the result on the next
+        // client tick.  This remains vanilla interaction; no packet spoofing or
+        // anti-cheat bypass is used.
+        String expectedBlock;
+        int expectedAge;
+        switch (replantKind) {
+            case WHEAT -> { expectedBlock = "minecraft:wheat"; expectedAge = 0; }
+            case BEETROOT -> { expectedBlock = "minecraft:beetroots"; expectedAge = 0; }
+            case CARROT -> { expectedBlock = "minecraft:carrots"; expectedAge = 0; }
+            case POTATO -> { expectedBlock = "minecraft:potatoes"; expectedAge = 0; }
+            default -> { // Fruit crops do not use the replant path.
+                restoreHotbar();
+                replantPos = null;
+                replantKind = null;
+                replantWait = 0;
+                replantAttempts = 0;
+                return false;
+            }
+        }
+
+        class_2680 planted = client.field_1687.method_8320(replantPos);
+        String plantedId = blockId(planted);
+        int plantedAge = extractAge(planted.toString().toLowerCase(Locale.ROOT));
+        if (expectedBlock.equals(plantedId) && plantedAge == expectedAge) {
+            restoreHotbar();
+            replantPos = null;
+            replantKind = null;
+            replantWait = 0;
+            replantAttempts = 0;
+            target = null;
+            stopMovement();
+            return true;
+        }
+
         int seed = findReplantSlot(client, replantKind);
-        if (seed < 0) return false;
+        if (seed < 0) {
+            restoreHotbar();
+            replantPos = null;
+            replantKind = null;
+            replantWait = 0;
+            replantAttempts = 0;
+            return false;
+        }
 
         var inv = client.field_1724.method_31548();
         if (previousHotbar < 0) previousHotbar = inv.field_7545;
@@ -351,19 +401,30 @@ public final class AutoSuperFarm {
         if (hotbar < 0) return false;
         workingHotbar = hotbar;
 
-        // Use the normal Minecraft hotbar selection path. If the seed is already
-        // in the hotbar, there is no inventory click and no extra artificial wait.
-        // If it was moved from the main inventory, give the selected-slot change
-        // one normal client tick to synchronize before interacting.
         if (inv.field_7545 != hotbar) {
             inv.method_61496(hotbar);
             stopMovement();
-            replantWait = Math.max(replantWait, 1);
+            // Give the normal selected-slot state one client tick to settle.
+            replantWait = 1;
             return false;
         }
 
         if (replantWait > 0) {
             replantWait--;
+            stopMovement();
+            return false;
+        }
+
+        // If a previous attempt did not result in the crop appearing, allow only
+        // a very small number of normal retries. This is deliberately bounded so
+        // a server that rejects placement cannot be flooded with interactions.
+        if (replantAttempts >= 2) {
+            restoreHotbar();
+            replantPos = null;
+            replantKind = null;
+            replantWait = 0;
+            replantAttempts = 0;
+            target = null;
             stopMovement();
             return false;
         }
@@ -375,22 +436,14 @@ public final class AutoSuperFarm {
                 farmland,
                 false);
 
-        // Vanilla interaction: one normal right-click against the top of the
-        // farmland. Do not require the local crop state to be AIR first because
-        // the server may acknowledge the break one tick after the client sends
-        // the break action; requiring AIR here can deadlock replanting.
+        // Normal vanilla block interaction.  Keep the seed selected after the
+        // click so the following tick can confirm the placement before restoring
+        // the player's original hotbar slot.
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
-
-        // Restore the previous slot after the interaction has been issued. This
-        // is the same normal client-side hotbar behavior used by a fast manual
-        // replant, without packet bursts or repeated placement attempts.
-        restoreHotbar();
-        replantPos = null;
-        replantKind = null;
-        replantWait = 0;
-        target = null;
+        replantAttempts++;
+        replantWait = 1;
         stopMovement();
-        return true;
+        return false;
     }
 
     private static int findReplantSlot(class_310 client, Kind kind) {
