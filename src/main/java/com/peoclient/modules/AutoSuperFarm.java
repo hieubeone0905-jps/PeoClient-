@@ -149,15 +149,18 @@ public final class AutoSuperFarm {
             return;
         }
 
-        double distance = client.field_1724.method_33571().method_1022(class_243.method_24953(target.pos));
-        face(client, target.pos);
+        double distanceSq = client.field_1724.method_33571().method_1022(class_243.method_24953(target.pos).method_1031(0.5D, 0.5D, 0.5D));
 
-        if (distance > 3.8D * 3.8D) {
+        // Keep steering until we are genuinely close to the crop. Do not snap
+        // the camera every tick while walking; that was the source of the
+        // jerky movement seen in-game. Rotation is only smoothed as needed.
+        if (distanceSq > 2.25D) {
             steerTo(client, target.pos);
             return;
         }
 
         stopMovement();
+        faceSmooth(client, target.pos);
         if (breakWait > 0) return;
 
         // Process a configurable number of harvest actions per tick. Every action
@@ -183,24 +186,31 @@ public final class AutoSuperFarm {
     }
 
     private static Target findNearestTarget(class_310 client) {
-        class_2338 center = class_2338.method_49638(client.field_1724.method_19538());
+        // Use the player's FEET block, not the eye block. The eye is ~1.6 blocks
+        // higher and the old implementation therefore scanned the wrong Y plane.
+        class_243 playerPos = client.field_1724.method_19538();
+        int playerX = (int) Math.floor(playerPos.field_1352);
+        int playerY = (int) Math.floor(playerPos.field_1351);
+        int playerZ = (int) Math.floor(playerPos.field_1350);
+        class_2338 center = new class_2338(playerX, playerY, playerZ);
         Target best = null;
         int r = radius;
-        int farmY = center.method_10264();
+        int farmY = playerY;
         for (int x = -r; x <= r; x++) {
             for (int z = -r; z <= r; z++) {
-                    if (x * x + z * z > r * r) continue;
-                    class_2338 pos = center.method_10069(x, 0, z);
+                if (x * x + z * z > r * r) continue;
+                class_2338 pos = center.method_10069(x, 0, z);
                     class_2680 state = client.field_1687.method_8320(pos);
                     Kind kind = classify(state);
                     if (kind == null) continue;
 
-                    if (pos.method_10264() != farmY) continue;
-                    double d = client.field_1724.method_33571().method_1022(class_243.method_24953(pos));
-                    if (d > (double) r * r || (best != null && d >= best.distanceSq())) continue;
-                    best = new Target(pos, kind, d);
-                }
+                if (pos.method_10264() != farmY) continue;
+                double d = client.field_1724.method_33571().method_1022(class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D));
+                double maxDistanceSq = (double) r * r + 1.0D;
+                if (d > maxDistanceSq || (best != null && d >= best.distanceSq())) continue;
+                best = new Target(pos, kind, d);
             }
+        }
         return best;
     }
 
@@ -234,29 +244,36 @@ public final class AutoSuperFarm {
     }
 
     private static void steerTo(class_310 client, class_2338 pos) {
-        class_243 here = client.field_1724.method_33571();
-        class_243 there = class_243.method_24953(pos).method_1031(0.0D, 0.35D, 0.0D);
+        class_243 here = client.field_1724.method_19538();
+        class_243 there = class_243.method_24953(pos).method_1031(0.5D, 0.0D, 0.5D);
         double dx = there.field_1352 - here.field_1352;
         double dz = there.field_1350 - here.field_1350;
         double len = Math.sqrt(dx * dx + dz * dz);
-        if (len < 0.001D) {
+        if (len < 0.05D) {
             stopMovement();
             return;
         }
 
-        double vx = dx / len * moveSpeed;
-        double vz = dz / len * moveSpeed;
-        client.field_1724.method_18799(new class_243(vx, client.field_1724.method_18798().field_1351, vz));
-        face(client, pos);
+        // Preserve vertical velocity and only control horizontal motion. A
+        // modest acceleration keeps the walk stable instead of teleport-like
+        // velocity changes every tick.
+        double desiredX = dx / len * moveSpeed;
+        double desiredZ = dz / len * moveSpeed;
+        class_243 old = client.field_1724.method_18798();
+        double vx = old.field_1352 + (desiredX - old.field_1352) * 0.45D;
+        double vz = old.field_1350 + (desiredZ - old.field_1350) * 0.45D;
+        client.field_1724.method_18799(new class_243(vx, old.field_1351, vz));
+        faceSmooth(client, pos);
     }
 
     private static void searchPatrol(class_310 client) {
-        float yaw = client.field_1724.method_36454() + 1.8F;
-        client.field_1724.method_36456(yaw);
-        client.field_1724.method_18799(new class_243(0.0D, client.field_1724.method_18798().field_1351, 0.0D));
+        // Do not spin the camera when no target is found. Spinning made the
+        // module look active while providing no useful movement and also caused
+        // visible jitter. The scan is repeated as the player moves.
+        stopMovement();
     }
 
-    private static void face(class_310 client, class_2338 pos) {
+    private static void faceSmooth(class_310 client, class_2338 pos) {
         class_243 eye = client.field_1724.method_33571();
         class_243 dst = class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D);
         double dx = dst.field_1352 - eye.field_1352;
@@ -264,10 +281,21 @@ public final class AutoSuperFarm {
         double dz = dst.field_1350 - eye.field_1350;
         double horizontal = Math.sqrt(dx * dx + dz * dz);
         if (horizontal < 0.001D) return;
-        float yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
-        float pitch = (float) (-Math.toDegrees(Math.atan2(dy, horizontal)));
+        float desiredYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+        float desiredPitch = (float) (-Math.toDegrees(Math.atan2(dy, horizontal)));
+        float yaw = approachAngle(client.field_1724.method_36454(), desiredYaw, 10.0F);
+        float pitch = approachAngle(client.field_1724.method_36455(), Math.max(-90.0F, Math.min(90.0F, desiredPitch)), 8.0F);
         client.field_1724.method_36456(yaw);
-        client.field_1724.method_36457(Math.max(-90.0F, Math.min(90.0F, pitch)));
+        client.field_1724.method_36457(pitch);
+    }
+
+    private static float approachAngle(float current, float target, float maxStep) {
+        float delta = target - current;
+        while (delta > 180.0F) delta -= 360.0F;
+        while (delta < -180.0F) delta += 360.0F;
+        if (delta > maxStep) delta = maxStep;
+        if (delta < -maxStep) delta = -maxStep;
+        return current + delta;
     }
 
     private static boolean tryReplant(class_310 client) {
@@ -294,7 +322,7 @@ public final class AutoSuperFarm {
         if (previousHotbar < 0) previousHotbar = client.field_1724.method_31548().field_7545;
         workingHotbar = hotbar;
         client.field_1724.method_31548().method_61496(hotbar);
-        face(client, replantPos);
+        faceSmooth(client, replantPos);
 
         class_3965 hit = new class_3965(
                 class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
