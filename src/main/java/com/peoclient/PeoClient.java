@@ -6,6 +6,7 @@ import com.peoclient.inventory.InventoryCleaner;
 import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.UpLevelVipProMax;
 import com.peoclient.modules.AutoCraftMaxSpeed;
+import com.peoclient.modules.AutoSuperFarm;
 import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.nuker.compat.NukerCompatibility;
 import com.peoclient.nuker.compat.SafeCompatibilityDiagnostics;
@@ -100,6 +101,7 @@ public final class PeoClient implements ClientModInitializer {
                 case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
                 case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
                 case "AutoCraftMaxSpeed" -> GLFW.GLFW_KEY_K;
+                case "AutoSuperFarm" -> GLFW.GLFW_KEY_L;
                 case "PeoJoin" -> GLFW.GLFW_KEY_P;
                 default -> GLFW.GLFW_KEY_UNKNOWN;
             };
@@ -131,6 +133,7 @@ public final class PeoClient implements ClientModInitializer {
             case "AntiVipProMax" -> GLFW.GLFW_KEY_C;
             case "UpLevelVipProMax" -> GLFW.GLFW_KEY_U;
                 case "AutoCraftMaxSpeed" -> GLFW.GLFW_KEY_K;
+                case "AutoSuperFarm" -> GLFW.GLFW_KEY_L;
             case "PeoJoin" -> GLFW.GLFW_KEY_P;
             default -> GLFW.GLFW_KEY_UNKNOWN;
         };
@@ -196,6 +199,7 @@ public final class PeoClient implements ClientModInitializer {
         AntiVipProMaxModule.tick();
         UpLevelVipProMax.tick(mc);
         AutoCraftMaxSpeed.tick(mc);
+        AutoSuperFarm.tick(mc);
         if (com.peoclient.diagnostic.DiagnosticUtil.clientTick() % 20 == 0) {
             com.peoclient.diagnostic.PreDisconnectSnapshot.get().record(mc);
             com.peoclient.diagnostic.LatencyMetrics.get().updatePing();
@@ -225,6 +229,7 @@ public final class PeoClient implements ClientModInitializer {
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
             case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             case "AutoCraftMaxSpeed" -> AutoCraftMaxSpeed.toggle();
+            case "AutoSuperFarm" -> AutoSuperFarm.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
             default -> {}
         }
@@ -260,6 +265,16 @@ public final class PeoClient implements ClientModInitializer {
         public boolean antiVipProMax = false;
         public boolean upLevelVipProMax = false;
         public boolean autoCraftMaxSpeed = false;
+        public boolean autoSuperFarm = false;
+        public int autoSuperFarmRadius = 14;
+        public double autoSuperFarmMoveSpeed = 0.115D;
+        public int autoSuperFarmHarvestSpeed = 1;
+        public boolean autoSuperFarmWheat = true;
+        public boolean autoSuperFarmBeetroot = true;
+        public boolean autoSuperFarmPumpkin = true;
+        public boolean autoSuperFarmMelon = true;
+        public boolean autoSuperFarmCarrot = true;
+        public boolean autoSuperFarmPotato = true;
         public int autoCraftMaxSpeedCraftSpeed = 1;
         public int autoCraftMaxSpeedDropSpeed = 1;
         public int autoCraftMaxSpeedThreshold = 10;
@@ -376,6 +391,16 @@ public final class PeoClient implements ClientModInitializer {
                 autoCraftMaxSpeedCraftSpeed = Math.max(1, Math.min(36, c.autoCraftMaxSpeedCraftSpeed));
                 autoCraftMaxSpeedDropSpeed = Math.max(1, Math.min(36, c.autoCraftMaxSpeedDropSpeed));
                 autoCraftMaxSpeedThreshold = c.autoCraftMaxSpeedThreshold <= 0 ? 10 : Math.max(1, Math.min(36, c.autoCraftMaxSpeedThreshold));
+                autoSuperFarm = c.autoSuperFarm;
+                autoSuperFarmRadius = Math.max(4, Math.min(32, c.autoSuperFarmRadius));
+                autoSuperFarmMoveSpeed = Math.max(0.04D, Math.min(0.22D, c.autoSuperFarmMoveSpeed <= 0 ? 0.115D : c.autoSuperFarmMoveSpeed));
+                autoSuperFarmHarvestSpeed = Math.max(1, Math.min(8, c.autoSuperFarmHarvestSpeed <= 0 ? 1 : c.autoSuperFarmHarvestSpeed));
+                autoSuperFarmWheat = c.autoSuperFarmWheat;
+                autoSuperFarmBeetroot = c.autoSuperFarmBeetroot;
+                autoSuperFarmPumpkin = c.autoSuperFarmPumpkin;
+                autoSuperFarmMelon = c.autoSuperFarmMelon;
+                autoSuperFarmCarrot = c.autoSuperFarmCarrot;
+                autoSuperFarmPotato = c.autoSuperFarmPotato;
                 upLevelVipProMaxThreshold = Math.max(10, Math.min(36, c.upLevelVipProMaxThreshold));
                 upLevelVipProMaxDropStacksPerTick = Math.max(1, Math.min(36, c.upLevelVipProMaxDropStacksPerTick));
                 antiVipProMaxGrim = c.antiVipProMaxGrim;

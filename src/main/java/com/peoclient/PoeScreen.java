@@ -4,6 +4,7 @@ import com.peoclient.modules.AntiVipProMaxModule;
 import com.peoclient.modules.PeoJoinModule;
 import com.peoclient.modules.UpLevelVipProMax;
 import com.peoclient.modules.AutoCraftMaxSpeed;
+import com.peoclient.modules.AutoSuperFarm;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -40,7 +41,7 @@ public final class PoeScreen extends class_437 {
     private String draggingSlider;
 
     static final List<String> MODULES = Arrays.asList(
-            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "UpLevelVipProMax", "AutoCraftMaxSpeed", "PeoJoin",
+            "Fullbright", "InventoryCleaner", "Nuker [Multi]", "X-Ray", "AntiVipProMax", "UpLevelVipProMax", "AutoCraftMaxSpeed", "AutoSuperFarm", "PeoJoin",
             "AimAssist", "AirPlace", "AnchorAura", "AntiAFK", "AntiBlind", "AntiCactus",
             "AntiEntityPush", "AntiHunger", "AntiKnockback", "AntiSpam", "AntiWaterPush",
             "AntiWobble", "ArrowDMG", "AutoArmor", "AutoBuild", "AutoComplete", "AutoDisconnect",
@@ -72,7 +73,7 @@ public final class PoeScreen extends class_437 {
         return name.equals("Fullbright") || name.equals("InventoryCleaner")
                 || name.equals("Nuker [Multi]") || name.equals("X-Ray")
                 || name.equals("AntiVipProMax") || name.equals("UpLevelVipProMax")
-                || name.equals("AutoCraftMaxSpeed") || name.equals("PeoJoin");
+                || name.equals("AutoCraftMaxSpeed") || name.equals("AutoSuperFarm") || name.equals("PeoJoin");
     }
 
     private boolean enabled(String name) {
@@ -84,6 +85,7 @@ public final class PoeScreen extends class_437 {
             case "AntiVipProMax" -> AntiVipProMaxModule.isEnabled();
             case "UpLevelVipProMax" -> UpLevelVipProMax.isEnabled();
             case "AutoCraftMaxSpeed" -> AutoCraftMaxSpeed.isEnabled();
+            case "AutoSuperFarm" -> AutoSuperFarm.isEnabled();
             case "PeoJoin" -> PeoJoinModule.isEnabled();
             default -> false;
         };
@@ -98,6 +100,7 @@ public final class PoeScreen extends class_437 {
             case "AntiVipProMax" -> AntiVipProMaxModule.toggle();
             case "UpLevelVipProMax" -> UpLevelVipProMax.toggle();
             case "AutoCraftMaxSpeed" -> AutoCraftMaxSpeed.toggle();
+            case "AutoSuperFarm" -> AutoSuperFarm.toggle();
             case "PeoJoin" -> PeoJoinModule.toggle();
         }
         PeoClient.CFG.save();
@@ -212,6 +215,7 @@ public final class PoeScreen extends class_437 {
                 case "AntiVipProMax" -> drawAntiVipProMax(d, x, yy, w);
                 case "UpLevelVipProMax" -> drawUpLevelVipProMax(d, x, yy, w);
                 case "AutoCraftMaxSpeed" -> drawAutoCraftMaxSpeed(d, x, yy, w);
+                case "AutoSuperFarm" -> drawAutoSuperFarm(d, x, yy, w);
                 case "PeoJoin" -> drawPeoJoin(d, x, yy, w);
             }
         } else {
@@ -420,6 +424,7 @@ public final class PoeScreen extends class_437 {
             case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
             case "UpLevelVipProMax" -> "Scans your inventory for valuable blocks, submits them to Island Level, then closes the level screen.";
             case "AutoCraftMaxSpeed" -> "Opens /craft, crafts mineral blocks, drops configured low-value blocks, then submits rare blocks through the server combine GUI.";
+            case "AutoSuperFarm" -> "AI farm assistant: harvests selected mature village crops on the player's current Y-level, replants field crops, and leaves melon/pumpkin stems untouched.";
             case "PeoJoin" -> "Automatic local recovery after disconnect; reconnects and sends /home.";
             default -> "";
         };
@@ -477,6 +482,22 @@ public final class PoeScreen extends class_437 {
         y = rowValue(d, x, y, w, "Craft list", "Coal / Redstone / Lapis / Raw+Gold / Raw+Iron / Emerald / Diamond");
         y = rowValue(d, x, y, w, "Drop list", "Cobblestone / Stone / Raw Gold / Raw Iron");
         y = rowValue(d, x, y, w, "Submit", "Right-click rare block → hopper → close → repeat");
+        return y;
+    }
+
+    private int drawAutoSuperFarm(class_332 d, int x, int y, int w) {
+        y = section(d, x, y, "Farm AI");
+        y = sliderRow(d, x, y, w, "Harvest speed", AutoSuperFarm.getHarvestSpeed(), 1, 8, "%.0f actions/tick");
+        y = sliderRow(d, x, y, w, "Range", AutoSuperFarm.getRadius(), 4, 32, "%.0f blocks");
+        y = rowValue(d, x, y, w, "Scan plane", "Same Y level as player only");
+        y = rowToggle(d, x, y, w, "Wheat", AutoSuperFarm.isWheatEnabled());
+        y = rowToggle(d, x, y, w, "Beetroot", AutoSuperFarm.isBeetrootEnabled());
+        y = rowToggle(d, x, y, w, "Pumpkin", AutoSuperFarm.isPumpkinEnabled());
+        y = rowToggle(d, x, y, w, "Melon", AutoSuperFarm.isMelonEnabled());
+        y = rowToggle(d, x, y, w, "Carrot", AutoSuperFarm.isCarrotEnabled());
+        y = rowToggle(d, x, y, w, "Potato", AutoSuperFarm.isPotatoEnabled());
+        y = rowValue(d, x, y, w, "Replant", "Wheat / Beetroot / Carrot / Potato");
+        y = rowValue(d, x, y, w, "Fruit blocks", "Harvest melon/pumpkin blocks only; stems untouched");
         return y;
     }
 
@@ -630,6 +651,35 @@ public final class PoeScreen extends class_437 {
                         AutoCraftMaxSpeed.setThreshold((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 36, "Rare threshold")));
                         save();
                         draggingSlider = "AutoCraftThreshold";
+                    }
+                }
+                case "AutoSuperFarm" -> {
+                    int speedY = contentY + 26;
+                    int rangeY = speedY + 34;
+                    int cropY = rangeY + 34 + 34;
+                    if (hit(mouseY, speedY)) {
+                        AutoSuperFarm.setHarvestSpeed((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 8, "Harvest speed")));
+                        draggingSlider = "AutoSuperFarmSpeed";
+                    } else if (hit(mouseY, rangeY)) {
+                        AutoSuperFarm.setRadius((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 4, 32, "Range")));
+                        draggingSlider = "AutoSuperFarmRange";
+                    } else {
+                        String[] crops = {"wheat", "beetroot", "pumpkin", "melon", "carrot", "potato"};
+                        for (int i = 0; i < crops.length; i++) {
+                            int row = cropY + i * 34;
+                            if (hit(mouseY, row)) {
+                                boolean value = switch (crops[i]) {
+                                    case "wheat" -> AutoSuperFarm.isWheatEnabled();
+                                    case "beetroot" -> AutoSuperFarm.isBeetrootEnabled();
+                                    case "pumpkin" -> AutoSuperFarm.isPumpkinEnabled();
+                                    case "melon" -> AutoSuperFarm.isMelonEnabled();
+                                    case "carrot" -> AutoSuperFarm.isCarrotEnabled();
+                                    default -> AutoSuperFarm.isPotatoEnabled();
+                                };
+                                AutoSuperFarm.setCropEnabled(crops[i], !value);
+                                break;
+                            }
+                        }
                     }
                 }
                 case "UpLevelVipProMax" -> {
@@ -942,6 +992,10 @@ public final class PoeScreen extends class_437 {
             } else if ("AutoCraftThreshold".equals(draggingSlider)) {
                 AutoCraftMaxSpeed.setThreshold((int)Math.round(
                         sliderValue(mouseX, sx, sw, 1, 36, "Rare threshold")));
+            } else if ("AutoSuperFarmSpeed".equals(draggingSlider)) {
+                AutoSuperFarm.setHarvestSpeed((int)Math.round(sliderValue(mouseX, sx, sw, 1, 8, "Harvest speed")));
+            } else if ("AutoSuperFarmRange".equals(draggingSlider)) {
+                AutoSuperFarm.setRadius((int)Math.round(sliderValue(mouseX, sx, sw, 4, 32, "Range")));
             } else if ("UpLevelThreshold".equals(draggingSlider)) {
                 UpLevelVipProMax.setValueBlockThreshold((int)Math.round(
                         sliderValue(mouseX, sx, sw, 10, 36, "Stack threshold")));
@@ -1015,6 +1069,7 @@ public final class PoeScreen extends class_437 {
             case "AntiVipProMax" -> 300;
             case "UpLevelVipProMax" -> 300;
             case "AutoCraftMaxSpeed" -> 360;
+            case "AutoSuperFarm" -> 620;
             default -> 120;
         };
     }
