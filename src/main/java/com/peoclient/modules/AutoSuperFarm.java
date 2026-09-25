@@ -2,324 +2,360 @@ package com.peoclient.modules;
 
 import com.peoclient.PeoClient;
 import net.minecraft.class_1268;
-import net.minecraft.class_1713;
+import net.minecraft.class_1542;
 import net.minecraft.class_1799;
 import net.minecraft.class_2338;
 import net.minecraft.class_2350;
+import net.minecraft.class_239;
 import net.minecraft.class_243;
 import net.minecraft.class_2680;
-import net.minecraft.class_310;
-import net.minecraft.class_3965;
 import net.minecraft.class_304;
+import net.minecraft.class_310;
+import net.minecraft.class_3959;
+import net.minecraft.class_3965;
 import net.minecraft.class_7923;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * AutoSuperFarm
+ * Wurst/Meteor-inspired AutoSuperFarm for PeoClient 1.21.4.
  *
- * Lightweight local farm AI for Fabric 1.21.4.
- *
- * Targets only:
- *  - mature wheat (age=7): break, then immediately replant wheat seeds;
- *  - melon blocks: harvest the fruit block only;
- *  - pumpkin blocks: harvest the fruit block only.
- *
- * Stems are never selected. The module uses the normal interaction manager for
- * breaking/placing and a small steering controller for movement. It does not
- * toggle, configure, or call Nuker, so enabling it does not modify Nuker's
- * settings/state.
+ * This module intentionally uses normal Minecraft interaction calls. It does
+ * not touch Nuker, does not inject packets, and does not bypass server checks.
+ * Movement is a lightweight client-side target steering system: ripe crops and
+ * dropped seeds are selected by distance, then the player walks to them.
  */
 public final class AutoSuperFarm {
     private static final class_310 MC = class_310.method_1551();
 
-    private static final int MIN_RADIUS = 4;
-    private static final int MAX_RADIUS = 32;
-    private static final int DEFAULT_RADIUS = 14;
-    private static final double DEFAULT_SPEED = 0.115D;
-    private static final int REPLANT_TIMEOUT = 8;
-    private static final int BREAK_COOLDOWN = 2;
-    private static final int TARGET_RESCAN = 3;
-    private static final int MIN_HARVEST_PER_TICK = 1;
-    private static final int MAX_HARVEST_PER_TICK = 8;
-    private static final int DEFAULT_HARVEST_PER_TICK = 1;
+    private static final double MIN_RANGE = 0.1D;
+    private static final double MAX_RANGE = 64.0D;
+    private static final double DEFAULT_RANGE = 14.0D;
+    private static final double MIN_SPEED = 0.1D;
+    private static final double MAX_SPEED = 20.0D;
+    private static final double DEFAULT_HARVEST_SPEED = 4.0D;
+    private static final double DEFAULT_REPLANT_SPEED = 4.0D;
+    private static final int MAX_REPLANT_RETRIES = 2;
 
     private static boolean enabled;
     private static boolean initialized;
-    private static int radius = DEFAULT_RADIUS;
-    private static double moveSpeed = DEFAULT_SPEED;
+    private static double range = DEFAULT_RANGE;
+    private static double harvestSpeed = DEFAULT_HARVEST_SPEED;
+    private static double replantSpeed = DEFAULT_REPLANT_SPEED;
+    private static boolean checkLineOfSight = false;
+    private static boolean faceTarget = true;
+    private static boolean swingHand = true;
+    private static boolean autoWalk = true;
+    private static boolean pickupSeeds = true;
+    private static boolean drawReplantSpots = false;
+    private static boolean drawHarvestBlocks = false;
+    private static boolean drawReplantBlocks = false;
+
     private static Target target;
-    private static class_2338 replantPos;
-    private static Kind replantKind;
+    private static PendingReplant pendingReplant;
+    private static int actionWait;
     private static int replantWait;
-    private static int replantAttempts;
-    private static int breakWait;
-    private static int rescanWait;
-    private static int harvestPerTick = DEFAULT_HARVEST_PER_TICK;
-    private static boolean harvestWheat = true;
-    private static boolean harvestBeetroot = true;
-    private static boolean harvestPumpkin = true;
-    private static boolean harvestMelon = true;
-    private static boolean harvestCarrot = true;
-    private static boolean harvestPotato = true;
+    private static int replantRetries;
+    private static int scanWait;
     private static int previousHotbar = -1;
     private static int workingHotbar = -1;
 
     private AutoSuperFarm() {}
 
-    private record Target(class_2338 pos, Kind kind, double distanceSq) {}
-    private enum Kind { WHEAT(true, "minecraft:wheat_seeds"), BEETROOT(true, "minecraft:beetroot_seeds"), CARROT(true, "minecraft:carrot"), POTATO(true, "minecraft:potato"), MELON(false, null), PUMPKIN(false, null);
-        final boolean replant; final String seedId;
-        Kind(boolean replant, String seedId) { this.replant = replant; this.seedId = seedId; }
+    private record CropSpec(String key, String blockId, String seedId, int maxAge,
+                            boolean fruitBlock, boolean defaultHarvest, boolean defaultReplant) {}
+
+    private record Target(class_2338 pos, class_1542 item, CropSpec crop, double distanceSq) {
+        boolean isItem() { return item != null; }
     }
 
-    public static void toggle() {
-        setEnabled(!enabled);
-    }
+    private record PendingReplant(class_2338 pos, CropSpec crop) {}
+
+    private static final List<CropSpec> CROPS = List.of(
+            new CropSpec("wheat", "minecraft:wheat", "minecraft:wheat_seeds", 7, false, true, true),
+            new CropSpec("beetroot", "minecraft:beetroots", "minecraft:beetroot_seeds", 3, false, true, true),
+            new CropSpec("carrot", "minecraft:carrots", "minecraft:carrot", 7, false, true, true),
+            new CropSpec("potato", "minecraft:potatoes", "minecraft:potato", 7, false, true, true),
+            new CropSpec("nether-wart", "minecraft:nether_wart", "minecraft:nether_wart", 3, false, true, true),
+            new CropSpec("pumpkin", "minecraft:pumpkin", null, 0, true, true, false),
+            new CropSpec("melon", "minecraft:melon", null, 0, true, true, false),
+            new CropSpec("sugar-cane", "minecraft:sugar_cane", null, 0, false, true, false),
+            new CropSpec("bamboo", "minecraft:bamboo", null, 0, false, true, false),
+            new CropSpec("cactus", "minecraft:cactus", null, 0, false, true, false),
+            new CropSpec("kelp", "minecraft:kelp", null, 0, false, true, false),
+            new CropSpec("sweet-berries", "minecraft:sweet_berry_bush", "minecraft:sweet_berries", 3, false, true, false),
+            new CropSpec("cocoa", "minecraft:cocoa", "minecraft:cocoa_beans", 2, false, true, false)
+    );
+
+    public static void toggle() { setEnabled(!enabled); }
 
     public static void setEnabled(boolean value) {
         enabled = value;
         PeoClient.CFG.autoSuperFarm = value;
         PeoClient.CFG.save();
-        if (!value) {
-            stopMovement();
-            target = null;
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-            replantAttempts = 0;
-            breakWait = 0;
-            rescanWait = 0;
-            restoreHotbar();
-        }
+        if (!value) resetState();
     }
 
-    public static boolean isEnabled() {
-        return enabled;
-    }
+    public static boolean isEnabled() { return enabled; }
 
     public static void tick(class_310 client) {
-        if (!initialized) {
-            enabled = PeoClient.CFG.autoSuperFarm;
-            radius = clamp(PeoClient.CFG.autoSuperFarmRadius, MIN_RADIUS, MAX_RADIUS);
-            moveSpeed = Math.max(0.04D, Math.min(0.22D, PeoClient.CFG.autoSuperFarmMoveSpeed));
-            harvestPerTick = clamp(PeoClient.CFG.autoSuperFarmHarvestSpeed, MIN_HARVEST_PER_TICK, MAX_HARVEST_PER_TICK);
-            harvestWheat = PeoClient.CFG.autoSuperFarmWheat;
-            harvestBeetroot = PeoClient.CFG.autoSuperFarmBeetroot;
-            harvestPumpkin = PeoClient.CFG.autoSuperFarmPumpkin;
-            harvestMelon = PeoClient.CFG.autoSuperFarmMelon;
-            harvestCarrot = PeoClient.CFG.autoSuperFarmCarrot;
-            harvestPotato = PeoClient.CFG.autoSuperFarmPotato;
-            initialized = true;
+        if (!initialized) loadSettings();
+        if (!enabled || client.field_1724 == null || client.field_1687 == null) return;
+        if (client.field_1755 != null) { stopMovement(); return; }
+
+        if (actionWait > 0) actionWait--;
+        if (replantWait > 0) replantWait--;
+        if (scanWait > 0) scanWait--;
+
+        // Replant has priority over searching for another crop. This keeps the
+        // harvest -> replant loop deterministic instead of running ahead.
+        if (pendingReplant != null) {
+            if (tryReplant(client, pendingReplant)) return;
         }
 
-        if (!enabled || client.field_1724 == null || client.field_1687 == null || client.field_1761 == null) {
-            return;
+        if (target == null || isInvalidTarget(client, target) || scanWait == 0) {
+            target = pickupSeeds ? findNearestSeed(client) : null;
+            if (target == null) target = findNearestHarvestable(client);
+            scanWait = 2;
         }
 
-        // Never operate through a GUI/container. This prevents inventory/server GUI
-        // traffic from being mixed with farm actions.
-        if (client.field_1755 != null) {
-            stopMovement();
-            return;
-        }
+        if (target == null) { stopMovement(); return; }
 
-        if (breakWait > 0) breakWait--;
-
-        if (replantPos != null) {
-            if (tryReplant(client)) return;
-            if (++replantWait > REPLANT_TIMEOUT) {
-                restoreHotbar();
-                replantPos = null;
-                replantWait = 0;
-                replantAttempts = 0;
-            } else {
+        if (target.isItem()) {
+            class_243 itemPos = target.item.method_19538();
+            double d = client.field_1724.method_19538().method_1022(itemPos);
+            if (d <= 1.15D) {
                 stopMovement();
+                target = null;
+                scanWait = 1;
+                return; // vanilla ItemEntity pickup handles the seed.
             }
+            steerTo(client, itemPos);
             return;
         }
 
-        if (rescanWait > 0) rescanWait--;
-
-        if (target == null || isInvalidTarget(client, target) || rescanWait == 0) {
-            Target next = findNearestTarget(client);
-            if (target == null || next == null || next.pos().equals(target.pos()) || next.distanceSq() + 1.0D < target.distanceSq()) {
-                target = next;
-            }
-            rescanWait = TARGET_RESCAN;
-        }
-
-        if (target == null) {
-            // No crop in the scan sphere: slowly rotate the search direction by
-            // moving in a small arc instead of standing permanently still.
-            searchPatrol(client);
-            return;
-        }
-
-        double distanceSq = client.field_1724.method_33571().method_1022(class_243.method_24953(target.pos).method_1031(0.5D, 0.5D, 0.5D));
-
-        // Keep steering until we are genuinely close to the crop. Do not snap
-        // the camera every tick while walking; that was the source of the
-        // jerky movement seen in-game. Rotation is only smoothed as needed.
-        if (distanceSq > 2.25D) {
-            steerTo(client, target.pos);
+        double d = client.field_1724.method_33571().method_1022(
+                class_243.method_24953(target.pos).method_1031(0.5D, 0.5D, 0.5D));
+        if (d > interactionDistance(client, target.pos)) {
+            if (autoWalk) steerTo(client, class_243.method_24953(target.pos).method_1031(0.5D, 0.0D, 0.5D));
+            else stopMovement();
             return;
         }
 
         stopMovement();
-        faceSmooth(client, target.pos);
-        if (breakWait > 0) return;
+        if (actionWait > 0) return;
+        if (checkLineOfSight && !hasLineOfSight(client, target.pos)) return;
+        if (faceTarget) faceSmooth(client, class_243.method_24953(target.pos).method_1031(0.5D, 0.5D, 0.5D));
 
-        // Process a configurable number of harvest actions per tick. Every action
-        // is still validated against this module's own crop filter and same-Y
-        // farming plane; Nuker is never called or modified.
-        int actions = Math.max(1, harvestPerTick);
-        for (int i = 0; i < actions; i++) {
-            Target current = (i == 0 && target != null) ? target : findNearestTarget(client);
-            if (current == null) break;
-            class_2350 side = class_2350.field_11036;
-            client.field_1761.method_2902(current.pos, side);
-            client.field_1724.method_6104(class_1268.field_5808);
-            if (current.kind.replant) {
-                replantPos = current.pos;
-                replantKind = current.kind;
-                replantWait = 0;
-                replantAttempts = 0;
-                target = null;
-                break;
+        if (harvest(client, target)) {
+            if (target.crop.seedId != null && isReplantEnabled(target.crop.key)) {
+                pendingReplant = new PendingReplant(target.pos, target.crop);
+                replantRetries = 0;
+                replantWait = speedToTicks(replantSpeed);
             }
             target = null;
+            actionWait = speedToTicks(harvestSpeed);
+            scanWait = 1;
         }
-        breakWait = BREAK_COOLDOWN;
     }
 
-    private static Target findNearestTarget(class_310 client) {
-        // Use the player's FEET block, not the eye block. The eye is ~1.6 blocks
-        // higher and the old implementation therefore scanned the wrong Y plane.
-        class_243 playerPos = client.field_1724.method_19538();
-        int playerX = (int) Math.floor(playerPos.field_1352);
-        int playerY = (int) Math.floor(playerPos.field_1351);
-        int playerZ = (int) Math.floor(playerPos.field_1350);
-        class_2338 playerBlock = new class_2338(playerX, playerY, playerZ);
-        Target best = null;
-        int r = radius;
+    private static boolean harvest(class_310 client, Target target) {
+        // Normal attackBlock call; this is the same client interaction path used
+        // by ordinary Minecraft controls rather than a packet-spam shortcut.
+        boolean ok = client.field_1761.method_2902(target.pos, class_2350.field_11036);
+        if (ok && swingHand) client.field_1724.method_7350(class_1268.field_5808);
+        return ok;
+    }
 
-        // The player can stand directly on the farmland (for example Y=3.9375
-        // while the farmland block is Y=3), or one block above it.  The crop is
-        // therefore determined from the farmland/support block instead of
-        // blindly requiring cropY == playerY.  This preserves the old elevated
-        // case while making the normal in-farm position work correctly.
-        int farmY;
-        class_2680 currentState = client.field_1687.method_8320(playerBlock);
-        class_2680 belowState = client.field_1687.method_8320(playerBlock.method_10074());
-        if ("minecraft:farmland".equals(blockId(currentState))) {
-            farmY = playerY;
-        } else if ("minecraft:farmland".equals(blockId(belowState))) {
-            farmY = playerY - 1;
-        } else {
-            // No visible farmland directly supporting the player. Keep the
-            // previous same-level behavior as a fallback.
-            farmY = playerY - 1;
+    private static boolean tryReplant(class_310 client, PendingReplant pending) {
+        class_2338 farmland = pending.pos.method_10074();
+        if (!"minecraft:farmland".equals(blockId(client.field_1687.method_8320(farmland)))) {
+            pendingReplant = null;
+            restoreHotbar(client);
+            return false;
         }
-        int cropY = farmY + 1;
-        class_2338 center = new class_2338(playerX, cropY, playerZ);
-        for (int x = -r; x <= r; x++) {
-            for (int z = -r; z <= r; z++) {
-                if (x * x + z * z > r * r) continue;
-                class_2338 pos = center.method_10069(x, 0, z);
-                    class_2680 state = client.field_1687.method_8320(pos);
-                    Kind kind = classify(state);
-                    if (kind == null) continue;
 
-                if (pos.method_10264() != cropY) continue;
-                double d = client.field_1724.method_33571().method_1022(class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D));
-                double maxDistanceSq = (double) r * r + 1.0D;
-                if (d > maxDistanceSq || (best != null && d >= best.distanceSq())) continue;
-                best = new Target(pos, kind, d);
+        if (isMatureOrFreshCrop(client.field_1687.method_8320(pending.pos), pending.crop, 0)) {
+            pendingReplant = null;
+            restoreHotbar(client);
+            return false;
+        }
+
+        int seedSlot = findHotbarItem(client, pending.crop.seedId);
+        if (seedSlot < 0) {
+            // No seed available: do not spin or spam interaction packets.
+            pendingReplant = null;
+            restoreHotbar(client);
+            return false;
+        }
+
+        if (previousHotbar < 0) previousHotbar = client.field_1724.field_7514.field_7545;
+        workingHotbar = seedSlot;
+        if (client.field_1724.field_7514.field_7545 != seedSlot) {
+            client.field_1724.field_7514.method_61496(seedSlot);
+            replantWait = Math.max(1, speedToTicks(replantSpeed));
+            stopMovement();
+            return true;
+        }
+
+        if (replantWait > 0) { stopMovement(); return true; }
+        if (replantRetries >= MAX_REPLANT_RETRIES) {
+            pendingReplant = null;
+            restoreHotbar(client);
+            return false;
+        }
+
+        if (checkLineOfSight && !hasLineOfSight(client, farmland)) return true;
+        if (faceTarget) faceSmooth(client, class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D));
+
+        class_3965 hit = new class_3965(
+                class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
+                class_2350.field_11036,
+                farmland,
+                false);
+        client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
+        if (swingHand) client.field_1724.method_7350(class_1268.field_5808);
+        replantRetries++;
+        replantWait = Math.max(1, speedToTicks(replantSpeed));
+        stopMovement();
+        return true;
+    }
+
+    private static Target findNearestSeed(class_310 client) {
+        class_243 player = client.field_1724.method_19538();
+        double max = range * range;
+        class_1542 best = null;
+        double bestD = Double.MAX_VALUE;
+        for (Object object : client.field_1687.method_18112()) {
+            if (!(object instanceof class_1542 item)) continue;
+            class_1799 stack = item.method_6983();
+            if (stack.method_7960() || !"minecraft:wheat_seeds".equals(itemId(stack))) continue;
+            double d = player.method_1022(item.method_19538());
+            if (d <= max && d < bestD) { best = item; bestD = d; }
+        }
+        return best == null ? null : new Target(null, best, null, bestD);
+    }
+
+    private static Target findNearestHarvestable(class_310 client) {
+        class_243 player = client.field_1724.method_19538();
+        int px = (int)Math.floor(player.field_1352);
+        int py = (int)Math.floor(player.field_1351);
+        int pz = (int)Math.floor(player.field_1350);
+        int r = (int)Math.ceil(range);
+        Target best = null;
+        double max = range * range + 1.0D;
+
+        for (int x = px - r; x <= px + r; x++) {
+            for (int y = py - 2; y <= py + 2; y++) {
+                for (int z = pz - r; z <= pz + r; z++) {
+                    class_2338 pos = new class_2338(x, y, z);
+                    double d = player.method_1022(class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D));
+                    if (d > max || (best != null && d >= best.distanceSq)) continue;
+                    class_2680 state = client.field_1687.method_8320(pos);
+                    CropSpec spec = cropFor(state);
+                    if (spec == null || !isHarvestEnabled(spec.key)) continue;
+                    if (!isMature(state, spec)) continue;
+                    if (isColumnCrop(spec) && !isTopColumnSegment(client, pos, spec)) continue;
+                    if (checkLineOfSight && !hasLineOfSight(client, pos)) continue;
+                    best = new Target(pos, null, spec, d);
+                }
             }
         }
         return best;
     }
 
-    private static Kind classify(class_2680 state) {
+
+    private static boolean isColumnCrop(CropSpec spec) {
+        return spec.blockId.equals("minecraft:sugar_cane")
+                || spec.blockId.equals("minecraft:bamboo")
+                || spec.blockId.equals("minecraft:cactus")
+                || spec.blockId.equals("minecraft:kelp");
+    }
+
+    private static boolean isTopColumnSegment(class_310 client, class_2338 pos, CropSpec spec) {
+        class_2680 above = client.field_1687.method_8320(pos.method_10086());
+        return !spec.blockId.equals(blockId(above));
+    }
+
+    private static CropSpec cropFor(class_2680 state) {
         String id = blockId(state);
-        if ("minecraft:melon".equals(id)) return harvestMelon ? Kind.MELON : null;
-        if ("minecraft:pumpkin".equals(id)) return harvestPumpkin ? Kind.PUMPKIN : null;
-        if ("minecraft:wheat".equals(id)) return harvestWheat && extractAge(state.toString().toLowerCase(Locale.ROOT)) >= 7 ? Kind.WHEAT : null;
-        if ("minecraft:beetroots".equals(id)) return harvestBeetroot && extractAge(state.toString().toLowerCase(Locale.ROOT)) >= 3 ? Kind.BEETROOT : null;
-        if ("minecraft:carrots".equals(id)) return harvestCarrot && extractAge(state.toString().toLowerCase(Locale.ROOT)) >= 7 ? Kind.CARROT : null;
-        if ("minecraft:potatoes".equals(id)) return harvestPotato && extractAge(state.toString().toLowerCase(Locale.ROOT)) >= 7 ? Kind.POTATO : null;
+        for (CropSpec spec : CROPS) if (spec.blockId.equals(id)) return spec;
         return null;
     }
 
-    private static int extractAge(String text) {
-        int p = text.indexOf("age=");
-        if (p < 0) return -1;
-        p += 4;
-        int end = p;
-        while (end < text.length() && Character.isDigit(text.charAt(end))) end++;
-        try {
-            return Integer.parseInt(text.substring(p, end));
-        } catch (RuntimeException ignored) {
-            return -1;
-        }
+    private static boolean isMature(class_2680 state, CropSpec spec) {
+        if (spec.fruitBlock) return true;
+        String text = state.toString().toLowerCase(Locale.ROOT);
+        int age = extractAge(text);
+        if (age >= 0) return age >= spec.maxAge;
+        // Multi-block plants have no simple age property; harvest only the
+        // upper segment so the base remains intact.
+        String id = spec.blockId;
+        return id.equals("minecraft:sugar_cane") || id.equals("minecraft:bamboo")
+                || id.equals("minecraft:cactus") || id.equals("minecraft:kelp");
+    }
+
+    private static boolean isMatureOrFresh(class_2680 state, CropSpec spec, int wantedAge) {
+        if (!spec.blockId.equals(blockId(state))) return false;
+        int age = extractAge(state.toString().toLowerCase(Locale.ROOT));
+        return age < 0 || age == wantedAge;
     }
 
     private static boolean isInvalidTarget(class_310 client, Target t) {
+        if (t.isItem()) {
+            if (!client.field_1687.method_62145(t.item)) return true;
+            class_1799 stack = t.item.method_6983();
+            return stack.method_7960() || !"minecraft:wheat_seeds".equals(itemId(stack));
+        }
         class_2680 state = client.field_1687.method_8320(t.pos);
-        return classify(state) != t.kind;
+        return !isHarvestEnabled(t.crop.key) || !isMature(state, t.crop);
     }
 
-    private static void steerTo(class_310 client, class_2338 pos) {
+    private static boolean hasLineOfSight(class_310 client, class_2338 pos) {
+        class_243 eye = client.field_1724.method_33571();
+        class_243 center = class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D);
+        try {
+            class_3965 hit = client.field_1687.method_17742(new class_3959(
+                    eye, center, class_3959.class_3960.field_17559,
+                    class_239.class_242.field_1348, client.field_1724));
+            return hit.method_17783() == class_239.class_240.field_1332 && pos.equals(hit.method_17777());
+        } catch (Throwable ignored) { return true; }
+    }
+
+    private static double interactionDistance(class_310 client, class_2338 pos) {
+        // Keep the configured scan range separate from the actual vanilla reach.
+        // Movement continues until the block can be interacted with normally.
+        return Math.max(2.9D, Math.min(4.5D, range));
+    }
+
+    private static void steerTo(class_310 client, class_243 there) {
         class_243 here = client.field_1724.method_19538();
-        class_243 there = class_243.method_24953(pos).method_1031(0.5D, 0.0D, 0.5D);
         double dx = there.field_1352 - here.field_1352;
         double dz = there.field_1350 - here.field_1350;
         double len = Math.sqrt(dx * dx + dz * dz);
-        if (len < 0.05D) {
-            stopMovement();
-            return;
-        }
-
-        // Do not fight ClientPlayerEntity's normal movement by writing velocity.
-        // Instead, steer the normal W input toward the target. This is much more
-        // stable on multiplayer servers because vanilla movement and movement
-        // packets remain in control of the player's horizontal motion.
-        float desiredYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
-        float yaw = approachAngle(client.field_1724.method_36454(), desiredYaw, 18.0F);
-        client.field_1724.method_36456(yaw);
-
+        if (len < 0.05D) { stopMovement(); return; }
+        float desiredYaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+        client.field_1724.method_36456(approachAngle(client.field_1724.method_36454(), desiredYaw, 14.0F));
         class_304 forward = client.field_1690.field_1894;
-        class_304 back = client.field_1690.field_1881;
-        class_304 left = client.field_1690.field_1913;
-        class_304 right = client.field_1690.field_1849;
-        back.method_23481(false);
-        left.method_23481(false);
-        right.method_23481(false);
-        forward.method_23481(true);
+        client.field_1690.field_1881.method_23481(false);
+        client.field_1690.field_1913.method_23481(false);
+        client.field_1690.field_1849.method_23481(false);
+        forward.method_23481(autoWalk);
     }
 
-    private static void searchPatrol(class_310 client) {
-        // Do not spin the camera when no target is found. Spinning made the
-        // module look active while providing no useful movement and also caused
-        // visible jitter. The scan is repeated as the player moves.
-        stopMovement();
-    }
-
-    private static void faceSmooth(class_310 client, class_2338 pos) {
+    private static void faceSmooth(class_310 client, class_243 there) {
         class_243 eye = client.field_1724.method_33571();
-        class_243 dst = class_243.method_24953(pos).method_1031(0.5D, 0.5D, 0.5D);
-        double dx = dst.field_1352 - eye.field_1352;
-        double dy = dst.field_1351 - eye.field_1351;
-        double dz = dst.field_1350 - eye.field_1350;
+        double dx = there.field_1352 - eye.field_1352;
+        double dy = there.field_1351 - eye.field_1351;
+        double dz = there.field_1350 - eye.field_1350;
         double horizontal = Math.sqrt(dx * dx + dz * dz);
-        if (horizontal < 0.001D) return;
-        float desiredYaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
-        float desiredPitch = (float) (-Math.toDegrees(Math.atan2(dy, horizontal)));
-        float yaw = approachAngle(client.field_1724.method_36454(), desiredYaw, 10.0F);
-        float pitch = approachAngle(client.field_1724.method_36455(), Math.max(-90.0F, Math.min(90.0F, desiredPitch)), 8.0F);
-        client.field_1724.method_36456(yaw);
-        client.field_1724.method_36457(pitch);
+        float yaw = (float)(Math.toDegrees(Math.atan2(dz, dx)) - 90.0D);
+        float pitch = (float)(-Math.toDegrees(Math.atan2(dy, horizontal)));
+        client.field_1724.method_36456(approachAngle(client.field_1724.method_36454(), yaw, 10.0F));
+        client.field_1724.method_36457(approachAngle(client.field_1724.method_36455(), pitch, 8.0F));
     }
 
     private static float approachAngle(float current, float target, float maxStep) {
@@ -331,153 +367,18 @@ public final class AutoSuperFarm {
         return current + delta;
     }
 
-    private static boolean tryReplant(class_310 client) {
-        if (replantPos == null || replantKind == null) return false;
-
-        // The block immediately below the harvested crop must be farmland.
-        class_2338 farmland = replantPos.method_10074();
-        class_2680 below = client.field_1687.method_8320(farmland);
-        if (!"minecraft:farmland".equals(blockId(below))) {
-            restoreHotbar();
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-            replantAttempts = 0;
-            return false;
-        }
-
-        // IMPORTANT: keep the seed selected until the server/client state shows
-        // that the crop was actually replanted.  The old implementation restored
-        // the previous slot immediately after interactBlock(), which could make
-        // the first few placements work and then silently lose later placements.
-        // One normal interaction is issued, then we verify the result on the next
-        // client tick.  This remains vanilla interaction; no packet spoofing or
-        // anti-cheat bypass is used.
-        String expectedBlock;
-        int expectedAge;
-        switch (replantKind) {
-            case WHEAT -> { expectedBlock = "minecraft:wheat"; expectedAge = 0; }
-            case BEETROOT -> { expectedBlock = "minecraft:beetroots"; expectedAge = 0; }
-            case CARROT -> { expectedBlock = "minecraft:carrots"; expectedAge = 0; }
-            case POTATO -> { expectedBlock = "minecraft:potatoes"; expectedAge = 0; }
-            default -> { // Fruit crops do not use the replant path.
-                restoreHotbar();
-                replantPos = null;
-                replantKind = null;
-                replantWait = 0;
-                replantAttempts = 0;
-                return false;
-            }
-        }
-
-        class_2680 planted = client.field_1687.method_8320(replantPos);
-        String plantedId = blockId(planted);
-        int plantedAge = extractAge(planted.toString().toLowerCase(Locale.ROOT));
-        if (expectedBlock.equals(plantedId) && plantedAge == expectedAge) {
-            restoreHotbar();
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-            replantAttempts = 0;
-            target = null;
-            stopMovement();
-            return true;
-        }
-
-        int seed = findReplantSlot(client, replantKind);
-        if (seed < 0) {
-            restoreHotbar();
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-            replantAttempts = 0;
-            return false;
-        }
-
-        var inv = client.field_1724.method_31548();
-        if (previousHotbar < 0) previousHotbar = inv.field_7545;
-
-        int hotbar = ensureHotbar(client, seed);
-        if (hotbar < 0) return false;
-        workingHotbar = hotbar;
-
-        if (inv.field_7545 != hotbar) {
-            inv.method_61496(hotbar);
-            stopMovement();
-            // Give the normal selected-slot state one client tick to settle.
-            replantWait = 1;
-            return false;
-        }
-
-        if (replantWait > 0) {
-            replantWait--;
-            stopMovement();
-            return false;
-        }
-
-        // If a previous attempt did not result in the crop appearing, allow only
-        // a very small number of normal retries. This is deliberately bounded so
-        // a server that rejects placement cannot be flooded with interactions.
-        if (replantAttempts >= 2) {
-            restoreHotbar();
-            replantPos = null;
-            replantKind = null;
-            replantWait = 0;
-            replantAttempts = 0;
-            target = null;
-            stopMovement();
-            return false;
-        }
-
-        faceSmooth(client, replantPos);
-        class_3965 hit = new class_3965(
-                class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
-                class_2350.field_11036,
-                farmland,
-                false);
-
-        // Normal vanilla block interaction.  Keep the seed selected after the
-        // click so the following tick can confirm the placement before restoring
-        // the player's original hotbar slot.
-        client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
-        replantAttempts++;
-        replantWait = 1;
-        stopMovement();
-        return false;
-    }
-
-    private static int findReplantSlot(class_310 client, Kind kind) {
-        if (kind == null || kind.seedId == null) return -1;
-        var inv = client.field_1724.method_31548();
-        for (int i = 0; i < 36; i++) {
-            class_1799 stack = inv.method_5438(i);
-            if (!stack.method_7960() && kind.seedId.equals(itemId(stack))) return i;
+    private static int findHotbarItem(class_310 client, String wantedId) {
+        if (wantedId == null) return -1;
+        for (int slot = 0; slot < 9; slot++) {
+            class_1799 stack = client.field_1724.field_7514.method_5438(slot);
+            if (!stack.method_7960() && wantedId.equals(itemId(stack))) return slot;
         }
         return -1;
     }
 
-    private static int ensureHotbar(class_310 client, int slot) {
-        var inv = client.field_1724.method_31548();
-        if (slot >= 0 && slot < 9) return slot;
-
-        int hotbar = findEmptyHotbar(client);
-        if (hotbar < 0) hotbar = 8;
-        int sourceScreen = slot < 9 ? 36 + slot : slot;
-        client.field_1761.method_2906(client.field_1724.field_7512.field_7763,
-                sourceScreen, hotbar, class_1713.field_7791, client.field_1724);
-        return hotbar;
-    }
-
-    private static int findEmptyHotbar(class_310 client) {
-        var inv = client.field_1724.method_31548();
-        for (int i = 0; i < 9; i++) if (inv.method_5438(i).method_7960()) return i;
-        return -1;
-    }
-
-    private static void restoreHotbar() {
-        if (MC.field_1724 == null) return;
-        if (previousHotbar >= 0 && previousHotbar < 9) {
-            MC.field_1724.method_31548().method_61496(previousHotbar);
+    private static void restoreHotbar(class_310 client) {
+        if (previousHotbar >= 0 && client.field_1724 != null) {
+            client.field_1724.field_7514.method_61496(previousHotbar);
         }
         previousHotbar = -1;
         workingHotbar = -1;
@@ -485,18 +386,28 @@ public final class AutoSuperFarm {
 
     private static void stopMovement() {
         if (MC.field_1724 == null) return;
-        class_304 forward = MC.field_1690.field_1894;
-        class_304 back = MC.field_1690.field_1881;
-        class_304 left = MC.field_1690.field_1913;
-        class_304 right = MC.field_1690.field_1849;
-        forward.method_23481(false);
-        back.method_23481(false);
-        left.method_23481(false);
-        right.method_23481(false);
+        MC.field_1690.field_1894.method_23481(false);
+        MC.field_1690.field_1881.method_23481(false);
+        MC.field_1690.field_1913.method_23481(false);
+        MC.field_1690.field_1849.method_23481(false);
         class_304.method_1424();
         class_243 v = MC.field_1724.method_18798();
         MC.field_1724.method_18799(new class_243(0.0D, v.field_1351, 0.0D));
         MC.field_1724.method_24830(false);
+    }
+
+    private static int speedToTicks(double speed) {
+        return Math.max(1, (int)Math.round(5.0D / Math.max(MIN_SPEED, Math.min(MAX_SPEED, speed))));
+    }
+
+    private static int extractAge(String text) {
+        int p = text.indexOf("age=");
+        if (p < 0) return -1;
+        p += 4;
+        int end = p;
+        while (end < text.length() && Character.isDigit(text.charAt(end))) end++;
+        try { return Integer.parseInt(text.substring(p, end)); }
+        catch (RuntimeException ignored) { return -1; }
     }
 
     private static String blockId(class_2680 state) {
@@ -507,46 +418,116 @@ public final class AutoSuperFarm {
         return class_7923.field_41178.method_10221(stack.method_7909()).toString().toLowerCase(Locale.ROOT);
     }
 
-    public static int getHarvestSpeed() { return harvestPerTick; }
-    public static void setHarvestSpeed(int value) {
-        harvestPerTick = clamp(value, MIN_HARVEST_PER_TICK, MAX_HARVEST_PER_TICK);
-        PeoClient.CFG.autoSuperFarmHarvestSpeed = harvestPerTick;
-        PeoClient.CFG.save();
+    private static boolean isHarvestEnabled(String key) {
+        return boolSetting(PeoClient.CFG.autoSuperFarmHarvest, key, true);
     }
-    public static int getRadius() { return radius; }
-    public static void setRadius(int value) {
-        radius = clamp(value, MIN_RADIUS, MAX_RADIUS);
-        PeoClient.CFG.autoSuperFarmRadius = radius;
-        PeoClient.CFG.save();
+
+    private static boolean isReplantEnabled(String key) {
+        return boolSetting(PeoClient.CFG.autoSuperFarmReplant, key, false);
     }
-    public static boolean isWheatEnabled() { return harvestWheat; }
-    public static boolean isBeetrootEnabled() { return harvestBeetroot; }
-    public static boolean isPumpkinEnabled() { return harvestPumpkin; }
-    public static boolean isMelonEnabled() { return harvestMelon; }
-    public static boolean isCarrotEnabled() { return harvestCarrot; }
-    public static boolean isPotatoEnabled() { return harvestPotato; }
-    public static void setCropEnabled(String crop, boolean value) {
-        switch (crop) {
-            case "wheat" -> harvestWheat = value;
-            case "beetroot" -> harvestBeetroot = value;
-            case "pumpkin" -> harvestPumpkin = value;
-            case "melon" -> harvestMelon = value;
-            case "carrot" -> harvestCarrot = value;
-            case "potato" -> harvestPotato = value;
-            default -> { return; }
-        }
-        switch (crop) {
-            case "wheat" -> PeoClient.CFG.autoSuperFarmWheat = value;
-            case "beetroot" -> PeoClient.CFG.autoSuperFarmBeetroot = value;
-            case "pumpkin" -> PeoClient.CFG.autoSuperFarmPumpkin = value;
-            case "melon" -> PeoClient.CFG.autoSuperFarmMelon = value;
-            case "carrot" -> PeoClient.CFG.autoSuperFarmCarrot = value;
-            case "potato" -> PeoClient.CFG.autoSuperFarmPotato = value;
-        }
+
+    private static boolean boolSetting(Map<String, Boolean> map, String key, boolean fallback) {
+        if (map == null || !map.containsKey(key)) return fallback;
+        return Boolean.TRUE.equals(map.get(key));
+    }
+
+    public static List<String> getCropKeys() {
+        List<String> out = new ArrayList<>();
+        for (CropSpec spec : CROPS) out.add(spec.key);
+        return out;
+    }
+
+    public static String displayName(String key) {
+        return switch (key) {
+            case "wheat" -> "Wheat";
+            case "beetroot" -> "Beetroot";
+            case "carrot" -> "Carrots";
+            case "potato" -> "Potatoes";
+            case "nether-wart" -> "Nether Wart";
+            case "pumpkin" -> "Pumpkins";
+            case "melon" -> "Melons";
+            case "sugar-cane" -> "Sugar Cane";
+            case "bamboo" -> "Bamboo";
+            case "cactus" -> "Cactus";
+            case "kelp" -> "Kelp";
+            case "sweet-berries" -> "Sweet Berries";
+            case "cocoa" -> "Cocoa";
+            default -> key;
+        };
+    }
+
+    public static boolean isHarvestEnabledFor(String key) { return isHarvestEnabled(key); }
+    public static boolean isReplantEnabledFor(String key) { return isReplantEnabled(key); }
+
+    public static void setHarvestEnabled(String key, boolean value) {
+        PeoClient.CFG.autoSuperFarmHarvest.put(key, value);
         PeoClient.CFG.save();
     }
 
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
+    public static void setReplantEnabled(String key, boolean value) {
+        PeoClient.CFG.autoSuperFarmReplant.put(key, value);
+        PeoClient.CFG.save();
     }
+
+    public static boolean isCheckLineOfSight() { return checkLineOfSight; }
+    public static void setCheckLineOfSight(boolean value) { checkLineOfSight = value; PeoClient.CFG.autoSuperFarmCheckLineOfSight = value; PeoClient.CFG.save(); }
+    public static boolean isFaceTarget() { return faceTarget; }
+    public static void setFaceTarget(boolean value) { faceTarget = value; PeoClient.CFG.autoSuperFarmFaceTarget = value; PeoClient.CFG.save(); }
+    public static boolean isSwingHand() { return swingHand; }
+    public static void setSwingHand(boolean value) { swingHand = value; PeoClient.CFG.autoSuperFarmSwingHand = value; PeoClient.CFG.save(); }
+    public static boolean isAutoWalk() { return autoWalk; }
+    public static void setAutoWalk(boolean value) { autoWalk = value; PeoClient.CFG.autoSuperFarmAutoWalk = value; PeoClient.CFG.save(); }
+    public static boolean isPickupSeeds() { return pickupSeeds; }
+    public static void setPickupSeeds(boolean value) { pickupSeeds = value; PeoClient.CFG.autoSuperFarmPickupSeeds = value; PeoClient.CFG.save(); }
+
+    public static double getRange() { return range; }
+    public static void setRange(double value) { range = clamp(value, MIN_RANGE, MAX_RANGE); PeoClient.CFG.autoSuperFarmRange = range; PeoClient.CFG.save(); }
+    public static double getHarvestSpeed() { return harvestSpeed; }
+    public static void setHarvestSpeed(double value) { harvestSpeed = clamp(value, MIN_SPEED, MAX_SPEED); PeoClient.CFG.autoSuperFarmHarvestSpeedX = harvestSpeed; PeoClient.CFG.save(); }
+    public static double getReplantSpeed() { return replantSpeed; }
+    public static void setReplantSpeed(double value) { replantSpeed = clamp(value, MIN_SPEED, MAX_SPEED); PeoClient.CFG.autoSuperFarmReplantSpeedX = replantSpeed; PeoClient.CFG.save(); }
+
+    // Backward-compatible accessors used by older PoeScreen builds.
+    public static int getRadius() { return (int)Math.round(range); }
+    public static void setRadius(int value) { setRange(value); }
+    public static int getHarvestSpeedInt() { return (int)Math.round(harvestSpeed); }
+    public static boolean isWheatEnabled() { return isHarvestEnabled("wheat"); }
+    public static boolean isBeetrootEnabled() { return isHarvestEnabled("beetroot"); }
+    public static boolean isPumpkinEnabled() { return isHarvestEnabled("pumpkin"); }
+    public static boolean isMelonEnabled() { return isHarvestEnabled("melon"); }
+    public static boolean isCarrotEnabled() { return isHarvestEnabled("carrot"); }
+    public static boolean isPotatoEnabled() { return isHarvestEnabled("potato"); }
+    public static void setCropEnabled(String crop, boolean value) { setHarvestEnabled(crop, value); }
+
+    private static void loadSettings() {
+        enabled = PeoClient.CFG.autoSuperFarm;
+        range = clamp(PeoClient.CFG.autoSuperFarmRange, MIN_RANGE, MAX_RANGE);
+        harvestSpeed = clamp(PeoClient.CFG.autoSuperFarmHarvestSpeedX, MIN_SPEED, MAX_SPEED);
+        replantSpeed = clamp(PeoClient.CFG.autoSuperFarmReplantSpeedX, MIN_SPEED, MAX_SPEED);
+        checkLineOfSight = PeoClient.CFG.autoSuperFarmCheckLineOfSight;
+        faceTarget = PeoClient.CFG.autoSuperFarmFaceTarget;
+        swingHand = PeoClient.CFG.autoSuperFarmSwingHand;
+        autoWalk = PeoClient.CFG.autoSuperFarmAutoWalk;
+        pickupSeeds = PeoClient.CFG.autoSuperFarmPickupSeeds;
+        if (PeoClient.CFG.autoSuperFarmHarvest == null) PeoClient.CFG.autoSuperFarmHarvest = new java.util.LinkedHashMap<>();
+        if (PeoClient.CFG.autoSuperFarmReplant == null) PeoClient.CFG.autoSuperFarmReplant = new java.util.LinkedHashMap<>();
+        for (CropSpec spec : CROPS) {
+            PeoClient.CFG.autoSuperFarmHarvest.putIfAbsent(spec.key, spec.defaultHarvest);
+            PeoClient.CFG.autoSuperFarmReplant.putIfAbsent(spec.key, spec.defaultReplant);
+        }
+        initialized = true;
+    }
+
+    private static void resetState() {
+        stopMovement();
+        target = null;
+        pendingReplant = null;
+        actionWait = 0;
+        replantWait = 0;
+        replantRetries = 0;
+        scanWait = 0;
+        restoreHotbar(MC);
+    }
+
+    private static double clamp(double v, double min, double max) { return Math.max(min, Math.min(max, v)); }
 }

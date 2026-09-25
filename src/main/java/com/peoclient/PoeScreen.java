@@ -424,7 +424,7 @@ public final class PoeScreen extends class_437 {
             case "AntiVipProMax" -> "Nuker compatibility/settings module; keeps existing Nuker logic unchanged.";
             case "UpLevelVipProMax" -> "Scans your inventory for valuable blocks, submits them to Island Level, then closes the level screen.";
             case "AutoCraftMaxSpeed" -> "Opens /craft, crafts mineral blocks, drops configured low-value blocks, then submits rare blocks through the server combine GUI.";
-            case "AutoSuperFarm" -> "AI farm assistant: harvests selected mature village crops on the player's current Y-level, replants field crops, and leaves melon/pumpkin stems untouched.";
+            case "AutoSuperFarm" -> "Wurst-inspired AutoFarm: walks to mature crops, harvests and replants selected plants, and can prioritize nearby wheat seeds.";
             case "PeoJoin" -> "Automatic local recovery after disconnect; reconnects and sends /home.";
             default -> "";
         };
@@ -486,19 +486,41 @@ public final class PoeScreen extends class_437 {
     }
 
     private int drawAutoSuperFarm(class_332 d, int x, int y, int w) {
-        y = section(d, x, y, "Farm AI");
-        y = sliderRow(d, x, y, w, "Harvest speed", AutoSuperFarm.getHarvestSpeed(), 1, 8, "%.0f actions/tick");
-        y = sliderRow(d, x, y, w, "Range", AutoSuperFarm.getRadius(), 4, 32, "%.0f blocks");
-        y = rowValue(d, x, y, w, "Scan plane", "Same Y level as player only");
-        y = rowToggle(d, x, y, w, "Wheat", AutoSuperFarm.isWheatEnabled());
-        y = rowToggle(d, x, y, w, "Beetroot", AutoSuperFarm.isBeetrootEnabled());
-        y = rowToggle(d, x, y, w, "Pumpkin", AutoSuperFarm.isPumpkinEnabled());
-        y = rowToggle(d, x, y, w, "Melon", AutoSuperFarm.isMelonEnabled());
-        y = rowToggle(d, x, y, w, "Carrot", AutoSuperFarm.isCarrotEnabled());
-        y = rowToggle(d, x, y, w, "Potato", AutoSuperFarm.isPotatoEnabled());
-        y = rowValue(d, x, y, w, "Replant", "Wheat / Beetroot / Carrot / Potato");
-        y = rowValue(d, x, y, w, "Fruit blocks", "Harvest melon/pumpkin blocks only; stems untouched");
+        y = section(d, x, y, "AutoFarm");
+        y = sliderRow(d, x, y, w, "Range", AutoSuperFarm.getRange(), 0.1, 64.0, "%.1f blocks");
+        y = sliderRow(d, x, y, w, "Harvest speed", AutoSuperFarm.getHarvestSpeed(), 0.1, 20.0, "%.1fx");
+        y = sliderRow(d, x, y, w, "Replant speed", AutoSuperFarm.getReplantSpeed(), 0.1, 20.0, "%.1fx");
+        y = rowToggle(d, x, y, w, "Check line of sight", AutoSuperFarm.isCheckLineOfSight());
+        y = rowToggle(d, x, y, w, "Face target", AutoSuperFarm.isFaceTarget());
+        y = rowToggle(d, x, y, w, "Swing hand", AutoSuperFarm.isSwingHand());
+        y = rowToggle(d, x, y, w, "Auto walk / AI", AutoSuperFarm.isAutoWalk());
+        y = rowToggle(d, x, y, w, "Pickup wheat seeds", AutoSuperFarm.isPickupSeeds());
+        y = section(d, x, y, "Render");
+        y = rowToggle(d, x, y, w, "Draw replanting spots", PeoClient.CFG.autoSuperFarmDrawReplantSpots);
+        y = rowToggle(d, x, y, w, "Draw blocks to harvest", PeoClient.CFG.autoSuperFarmDrawHarvestBlocks);
+        y = rowToggle(d, x, y, w, "Draw blocks to replant", PeoClient.CFG.autoSuperFarmDrawReplantBlocks);
+        y = section(d, x, y, "Plant types");
+        y = rowValue(d, x, y, w, "Columns", "Harvest / Replant");
+        for (String crop : AutoSuperFarm.getCropKeys()) {
+            y = dualToggleRow(d, x, y, w, AutoSuperFarm.displayName(crop),
+                    AutoSuperFarm.isHarvestEnabledFor(crop), AutoSuperFarm.isReplantEnabledFor(crop));
+        }
         return y;
+    }
+
+    private int dualToggleRow(class_332 d, int x, int y, int w, String label, boolean harvest, boolean replant) {
+        d.method_25294(x, y, x + w, y + 28, 0xB7152029);
+        d.method_49601(x, y, w, 28, 0xFF294354);
+        drawText(d, label, x + 10, y + 9, 0xFFFFFFFF, false);
+        int bx = x + w - 126;
+        drawText(d, "Harvest", bx - 45, y + 9, 0xFFD9E0E5, false);
+        d.method_25294(bx, y + 7, bx + 30, y + 21, harvest ? 0xFFFFFFFF : 0xFF697782);
+        drawText(d, harvest ? "ON" : "OFF", bx + 4, y + 9, harvest ? 0xFF0A1014 : 0xFFFFFFFF, true);
+        int rx = x + w - 60;
+        drawText(d, "Replant", rx - 48, y + 9, 0xFFD9E0E5, false);
+        d.method_25294(rx, y + 7, rx + 30, y + 21, replant ? 0xFFFFFFFF : 0xFF697782);
+        drawText(d, replant ? "ON" : "OFF", rx + 4, y + 9, replant ? 0xFF0A1014 : 0xFFFFFFFF, true);
+        return y + 34;
     }
 
     private int drawPeoJoin(class_332 d, int x, int y, int w) {
@@ -654,30 +676,48 @@ public final class PoeScreen extends class_437 {
                     }
                 }
                 case "AutoSuperFarm" -> {
-                    int speedY = contentY + 26;
-                    int rangeY = speedY + 34;
-                    int cropY = rangeY + 34 + 34;
-                    if (hit(mouseY, speedY)) {
-                        AutoSuperFarm.setHarvestSpeed((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 1, 8, "Harvest speed")));
-                        draggingSlider = "AutoSuperFarmSpeed";
-                    } else if (hit(mouseY, rangeY)) {
-                        AutoSuperFarm.setRadius((int)Math.round(sliderValue(mouseX, settingsX, settingsW, 4, 32, "Range")));
+                    int row = contentY + 26;
+                    if (hit(mouseY, row)) {
+                        AutoSuperFarm.setRange(sliderValue(mouseX, settingsX, settingsW, 0.1, 64.0, "Range"));
                         draggingSlider = "AutoSuperFarmRange";
+                    } else if (hit(mouseY, row + 34)) {
+                        AutoSuperFarm.setHarvestSpeed(sliderValue(mouseX, settingsX, settingsW, 0.1, 20.0, "Harvest speed"));
+                        draggingSlider = "AutoSuperFarmHarvestSpeed";
+                    } else if (hit(mouseY, row + 68)) {
+                        AutoSuperFarm.setReplantSpeed(sliderValue(mouseX, settingsX, settingsW, 0.1, 20.0, "Replant speed"));
+                        draggingSlider = "AutoSuperFarmReplantSpeed";
                     } else {
-                        String[] crops = {"wheat", "beetroot", "pumpkin", "melon", "carrot", "potato"};
-                        for (int i = 0; i < crops.length; i++) {
-                            int row = cropY + i * 34;
-                            if (hit(mouseY, row)) {
-                                boolean value = switch (crops[i]) {
-                                    case "wheat" -> AutoSuperFarm.isWheatEnabled();
-                                    case "beetroot" -> AutoSuperFarm.isBeetrootEnabled();
-                                    case "pumpkin" -> AutoSuperFarm.isPumpkinEnabled();
-                                    case "melon" -> AutoSuperFarm.isMelonEnabled();
-                                    case "carrot" -> AutoSuperFarm.isCarrotEnabled();
-                                    default -> AutoSuperFarm.isPotatoEnabled();
-                                };
-                                AutoSuperFarm.setCropEnabled(crops[i], !value);
-                                break;
+                        int toggleY = row + 102;
+                        if (hit(mouseY, toggleY)) AutoSuperFarm.setCheckLineOfSight(!AutoSuperFarm.isCheckLineOfSight());
+                        else if (hit(mouseY, toggleY + 34)) AutoSuperFarm.setFaceTarget(!AutoSuperFarm.isFaceTarget());
+                        else if (hit(mouseY, toggleY + 68)) AutoSuperFarm.setSwingHand(!AutoSuperFarm.isSwingHand());
+                        else if (hit(mouseY, toggleY + 102)) AutoSuperFarm.setAutoWalk(!AutoSuperFarm.isAutoWalk());
+                        else if (hit(mouseY, toggleY + 136)) AutoSuperFarm.setPickupSeeds(!AutoSuperFarm.isPickupSeeds());
+                        else {
+                            int renderY = toggleY + 170 + 26;
+                            if (hit(mouseY, renderY)) {
+                                PeoClient.CFG.autoSuperFarmDrawReplantSpots = !PeoClient.CFG.autoSuperFarmDrawReplantSpots;
+                            } else if (hit(mouseY, renderY + 34)) {
+                                PeoClient.CFG.autoSuperFarmDrawHarvestBlocks = !PeoClient.CFG.autoSuperFarmDrawHarvestBlocks;
+                            } else if (hit(mouseY, renderY + 68)) {
+                                PeoClient.CFG.autoSuperFarmDrawReplantBlocks = !PeoClient.CFG.autoSuperFarmDrawReplantBlocks;
+                            } else {
+                                int cropY = renderY + 102 + 26 + 34;
+                                List<String> crops = AutoSuperFarm.getCropKeys();
+                                for (int i = 0; i < crops.size(); i++) {
+                                    int cy = cropY + i * 34;
+                                    if (!hit(mouseY, cy)) continue;
+                                    int harvestX = settingsX + settingsW - 126;
+                                    int replantX = settingsX + settingsW - 60;
+                                    if (mouseX >= harvestX && mouseX <= harvestX + 30) {
+                                        String crop = crops.get(i);
+                                        AutoSuperFarm.setHarvestEnabled(crop, !AutoSuperFarm.isHarvestEnabledFor(crop));
+                                    } else if (mouseX >= replantX && mouseX <= replantX + 30) {
+                                        String crop = crops.get(i);
+                                        AutoSuperFarm.setReplantEnabled(crop, !AutoSuperFarm.isReplantEnabledFor(crop));
+                                    }
+                                    break;
+                                }
                             }
                         }
                     }
@@ -992,10 +1032,12 @@ public final class PoeScreen extends class_437 {
             } else if ("AutoCraftThreshold".equals(draggingSlider)) {
                 AutoCraftMaxSpeed.setThreshold((int)Math.round(
                         sliderValue(mouseX, sx, sw, 1, 36, "Rare threshold")));
-            } else if ("AutoSuperFarmSpeed".equals(draggingSlider)) {
-                AutoSuperFarm.setHarvestSpeed((int)Math.round(sliderValue(mouseX, sx, sw, 1, 8, "Harvest speed")));
             } else if ("AutoSuperFarmRange".equals(draggingSlider)) {
-                AutoSuperFarm.setRadius((int)Math.round(sliderValue(mouseX, sx, sw, 4, 32, "Range")));
+                AutoSuperFarm.setRange(sliderValue(mouseX, sx, sw, 0.1, 64.0, "Range"));
+            } else if ("AutoSuperFarmHarvestSpeed".equals(draggingSlider)) {
+                AutoSuperFarm.setHarvestSpeed(sliderValue(mouseX, sx, sw, 0.1, 20.0, "Harvest speed"));
+            } else if ("AutoSuperFarmReplantSpeed".equals(draggingSlider)) {
+                AutoSuperFarm.setReplantSpeed(sliderValue(mouseX, sx, sw, 0.1, 20.0, "Replant speed"));
             } else if ("UpLevelThreshold".equals(draggingSlider)) {
                 UpLevelVipProMax.setValueBlockThreshold((int)Math.round(
                         sliderValue(mouseX, sx, sw, 10, 36, "Stack threshold")));
@@ -1069,7 +1111,7 @@ public final class PoeScreen extends class_437 {
             case "AntiVipProMax" -> 300;
             case "UpLevelVipProMax" -> 300;
             case "AutoCraftMaxSpeed" -> 360;
-            case "AutoSuperFarm" -> 620;
+            case "AutoSuperFarm" -> 1180;
             default -> 120;
         };
     }
