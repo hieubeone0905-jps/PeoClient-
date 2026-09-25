@@ -199,7 +199,9 @@ public final class AutoSuperFarm {
         class_2338 center = new class_2338(playerX, playerY, playerZ);
         Target best = null;
         int r = radius;
-        int farmY = playerY;
+        // The player stands on the farmland block; the crop itself is one block above.
+        // Example from the farm layout: player block Y=3, wheat block Y=4.
+        int farmY = playerY + 1;
         for (int x = -r; x <= r; x++) {
             for (int z = -r; z <= r; z++) {
                 if (x * x + z * z > r * r) continue;
@@ -332,8 +334,11 @@ public final class AutoSuperFarm {
         if (previousHotbar < 0) previousHotbar = client.field_1724.method_31548().field_7545;
         workingHotbar = hotbar;
         client.field_1724.method_31548().method_61496(hotbar);
-        faceSmooth(client, replantPos);
 
+        // Plant through the normal vanilla interaction manager. Do NOT rotate the
+        // camera here: the player should keep a stable view while replanting.
+        // A normal use-on-block interaction is issued once per ready farmland
+        // state, just like a real player placing a seed. There is no packet spam.
         class_3965 hit = new class_3965(
                 class_243.method_24953(farmland).method_1031(0.5D, 1.0D, 0.5D),
                 class_2350.field_11036,
@@ -341,12 +346,27 @@ public final class AutoSuperFarm {
                 false);
         client.field_1761.method_2896(client.field_1724, class_1268.field_5808, hit);
 
-        // One normal interaction packet is enough to plant the seed. Restore the
-        // player's original hotbar selection immediately after issuing it so the
-        // module does not leave the seed selected.
-        restoreHotbar();
-        replantPos = null;
-        replantWait = 0;
+        // Keep the replant state for one short verification tick. This prevents
+        // the next harvest from starting before the server has accepted the
+        // planting interaction, while still making replant effectively immediate.
+        class_2680 planted = client.field_1687.method_8320(replantPos);
+        if (classify(planted) == replantKind) {
+            restoreHotbar();
+            replantPos = null;
+            replantKind = null;
+            replantWait = 0;
+            return true;
+        }
+
+        // If the client has not received the planted state yet, leave the seed
+        // selected and retry on the next tick. This is still normal interaction,
+        // not accelerated packet injection.
+        if (++replantWait >= REPLANT_TIMEOUT) {
+            restoreHotbar();
+            replantPos = null;
+            replantKind = null;
+            replantWait = 0;
+        }
         return true;
     }
 
