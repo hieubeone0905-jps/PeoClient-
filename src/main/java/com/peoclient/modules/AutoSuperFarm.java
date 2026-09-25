@@ -152,7 +152,7 @@ public final class AutoSuperFarm {
         double distance = client.field_1724.method_33571().method_1022(class_243.method_24953(target.pos));
         face(client, target.pos);
 
-        if (distance > 3.8D) {
+        if (distance > 3.8D * 3.8D) {
             steerTo(client, target.pos);
             return;
         }
@@ -183,7 +183,7 @@ public final class AutoSuperFarm {
     }
 
     private static Target findNearestTarget(class_310 client) {
-        class_2338 center = class_2338.method_49638(client.field_1724.method_33571());
+        class_2338 center = class_2338.method_49638(client.field_1724.method_19538());
         Target best = null;
         int r = radius;
         int farmY = center.method_10264();

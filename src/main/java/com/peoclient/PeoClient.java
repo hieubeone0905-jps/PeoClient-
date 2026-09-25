@@ -833,6 +833,7 @@ public final class PeoClient implements ClientModInitializer {
             if (AntiVipProMaxModule.isEnabled()) y = active(d, mc, "AntiVipProMax", y);
             if (UpLevelVipProMax.isEnabled()) y = active(d, mc, "UpLevelVipProMax", y);
             if (AutoCraftMaxSpeed.isEnabled()) y = active(d, mc, "AutoCraftMaxSpeed", y);
+            if (AutoSuperFarm.isEnabled()) y = active(d, mc, "AutoSuperFarm", y);
             if (PeoJoinModule.isEnabled()) y = active(d, mc, "PeoJoin", y);
         }
 
